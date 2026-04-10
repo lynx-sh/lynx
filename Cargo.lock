@@ -310,7 +310,7 @@ dependencies = [
  "lynx-core",
  "serde",
  "thiserror",
- "toml",
+ "tokio",
 ]
 
 [[package]]
