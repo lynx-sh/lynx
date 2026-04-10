@@ -1,0 +1,18 @@
+[meta]
+name = "minimal"
+description = "Monochrome minimal theme for agent and minimal contexts"
+author = "proxikal"
+
+[segments.left]
+order = ["dir"]
+
+[segments.right]
+order = ["context_badge"]
+
+[segment.dir]
+max_depth = 0
+truncate_to_repo = false
+
+[segment.context_badge]
+show_in = ["agent", "minimal"]
+label = { agent = "AI", minimal = "MIN" }
