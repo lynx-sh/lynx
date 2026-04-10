@@ -5,8 +5,9 @@ edition.workspace = true
 authors.workspace = true
 
 [dependencies]
-lynx-core = { path = "../lynx-core" }
+lynx-core     = { path = "../lynx-core" }
+lynx-manifest = { path = "../lynx-manifest" }
+lynx-events   = { path = "../lynx-events" }
+lynx-shell    = { path = "../lynx-shell" }
 serde.workspace = true
-toml.workspace = true
-anyhow.workspace = true
 thiserror.workspace = true

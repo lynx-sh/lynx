@@ -262,10 +262,12 @@ dependencies = [
  "lynx-config",
  "lynx-core",
  "lynx-events",
+ "lynx-manifest",
  "lynx-plugin",
  "lynx-shell",
  "lynx-task",
  "lynx-theme",
+ "serde_json",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -321,11 +323,12 @@ dependencies = [
 name = "lynx-loader"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "lynx-core",
+ "lynx-events",
+ "lynx-manifest",
+ "lynx-shell",
  "serde",
  "thiserror",
- "toml",
 ]
 
 [[package]]
@@ -343,11 +346,13 @@ dependencies = [
 name = "lynx-plugin"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "lynx-core",
+ "lynx-events",
+ "lynx-manifest",
+ "lynx-shell",
  "serde",
+ "tempfile",
  "thiserror",
- "toml",
 ]
 
 [[package]]
