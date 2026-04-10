@@ -7,7 +7,7 @@ Fast, Rust-powered shell framework. Context-aware, plugin-isolated, theme-driven
 - [Architecture](architecture.md) — crate map, shell integration, data flow
 - [Plugin Authoring](plugin-authoring.md) — build your own plugin
 - [Theme Authoring](theme-authoring.md) — build your own theme
-- [Decisions](decisions/) — Architecture Decision Records
+- Decisions tracked in `pt decisions` (run `pt decisions arch`, `pt decisions plugins`, `pt decisions config`)
 
 ## Quick links
 
