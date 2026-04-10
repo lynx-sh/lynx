@@ -1,0 +1,40 @@
+[meta]
+name = "default"
+description = "Clean, minimal default theme"
+author = "proxikal"
+
+[segments.left]
+order = ["dir", "git_branch", "git_status"]
+
+[segments.right]
+order = ["cmd_duration", "context_badge"]
+
+[segment.dir]
+max_depth = 3
+truncate_to_repo = true
+color = { fg = "blue", bold = true }
+
+[segment.git_branch]
+icon = " "
+color = { fg = "yellow" }
+
+[segment.git_status]
+staged   = { icon = "+", color = "green" }
+modified = { icon = "!", color = "red" }
+untracked = { icon = "?", color = "grey" }
+
+[segment.cmd_duration]
+min_ms = 500
+color = { fg = "grey" }
+
+[segment.context_badge]
+show_in = ["agent"]
+label = { agent = "AI", minimal = "MIN" }
+color = { fg = "magenta", bold = true }
+
+[colors]
+accent  = "#7aa2f7"
+success = "#9ece6a"
+warning = "#e0af68"
+error   = "#f7768e"
+muted   = "#565f89"

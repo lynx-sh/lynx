@@ -1,0 +1,6 @@
+# Default context for normal shell use.
+
+[load]
+aliases = true
+plugins = ["core", "git", "fzf"]
+prompt  = "default"

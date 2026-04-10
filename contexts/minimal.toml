@@ -1,0 +1,6 @@
+# For scripts, SSH sessions, and CI.
+
+[load]
+aliases = false
+plugins = ["core"]
+prompt  = "minimal"

@@ -1,0 +1,10 @@
+[package]
+name = "lynx-core"
+description = "Core types, traits, error types, and brand constants"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[dependencies]
+thiserror.workspace = true
+serde.workspace = true

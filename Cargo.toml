@@ -1,0 +1,44 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/lynx-core",
+    "crates/lynx-config",
+    "crates/lynx-manifest",
+    "crates/lynx-events",
+    "crates/lynx-template",
+    "crates/lynx-shell",
+    "crates/lynx-loader",
+    "crates/lynx-prompt",
+    "crates/lynx-theme",
+    "crates/lynx-plugin",
+    "crates/lynx-task",
+    "crates/lynx-registry",
+    "crates/lynx-daemon",
+    "crates/lynx-cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["proxikal"]
+license = "MIT"
+repository = "https://github.com/proxikal/lynx"
+
+[workspace.dependencies]
+# Serialization
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+
+# CLI
+clap = { version = "4", features = ["derive", "color"] }
+
+# Async
+tokio = { version = "1", features = ["full"] }
+
+# Error handling
+anyhow = "1"
+thiserror = "1"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = "0.3"

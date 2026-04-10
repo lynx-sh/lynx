@@ -1,0 +1,23 @@
+[package]
+name = "lynx-cli"
+description = "lx — the Lynx shell framework CLI"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "lx"
+path = "src/main.rs"
+
+[dependencies]
+lynx-core    = { path = "../lynx-core" }
+lynx-config  = { path = "../lynx-config" }
+lynx-plugin  = { path = "../lynx-plugin" }
+lynx-theme   = { path = "../lynx-theme" }
+lynx-task    = { path = "../lynx-task" }
+lynx-shell   = { path = "../lynx-shell" }
+clap.workspace = true
+anyhow.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true

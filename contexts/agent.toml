@@ -1,0 +1,10 @@
+# Loaded automatically when CLAUDE_CODE or CURSOR_SESSION is set.
+# Minimal footprint — no aliases, no heavy plugins.
+
+[load]
+aliases = false
+plugins = ["core"]
+prompt  = "minimal"
+
+[detect]
+env_vars = ["CLAUDE_CODE", "CURSOR_SESSION"]

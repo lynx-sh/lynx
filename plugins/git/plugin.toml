@@ -1,0 +1,20 @@
+[plugin]
+name        = "git"
+version     = "0.1.0"
+description = "Git integration — prompt info, branch tools, useful aliases"
+authors     = ["proxikal"]
+
+[load]
+lazy  = false
+hooks = ["chpwd"]
+
+[deps]
+binaries = ["git"]
+plugins  = []
+
+[exports]
+functions = ["git_branch", "git_dirty", "git_stash_count"]
+aliases   = ["gst", "gco", "gcm", "glog", "gd", "ga", "gp", "gl"]
+
+[contexts]
+disabled_in = ["agent", "minimal"]
