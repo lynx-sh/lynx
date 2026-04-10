@@ -1,0 +1,110 @@
+use lynx_core::types::Context;
+
+/// Parameters required to generate the shell init script.
+pub struct InitParams<'a> {
+    pub context: &'a Context,
+    pub lynx_dir: &'a str,
+    pub plugin_dir: &'a str,
+    pub enabled_plugins: &'a [String],
+}
+
+/// Generate the zsh init script that the shell evals on startup.
+///
+/// Output is deterministic and side-effect-free. All logic is in Rust;
+/// the zsh side does nothing but eval this string (D-001).
+pub fn generate_init_script(params: &InitParams<'_>) -> String {
+    let context_str = match params.context {
+        Context::Interactive => "interactive",
+        Context::Agent => "agent",
+        Context::Minimal => "minimal",
+    };
+
+    let mut out = String::new();
+
+    // Guard: skip if already initialized (idempotency)
+    out.push_str("if [[ -z \"${LYNX_INITIALIZED}\" ]]; then\n");
+
+    // Core env vars
+    out.push_str(&format!(
+        "  export LYNX_DIR={dir}\n  export LYNX_CONTEXT={ctx}\n  export LYNX_PLUGIN_DIR={pdir}\n",
+        dir = shell_quote(params.lynx_dir),
+        ctx = context_str,
+        pdir = shell_quote(params.plugin_dir),
+    ));
+
+    // Source hook bridge (registered once per session)
+    out.push_str(&format!(
+        "  source {dir}/shell/core/hooks.zsh 2>/dev/null\n",
+        dir = shell_quote(params.lynx_dir),
+    ));
+
+    // Eval-bridge calls for each enabled plugin
+    for plugin in params.enabled_plugins {
+        // In agent/minimal contexts, plugin aliases are suppressed by the plugin itself
+        // via disabled_in — we still call the bridge so functions load.
+        out.push_str(&format!(
+            "  lynx_eval_plugin {}\n",
+            shell_quote(plugin)
+        ));
+    }
+
+    out.push_str("  export LYNX_INITIALIZED=1\n");
+    out.push_str("fi\n");
+
+    out
+}
+
+/// Minimal shell quoting: wraps value in single-quotes, escaping internal single-quotes.
+fn shell_quote(s: &str) -> String {
+    format!("'{}'", s.replace('\'', "'\\''"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn base_params<'a>(ctx: &'a Context, plugins: &'a [String]) -> InitParams<'a> {
+        InitParams {
+            context: ctx,
+            lynx_dir: "/home/user/.local/share/lynx",
+            plugin_dir: "/home/user/.local/share/lynx/plugins",
+            enabled_plugins: plugins,
+        }
+    }
+
+    #[test]
+    fn output_contains_required_exports() {
+        let plugins = vec!["git".to_string()];
+        let script = generate_init_script(&base_params(&Context::Interactive, &plugins));
+        assert!(script.contains("LYNX_DIR="));
+        assert!(script.contains("LYNX_CONTEXT=interactive"));
+        assert!(script.contains("LYNX_PLUGIN_DIR="));
+    }
+
+    #[test]
+    fn agent_context_sets_correct_value() {
+        let script = generate_init_script(&base_params(&Context::Agent, &[]));
+        assert!(script.contains("LYNX_CONTEXT=agent"));
+    }
+
+    #[test]
+    fn enabled_plugins_emit_eval_bridge_calls() {
+        let plugins = vec!["git".to_string(), "fzf".to_string()];
+        let script = generate_init_script(&base_params(&Context::Interactive, &plugins));
+        assert!(script.contains("lynx_eval_plugin 'git'"));
+        assert!(script.contains("lynx_eval_plugin 'fzf'"));
+    }
+
+    #[test]
+    fn idempotency_guard_present() {
+        let script = generate_init_script(&base_params(&Context::Interactive, &[]));
+        assert!(script.contains("LYNX_INITIALIZED"));
+    }
+
+    #[test]
+    fn no_plugins_produces_valid_structure() {
+        let script = generate_init_script(&base_params(&Context::Minimal, &[]));
+        assert!(script.contains("LYNX_CONTEXT=minimal"));
+        assert!(!script.contains("lynx_eval_plugin"));
+    }
+}

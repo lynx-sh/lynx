@@ -1,3 +1,4 @@
+pub mod init;
 pub mod plugin;
 pub mod theme;
 pub mod task;
@@ -8,7 +9,7 @@ use crate::cli::{Cli, Command};
 
 pub async fn dispatch(cli: Cli) -> Result<()> {
     match cli.command {
-        Command::Init          => init().await,
+        Command::Init(args)    => init::run(args).await,
         Command::Plugin(args)  => plugin::run(args).await,
         Command::Theme(args)   => theme::run(args).await,
         Command::Task(args)    => task::run(args).await,
@@ -20,8 +21,7 @@ pub async fn dispatch(cli: Cli) -> Result<()> {
     }
 }
 
-async fn init()              -> Result<()> { println!("init"); Ok(()) }
 async fn context(name: String) -> Result<()> { println!("context: {name}"); Ok(()) }
-async fn doctor()            -> Result<()> { println!("doctor"); Ok(()) }
-async fn benchmark()         -> Result<()> { println!("benchmark"); Ok(()) }
-async fn rollback()          -> Result<()> { println!("rollback"); Ok(()) }
+async fn doctor()              -> Result<()> { println!("doctor"); Ok(()) }
+async fn benchmark()           -> Result<()> { println!("benchmark"); Ok(()) }
+async fn rollback()            -> Result<()> { println!("rollback"); Ok(()) }

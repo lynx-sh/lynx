@@ -15,7 +15,7 @@ pub struct Cli {
 #[derive(Subcommand)]
 pub enum Command {
     /// Initialize Lynx in a new shell session
-    Init,
+    Init(crate::commands::init::InitArgs),
     /// Manage plugins
     Plugin(crate::commands::plugin::PluginArgs),
     /// Manage themes
