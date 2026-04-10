@@ -1,3 +1,4 @@
+pub mod event;
 pub mod init;
 pub mod plugin;
 pub mod theme;
@@ -10,6 +11,7 @@ use crate::cli::{Cli, Command};
 pub async fn dispatch(cli: Cli) -> Result<()> {
     match cli.command {
         Command::Init(args)    => init::run(args).await,
+        Command::Event(args)   => event::run(args).await,
         Command::Plugin(args)  => plugin::run(args).await,
         Command::Theme(args)   => theme::run(args).await,
         Command::Task(args)    => task::run(args).await,

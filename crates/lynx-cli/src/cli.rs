@@ -16,6 +16,8 @@ pub struct Cli {
 pub enum Command {
     /// Initialize Lynx in a new shell session
     Init(crate::commands::init::InitArgs),
+    /// Emit or subscribe to events
+    Event(crate::commands::event::EventArgs),
     /// Manage plugins
     Plugin(crate::commands::plugin::PluginArgs),
     /// Manage themes

@@ -261,6 +261,7 @@ dependencies = [
  "clap",
  "lynx-config",
  "lynx-core",
+ "lynx-events",
  "lynx-plugin",
  "lynx-shell",
  "lynx-task",
@@ -287,6 +288,7 @@ name = "lynx-core"
 version = "0.1.0"
 dependencies = [
  "serde",
+ "tempfile",
  "thiserror",
  "toml",
 ]
@@ -309,6 +311,8 @@ dependencies = [
  "anyhow",
  "lynx-core",
  "serde",
+ "serde_json",
+ "tempfile",
  "thiserror",
  "tokio",
 ]
