@@ -9,7 +9,7 @@ environment. Shell frameworks typically cause problems for agents: aliases
 shadow commands the agent expects to run directly, colorized output breaks
 parsing, and prompt rendering adds latency and noise.
 
-The naive fix is to tell users to add `if [[ -n "$CLAUDE_CODE" ]]; then ...`
+The naive fix is to tell users to add `if [[ -n "$CLAUDECODE" ]]; then ...`
 in their `.zshrc`. This is brittle — users forget, the check must be maintained
 per-agent, and it requires user action.
 
@@ -20,12 +20,18 @@ environment variables:
 
 | Env var | Set by |
 |---|---|
-| `CLAUDE_CODE=1` | Claude Code CLI |
-| `CURSOR_SESSION=<session-id>` | Cursor |
+| `CLAUDECODE=1` | Claude Code CLI |
+| `CURSOR_CLI=<value>` | Cursor integrated terminal |
 | `CI=true` | CI systems (triggers minimal — non-interactive, not agent) |
-| `LYNX_CONTEXT=minimal` | Users who want minimal mode manually |
+| `LYNX_CONTEXT=<interactive\|agent\|minimal>` | Explicit override (highest precedence) |
 
-When any of these is set, Lynx sets `LYNX_CONTEXT=agent` (or `minimal`).
+Detection precedence is:
+1. `LYNX_CONTEXT` explicit override
+2. `CLAUDECODE` or `CURSOR_CLI` -> `agent`
+3. `CI=true` -> `minimal`
+4. fallback -> `interactive`
+
+When auto-detection applies, Lynx sets `LYNX_CONTEXT` accordingly.
 Plugins with `disabled_in = ["agent"]` are skipped. Aliases are never loaded.
 
 **No user action required.** Installing Lynx is sufficient — agent context

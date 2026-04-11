@@ -165,7 +165,7 @@ Lynx operates in one of three contexts, detected automatically at init time.
 | Context | Detected when | Effect |
 |---|---|---|
 | `interactive` | Default — normal terminal session | All plugins and aliases load |
-| `agent` | `CLAUDE_CODE=1` or `CURSOR_SESSION=<id>` | Aliases skipped; minimal prompt |
+| `agent` | `CLAUDECODE=1` or `CURSOR_CLI=<value>` | Aliases skipped; minimal prompt |
 | `minimal` | `CI=true` | Only essential plugins load |
 
 Detection is automatic by default. `LYNX_CONTEXT` may be set explicitly to
@@ -183,7 +183,7 @@ across 5 architectural drift classes and must pass before every PR merge.
 | Class | What drifts | Where enforced |
 |---|---|---|
 | Shell protocol | Static shell files grow > line limit or gain branching logic | `test_init.bats` |
-| Context mismatch | `CLAUDE_CODE`/`CURSOR_SESSION`/`CI` constants removed from detector | `test_context.bats` |
+| Context mismatch | `CLAUDECODE`/`CURSOR_CLI`/`CI` constants removed from detector | `test_context.bats` |
 | Dep map drift | Forbidden crate dep pairs introduced (circular or upward) | `test_doctor.bats` |
 | Checksum enforcement | `validate_index` removed from `fetch_plugin` pipeline | `test_doctor.bats` |
 | Docs-command mismatch | CLI subcommands added without README docs | `test_doctor.bats` |

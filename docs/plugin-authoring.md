@@ -263,8 +263,8 @@ Contexts tell Lynx what environment the shell is running in:
 | Context | When active |
 |---|---|
 | `interactive` | Normal terminal session |
-| `agent` | AI coding agent (Claude Code, Cursor, CI) |
-| `minimal` | Minimal mode (`LYNX_MINIMAL=1`) |
+| `agent` | `CLAUDECODE=1` or `CURSOR_CLI=<value>` |
+| `minimal` | `CI=true` |
 
 Your plugin's `[contexts].disabled_in` controls which contexts skip loading.
 **Aliases must always list `"agent"` and `"minimal"`** — aliases in agent context

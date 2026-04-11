@@ -4,7 +4,7 @@ use lynx_core::types::Context;
 pub const CONTEXT_OVERRIDE_ENV: &str = "LYNX_CONTEXT";
 
 /// Canonical env vars that indicate agent context.
-pub const AGENT_ENV_VARS: &[&str] = &["CLAUDE_CODE", "CURSOR_SESSION"];
+pub const AGENT_ENV_VARS: &[&str] = &["CLAUDECODE", "CURSOR_CLI"];
 
 /// Canonical env vars that indicate minimal context.
 pub const MINIMAL_ENV_VARS: &[&str] = &["CI"];
@@ -147,7 +147,7 @@ mod tests {
     #[test]
     fn claude_code_set_returns_agent() {
         let _g1 = EnvGuard::unset(&["LYNX_CONTEXT"]);
-        let _g2 = EnvGuard::set(&[("CLAUDE_CODE", "1")]);
+        let _g2 = EnvGuard::set(&[("CLAUDECODE", "1")]);
         assert_eq!(detect_context(), Context::Agent);
     }
 
@@ -155,7 +155,7 @@ mod tests {
     fn detect_for_init_ignores_inherited_lynx_context() {
         // Simulate a child shell inheriting LYNX_CONTEXT=interactive from a parent
         // while Claude Code env var is also present.
-        let _g1 = EnvGuard::set(&[("LYNX_CONTEXT", "interactive"), ("CLAUDE_CODE", "1")]);
+        let _g1 = EnvGuard::set(&[("LYNX_CONTEXT", "interactive"), ("CLAUDECODE", "1")]);
         // detect_context() would return Interactive (override wins)
         assert_eq!(detect_context(), Context::Interactive);
         // detect_context_for_init() must return Agent (ignores inherited LYNX_CONTEXT)
@@ -164,14 +164,14 @@ mod tests {
 
     #[test]
     fn detect_for_init_falls_back_to_interactive_when_no_agent_env() {
-        let _g = EnvGuard::unset(&["LYNX_CONTEXT", "CLAUDE_CODE", "CURSOR_SESSION", "CI"]);
+        let _g = EnvGuard::unset(&["LYNX_CONTEXT", "CLAUDECODE", "CURSOR_CLI", "CI"]);
         assert_eq!(detect_context_for_init(), Context::Interactive);
     }
 
     #[test]
     fn cursor_session_set_returns_agent() {
         let _g1 = EnvGuard::unset(&["LYNX_CONTEXT"]);
-        let _g2 = EnvGuard::set(&[("CURSOR_SESSION", "abc")]);
+        let _g2 = EnvGuard::set(&[("CURSOR_CLI", "abc")]);
         assert_eq!(detect_context(), Context::Agent);
     }
 
@@ -195,23 +195,23 @@ mod tests {
 
     #[test]
     fn ci_with_no_tty_returns_minimal() {
-        let _g1 = EnvGuard::unset(&["LYNX_CONTEXT", "CLAUDE_CODE", "CURSOR_SESSION"]);
+        let _g1 = EnvGuard::unset(&["LYNX_CONTEXT", "CLAUDECODE", "CURSOR_CLI"]);
         let _g2 = EnvGuard::set(&[("CI", "true")]);
         assert_eq!(detect_context(), Context::Minimal);
     }
 
     #[test]
     fn unknown_override_falls_back_to_auto_detect() {
-        let _g1 = EnvGuard::set(&[("LYNX_CONTEXT", "unknown"), ("CLAUDE_CODE", "1")]);
+        let _g1 = EnvGuard::set(&[("LYNX_CONTEXT", "unknown"), ("CLAUDECODE", "1")]);
         assert_eq!(detect_context(), Context::Agent);
     }
 
     #[test]
     fn outcome_reports_detecting_env_var() {
-        let _g1 = EnvGuard::unset(&["LYNX_CONTEXT", "CLAUDE_CODE", "CURSOR_SESSION", "CI"]);
-        let _g2 = EnvGuard::set(&[("CURSOR_SESSION", "session-123")]);
+        let _g1 = EnvGuard::unset(&["LYNX_CONTEXT", "CLAUDECODE", "CURSOR_CLI", "CI"]);
+        let _g2 = EnvGuard::set(&[("CURSOR_CLI", "session-123")]);
         let out = detect_context_outcome();
         assert_eq!(out.context, Context::Agent);
-        assert_eq!(out.method, DetectionMethod::AgentEnv("CURSOR_SESSION"));
+        assert_eq!(out.method, DetectionMethod::AgentEnv("CURSOR_CLI"));
     }
 }
