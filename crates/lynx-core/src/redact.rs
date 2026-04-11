@@ -18,6 +18,12 @@ pub fn redact(s: &str) -> String {
         + if s.ends_with('\n') { "\n" } else { "" }
 }
 
+/// Returns true if the env key name looks like it holds a secret.
+/// Used at profile parse time to warn before storing secrets in profiles.
+pub fn looks_like_secret_value(key: &str, _value: &str) -> bool {
+    is_secret_key(key)
+}
+
 fn is_secret_key(key: &str) -> bool {
     let upper = key.trim().to_uppercase();
     const SUFFIXES: &[&str] = &[

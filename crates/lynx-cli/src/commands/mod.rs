@@ -8,6 +8,7 @@ pub mod examples;
 pub mod init;
 pub mod migrate;
 pub mod plugin;
+pub mod profile;
 pub mod rollback;
 pub mod sync;
 pub mod task;
@@ -36,5 +37,6 @@ pub async fn dispatch(cli: Cli) -> Result<()> {
         Command::Update(args)    => update::run(args).await,
         Command::Uninstall(args) => uninstall::run(args).await,
         Command::Examples(args)  => examples::run(args).await,
+        Command::Profile(args)   => profile::run(args).await,
     }
 }

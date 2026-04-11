@@ -90,4 +90,5 @@ pub const KNOWN_SEGMENTS: &[&str] = &[
     "cmd_duration",
     "context_badge",
     "kubectl_context",
+    "profile_badge",
 ];

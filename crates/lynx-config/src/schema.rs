@@ -16,6 +16,9 @@ pub struct LynxConfig {
     pub enabled_plugins: Vec<String>,
     #[serde(default)]
     pub sync: SyncConfig,
+    /// Currently active profile name (None = no profile active).
+    #[serde(default)]
+    pub active_profile: Option<String>,
 }
 
 fn default_schema_version() -> u32 {

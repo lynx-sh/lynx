@@ -1,0 +1,17 @@
+# Lynx work profile
+# Extends default — inherits git and fzf, adds work-specific tools.
+
+name    = "work"
+extends = "default"
+theme   = "nord"
+plugins = ["kubectl", "atuin"]
+
+# context_override = "interactive"
+
+[env]
+KUBECONFIG  = "~/.kube/work-config"
+# DOCKER_HOST = "ssh://build-server"  # example — never store tokens here
+
+[aliases]
+# Aliases are only loaded in interactive context (context filter applies).
+# k = "kubectl"

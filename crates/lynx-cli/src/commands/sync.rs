@@ -93,7 +93,8 @@ fn cmd_push() -> Result<()> {
 
     // Stage all tracked files (respecting .gitignore).
     git(&dir, &["add", "-u"])?;
-    git(&dir, &["add", "*.toml", ".gitignore"])?;
+    // Explicitly include profiles/ so new profile files are synced.
+    git(&dir, &["add", "*.toml", "profiles/", ".gitignore"])?;
 
     // Commit only if there are staged changes.
     let status = git_output(&dir, &["status", "--porcelain"])?;

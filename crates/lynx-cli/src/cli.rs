@@ -46,4 +46,6 @@ pub enum Command {
     Uninstall(crate::commands::uninstall::UninstallArgs),
     /// Show real-world usage examples and quickstart guide
     Examples(crate::commands::examples::ExamplesArgs),
+    /// Manage shell profiles
+    Profile(crate::commands::profile::ProfileArgs),
 }
