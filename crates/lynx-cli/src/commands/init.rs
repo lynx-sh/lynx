@@ -83,6 +83,12 @@ pub async fn run(args: InitArgs) -> Result<()> {
         }
     }
 
+    // Export HOSTNAME so child processes (lx prompt render) can read it.
+    // On macOS, HOSTNAME is a zsh special parameter that is NOT exported to
+    // the environment by default — std::env::var("HOSTNAME") would fail in lx.
+    // Using ${HOSTNAME:-$(hostname -s)} respects any existing exported value.
+    print!("export HOSTNAME=\"${{HOSTNAME:-$(hostname -s)}}\"\n");
+
     print!("{}", script);
     Ok(())
 }
