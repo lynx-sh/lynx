@@ -5,11 +5,11 @@ author      = "proxikal"
 
 # ── Layout ─────────────────────────────────────────────────────────────────────
 #
-# Line 1 (top):   ┌─[user@host] - [~/full/path] - [YYYY-MM-DD HH:MM:SS] [branch+✱]
-# Line 2 (input): └─[✘ N]
+# Line 1 (top):   ┌─[user@host] - [~/full/path] - [YYYY-MM-DD HH:MM:SS]    [branch+✱]
+# Line 2 (input): └─[✗]
 #
-# Exit code brackets only appear on non-zero exit.
 # Git section only appears inside a git repo.
+# Bottom [✗] is always shown.
 
 [segments.top]
 order = [
@@ -22,6 +22,10 @@ order = [
   "custom_mid2",
   "time",
   "custom_top_close",
+]
+
+[segments.top_right]
+order = [
   "custom_git_open",
   "git_branch",
   "git_status",
@@ -32,7 +36,7 @@ order = [
 order = [
   "custom_bot_prefix",
   "custom_bot_open",
-  "exit_code",
+  "custom_bot_x",
   "custom_bot_close",
 ]
 
@@ -89,39 +93,34 @@ color    = { fg = "blue", bold = true }
 template = "└─"
 color    = { fg = "blue", bold = true }
 
-# [ and ] only appear when last exit was non-zero (cleaner than showing [0] always).
 [segment.custom_bot_open]
-template  = "["
-show_when = { exit_code_nonzero = true }
-color     = { fg = "blue", bold = true }
+template = "["
+color    = { fg = "blue", bold = true }
 
-[segment.exit_code]
-color = { fg = "magenta", bold = true }
+[segment.custom_bot_x]
+template = "✗"
+color    = { fg = "yellow", bold = true }
 
 [segment.custom_bot_close]
-template  = "]"
-show_when = { exit_code_nonzero = true }
-color     = { fg = "blue", bold = true }
+template = "]"
+color    = { fg = "blue", bold = true }
 
-# Git section — only inside a git repo.
+# Git section — rendered in top_right slot, only appears when inside a git repo.
 [segment.custom_git_open]
-template  = " ["
+template  = "["
 show_when = { in_git_repo = true }
 color     = { fg = "blue", bold = true }
 
 [segment.git_branch]
 icon   = ""
 format = "$branch"
-color  = { fg = "blue", bold = true }
+color  = { fg = "yellow", bold = true }
 
 [segment.git_status]
 staged    = { icon = "+" }
 modified  = { icon = "✱" }
 untracked = { icon = "✈" }
-
-# git_status uses cache_key "git_state" for renderer color lookup.
-[segment.git_state]
-color = { fg = "yellow" }
+color     = { fg = "yellow" }
 
 [segment.custom_git_close]
 template  = "]"

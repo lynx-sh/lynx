@@ -99,8 +99,9 @@ async fn cmd_render(transient: bool) -> Result<()> {
         return Ok(());
     }
 
-    let (left, right, top, continuation) = evaluate_theme(&segments, theme_ref, &ctx).await;
-    let output = render_prompt(&left, &right, &top, &continuation, theme_ref);
+    let columns = ctx.env.get("COLUMNS").and_then(|v| v.parse::<u32>().ok());
+    let (left, right, top, top_right, continuation) = evaluate_theme(&segments, theme_ref, &ctx).await;
+    let output = render_prompt(&left, &right, &top, &top_right, &continuation, theme_ref, columns);
     print!("{}", output);
     Ok(())
 }
@@ -177,6 +178,7 @@ fn build_render_context_from_env() -> RenderContext {
         env_vars::LYNX_LAST_EXIT_CODE,
         env_vars::LYNX_BG_JOBS,
         env_vars::LYNX_VI_MODE,
+        "COLUMNS",
     ];
     let env: HashMap<String, String> = env_keys
         .iter()
