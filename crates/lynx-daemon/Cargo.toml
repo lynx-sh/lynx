@@ -14,6 +14,10 @@ path = "src/lib.rs"
 
 [dependencies]
 lynx-core = { path = "../lynx-core" }
+lynx-config = { path = "../lynx-config" }
+lynx-manifest = { path = "../lynx-manifest" }
+lynx-depgraph = { path = "../lynx-depgraph" }
+lynx-plugin = { path = "../lynx-plugin" }
 lynx-events = { path = "../lynx-events" }
 lynx-task = { path = "../lynx-task" }
 serde.workspace = true

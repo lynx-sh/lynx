@@ -933,8 +933,12 @@ name = "lynx-daemon"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "lynx-config",
  "lynx-core",
+ "lynx-depgraph",
  "lynx-events",
+ "lynx-manifest",
+ "lynx-plugin",
  "lynx-task",
  "serde",
  "serde_json",

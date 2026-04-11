@@ -2,6 +2,7 @@ use anyhow::Result;
 use lynx_core::runtime;
 use lynx_events::{bridge::IpcMessage, logger, types::Event, EventBus};
 use lynx_task::{load_tasks, run_scheduler};
+use lynx_plugin::{lifecycle, registry::PluginState};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -94,6 +95,11 @@ async fn main() -> Result<()> {
     info!("IPC socket open at {}", socket_path.display());
 
     let dispatch_state = DispatchState::new();
+
+    // Wire plugin lifecycle: DECLARE → RESOLVE → ACTIVATE.
+    // This registers EventBus subscriptions for all plugins that declare hooks.
+    // Shell-side execution (lx init / lx plugin exec) is a separate pathway.
+    activate_plugins(&dispatch_state.bus);
 
     // Spawn IPC accept loop.
     tokio::spawn(async move {
@@ -219,6 +225,53 @@ fn tasks_toml_path() -> PathBuf {
 
 fn log_dir_path() -> PathBuf {
     lynx_core::paths::logs_dir()
+}
+
+/// Run the plugin lifecycle (DECLARE → RESOLVE → ACTIVATE) at daemon startup.
+///
+/// Registers EventBus subscriptions for every plugin that declares hooks in
+/// its manifest. Failures are logged but never fatal — the daemon continues.
+fn activate_plugins(bus: &Arc<EventBus>) {
+    let config = match lynx_config::load() {
+        Ok(c) => c,
+        Err(e) => {
+            warn!("plugin lifecycle skipped — could not load config: {e}");
+            return;
+        }
+    };
+
+    let plugins_dir = lynx_core::paths::installed_plugins_dir();
+    let mut registry = lifecycle::declare(&plugins_dir);
+
+    let manifests: Vec<lynx_manifest::schema::PluginManifest> =
+        registry.all().map(|e| e.manifest.clone()).collect();
+
+    let load_order = match lynx_depgraph::depgraph::resolve(&manifests) {
+        Ok(order) => order,
+        Err(e) => {
+            warn!("plugin dep graph resolution failed: {e}");
+            return;
+        }
+    };
+
+    lifecycle::apply_resolve(
+        &mut registry,
+        &config.active_context,
+        &load_order.eager,
+        &load_order.lazy,
+        &load_order.excluded,
+    );
+
+    let mut activated = 0usize;
+    for entry in registry.all() {
+        if matches!(entry.state, PluginState::Resolved) {
+            match lifecycle::activate(&entry.manifest.plugin.name, &entry.manifest, Arc::clone(bus)) {
+                Ok(()) => activated += 1,
+                Err(e) => warn!(plugin = %entry.manifest.plugin.name, "activate failed: {e}"),
+            }
+        }
+    }
+    info!("plugin lifecycle complete — {} plugin(s) activated", activated);
 }
 
 fn load_tasks_safe(path: &Path) -> Vec<lynx_task::ValidatedTask> {
