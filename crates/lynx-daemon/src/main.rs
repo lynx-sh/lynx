@@ -218,6 +218,28 @@ fn tasks_toml_path() -> PathBuf {
     PathBuf::from(home).join(".config/lynx/tasks.toml")
 }
 
+fn log_dir_path() -> PathBuf {
+    let home = std::env::var("HOME").unwrap_or_default();
+    PathBuf::from(home).join(".config/lynx/logs")
+}
+
+fn load_tasks_safe(path: &Path) -> Vec<lynx_task::ValidatedTask> {
+    if !path.exists() {
+        info!("tasks.toml not found — no tasks scheduled");
+        return Vec::new();
+    }
+    match load_tasks(path) {
+        Ok(tasks) => {
+            info!("loaded {} task(s) from {}", tasks.len(), path.display());
+            tasks
+        }
+        Err(e) => {
+            error!("failed to load tasks: {e}");
+            Vec::new()
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -318,27 +340,5 @@ mod tests {
             .any(|e| e.source == "daemon:subscriber:_precmd_hook"));
 
         std::env::remove_var("HOME");
-    }
-}
-
-fn log_dir_path() -> PathBuf {
-    let home = std::env::var("HOME").unwrap_or_default();
-    PathBuf::from(home).join(".config/lynx/logs")
-}
-
-fn load_tasks_safe(path: &Path) -> Vec<lynx_task::ValidatedTask> {
-    if !path.exists() {
-        info!("tasks.toml not found — no tasks scheduled");
-        return Vec::new();
-    }
-    match load_tasks(path) {
-        Ok(tasks) => {
-            info!("loaded {} task(s) from {}", tasks.len(), path.display());
-            tasks
-        }
-        Err(e) => {
-            error!("failed to load tasks: {e}");
-            Vec::new()
-        }
     }
 }

@@ -18,7 +18,9 @@ pub async fn evaluate(
         segments.iter().map(|s| (s.name(), s.as_ref())).collect();
 
     // Spawn all segments concurrently via tokio tasks.
-    let futures: Vec<std::pin::Pin<Box<dyn std::future::Future<Output = Option<RenderedSegment>> + Send>>> = order
+    let futures: Vec<
+        std::pin::Pin<Box<dyn std::future::Future<Output = Option<RenderedSegment>> + Send>>,
+    > = order
         .iter()
         .map(|name| {
             let seg = seg_map.get(name.as_str()).copied();
@@ -30,24 +32,34 @@ pub async fn evaluate(
                 } else {
                     None
                 }
-            }) as std::pin::Pin<Box<dyn std::future::Future<Output = Option<RenderedSegment>> + Send>>
+            })
+                as std::pin::Pin<
+                    Box<dyn std::future::Future<Output = Option<RenderedSegment>> + Send>,
+                >
         })
         .collect();
 
-    join_all(futures)
-        .await
-        .into_iter()
-        .flatten()
-        .collect()
+    join_all(futures).await.into_iter().flatten().collect()
+}
+
+/// Evaluate both left and right orders from a theme, return (left_segments, right_segments).
+pub async fn evaluate_theme(
+    segments: &[Box<dyn Segment>],
+    theme: &Theme,
+    ctx: &RenderContext,
+) -> (Vec<RenderedSegment>, Vec<RenderedSegment>) {
+    let left = evaluate(segments, &theme.segments.left.order, &theme.segment, ctx);
+    let right = evaluate(segments, &theme.segments.right.order, &theme.segment, ctx);
+    tokio::join!(left, right)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashMap;
-    use std::time::{Duration, Instant};
     use lynx_core::types::Context;
     use lynx_theme::schema::SegmentConfig;
+    use std::collections::HashMap;
+    use std::time::{Duration, Instant};
 
     use crate::segment::{RenderContext, RenderedSegment, Segment};
 
@@ -82,8 +94,14 @@ mod tests {
         // Two segments each sleeping 100ms. If sequential, total ≥ 200ms.
         // If concurrent, total ≈ 100ms (the slowest).
         let segments: Vec<Box<dyn Segment>> = vec![
-            Box::new(SlowSegment { name: "a", delay_ms: 100 }),
-            Box::new(SlowSegment { name: "b", delay_ms: 100 }),
+            Box::new(SlowSegment {
+                name: "a",
+                delay_ms: 100,
+            }),
+            Box::new(SlowSegment {
+                name: "b",
+                delay_ms: 100,
+            }),
         ];
         let order = vec!["a".to_string(), "b".to_string()];
         let start = Instant::now();
@@ -92,8 +110,10 @@ mod tests {
 
         assert_eq!(results.len(), 2);
         // With real parallelism this would be ~100ms; allow generous 350ms for CI.
-        assert!(elapsed < Duration::from_millis(350),
-            "segments should run concurrently, got {elapsed:?}");
+        assert!(
+            elapsed < Duration::from_millis(350),
+            "segments should run concurrently, got {elapsed:?}"
+        );
     }
 
     #[tokio::test]
@@ -108,23 +128,18 @@ mod tests {
     #[tokio::test]
     async fn order_preserved() {
         let segments: Vec<Box<dyn Segment>> = vec![
-            Box::new(SlowSegment { name: "slow", delay_ms: 80 }),
-            Box::new(SlowSegment { name: "fast", delay_ms: 10 }),
+            Box::new(SlowSegment {
+                name: "slow",
+                delay_ms: 80,
+            }),
+            Box::new(SlowSegment {
+                name: "fast",
+                delay_ms: 10,
+            }),
         ];
         let order = vec!["slow".to_string(), "fast".to_string()];
         let results = evaluate(&segments, &order, &HashMap::new(), &ctx()).await;
         assert_eq!(results[0].text, "slow");
         assert_eq!(results[1].text, "fast");
     }
-}
-
-/// Evaluate both left and right orders from a theme, return (left_segments, right_segments).
-pub async fn evaluate_theme(
-    segments: &[Box<dyn Segment>],
-    theme: &Theme,
-    ctx: &RenderContext,
-) -> (Vec<RenderedSegment>, Vec<RenderedSegment>) {
-    let left = evaluate(segments, &theme.segments.left.order, &theme.segment, ctx);
-    let right = evaluate(segments, &theme.segments.right.order, &theme.segment, ctx);
-    tokio::join!(left, right)
 }

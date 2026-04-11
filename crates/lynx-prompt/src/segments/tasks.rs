@@ -166,7 +166,7 @@ mod tests {
         std::env::set_var("HOME", tmp.path());
         let result = compute_task_summary();
         // Restore HOME — best effort in test.
-        let _ = std::env::remove_var("HOME");
+        std::env::remove_var("HOME");
         assert!(result.is_none());
     }
 
@@ -182,7 +182,7 @@ mod tests {
 
         std::env::set_var("HOME", tmp.path());
         let result = compute_task_summary();
-        let _ = std::env::remove_var("HOME");
+        std::env::remove_var("HOME");
 
         let summary = result.unwrap();
         assert!(summary.contains("2"), "expected count 2, got: {summary}");

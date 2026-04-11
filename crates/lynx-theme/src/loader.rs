@@ -9,14 +9,19 @@ use crate::schema::{Theme, KNOWN_SEGMENTS};
 /// but remain editable in the `themes/` source directory.
 macro_rules! builtin {
     ($name:literal) => {
-        ($name, include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../themes/", $name, ".toml")))
+        (
+            $name,
+            include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../themes/",
+                $name,
+                ".toml"
+            )),
+        )
     };
 }
 
-const BUILTIN_THEMES: &[(&str, &str)] = &[
-    builtin!("default"),
-    builtin!("minimal"),
-];
+const BUILTIN_THEMES: &[(&str, &str)] = &[builtin!("default"), builtin!("minimal")];
 
 /// Resolve the user theme directory: `~/.config/lynx/themes/`.
 pub fn user_theme_dir() -> PathBuf {
@@ -88,10 +93,7 @@ pub fn builtin_content(name: &str) -> Option<&'static str> {
 
 /// List all available theme names (built-in + user).
 pub fn list() -> Vec<String> {
-    let mut names: Vec<String> = BUILTIN_THEMES
-        .iter()
-        .map(|(n, _)| n.to_string())
-        .collect();
+    let mut names: Vec<String> = BUILTIN_THEMES.iter().map(|(n, _)| n.to_string()).collect();
 
     let user_dir = user_theme_dir();
     if let Ok(entries) = std::fs::read_dir(&user_dir) {
@@ -137,7 +139,11 @@ order = []
 "#;
         // Should succeed — unknown segment produces a warning, not an error.
         let theme = parse_and_validate(toml, "test").expect("should not error on unknown segment");
-        assert!(theme.segments.left.order.contains(&"unknown_segment_xyz".to_string()));
+        assert!(theme
+            .segments
+            .left
+            .order
+            .contains(&"unknown_segment_xyz".to_string()));
     }
 
     #[test]
@@ -156,7 +162,7 @@ order = []
         // No colors table — defaults to empty HashMap
         assert!(theme.colors.is_empty());
         // dir segment has no config — falls back to SegmentConfig::default()
-        assert!(theme.segment.get("dir").is_none());
+        assert!(!theme.segment.contains_key("dir"));
     }
 
     #[test]

@@ -64,8 +64,7 @@ pub fn write_entry(event: &Event, source: &str) -> std::io::Result<()> {
         source: source.to_string(),
     };
 
-    let mut line = serde_json::to_string(&entry)
-        .map_err(std::io::Error::other)?;
+    let mut line = serde_json::to_string(&entry).map_err(std::io::Error::other)?;
     line.push('\n');
 
     let mut file = std::fs::OpenOptions::new()
@@ -135,11 +134,7 @@ pub fn tail_log(n: usize, filter: Option<&str>) -> std::io::Result<Vec<LogEntry>
     let entries: Vec<LogEntry> = content
         .lines()
         .filter_map(|line| serde_json::from_str::<LogEntry>(line).ok())
-        .filter(|e| {
-            filter
-                .map(|f| e.event_name.starts_with(f))
-                .unwrap_or(true)
-        })
+        .filter(|e| filter.map(|f| e.event_name.starts_with(f)).unwrap_or(true))
         .collect();
 
     let skip = entries.len().saturating_sub(n);
@@ -197,7 +192,7 @@ mod tests {
         std::env::set_var("HOME", tmp.path());
 
         for i in 0..5 {
-            write_entry(&Event::new("shell:precmd", &i.to_string()), "shell").unwrap();
+            write_entry(&Event::new("shell:precmd", i.to_string()), "shell").unwrap();
         }
 
         let entries = tail_log(3, None).unwrap();

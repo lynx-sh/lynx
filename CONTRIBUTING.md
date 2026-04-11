@@ -70,6 +70,7 @@ bats tests/integration/shell/
 cargo nextest run --all                  # must pass
 bats tests/integration/shell/           # must pass
 cargo clippy --all -- -D warnings        # must be clean
+scripts/verify-guardrails.sh            # must pass (38 invariant checks)
 ```
 
 ---
@@ -168,7 +169,7 @@ you want to request a plugin without building it yourself.
 To add a theme to the official themes directory:
 
 1. Create `themes/<name>.toml` following the [Theme Authoring Guide](docs/theme-authoring.md)
-2. Test it: `lx theme switch <name>` then open a new terminal
+2. Test it: `lx theme set <name>` then open a new terminal
 3. Run `lx doctor` — should show no unknown segments
 4. Submit a PR with the theme file
 
