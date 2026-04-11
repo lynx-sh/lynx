@@ -1,9 +1,10 @@
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use lynx_core::error::{LynxError, Result};
 use tracing::warn;
 
-use crate::schema::{Theme, KNOWN_SEGMENTS};
+use crate::schema::{SegmentColor, Theme, KNOWN_SEGMENTS};
 
 /// Built-in themes bundled via `include_str!` so they ship with the binary
 /// but remain editable in the `themes/` source directory.
@@ -57,12 +58,61 @@ pub fn load_from_path(path: &Path) -> Result<Theme> {
 }
 
 /// Parse TOML content into a `Theme`, warning on unknown segments.
+/// Palette variable references (`$varname`) in segment color fields are resolved
+/// against the `[colors]` table before the theme is returned.
 pub fn parse_and_validate(content: &str, name: &str) -> Result<Theme> {
-    let theme: Theme = toml::from_str(content)
+    let mut theme: Theme = toml::from_str(content)
         .map_err(|e| LynxError::Theme(format!("parse error in theme '{name}': {e}")))?;
 
+    resolve_palette(&mut theme);
     validate_segment_names(&theme, name);
     Ok(theme)
+}
+
+/// Resolve `$varname` color strings in all segment configs against the `[colors]`
+/// palette table. Runs once at load time — segments see plain hex/named values.
+///
+/// Rules:
+/// - Only strings starting with `$` are resolved.
+/// - If the palette key is not found the value is left unchanged (may be a valid
+///   named color or hex — the renderer will handle it).
+/// - The `[colors]` table itself is never mutated.
+fn resolve_palette(theme: &mut Theme) {
+    if theme.colors.is_empty() {
+        return;
+    }
+    let palette = theme.colors.clone();
+
+    for config in theme.segment.values_mut() {
+        resolve_segment_color(&mut config.color, &palette);
+        if let Some(ref mut si) = config.staged {
+            resolve_opt_string(&mut si.color, &palette);
+        }
+        if let Some(ref mut si) = config.modified {
+            resolve_opt_string(&mut si.color, &palette);
+        }
+        if let Some(ref mut si) = config.untracked {
+            resolve_opt_string(&mut si.color, &palette);
+        }
+    }
+}
+
+fn resolve_segment_color(color: &mut Option<SegmentColor>, palette: &HashMap<String, String>) {
+    if let Some(ref mut c) = color {
+        resolve_opt_string(&mut c.fg, palette);
+        resolve_opt_string(&mut c.bg, palette);
+    }
+}
+
+/// If `s` starts with `$`, look up the remainder in `palette` and replace.
+fn resolve_opt_string(s: &mut Option<String>, palette: &HashMap<String, String>) {
+    if let Some(ref mut val) = s {
+        if let Some(key) = val.strip_prefix('$') {
+            if let Some(resolved) = palette.get(key) {
+                *val = resolved.clone();
+            }
+        }
+    }
 }
 
 fn validate_segment_names(theme: &Theme, name: &str) {
@@ -180,6 +230,82 @@ order = []
         let names = list();
         assert!(names.contains(&"default".to_string()));
         assert!(names.contains(&"minimal".to_string()));
+    }
+
+    #[test]
+    fn palette_vars_resolved_in_segment_colors() {
+        let toml = r###"
+[meta]
+name = "palette-test"
+
+[colors]
+accent = "#7aa2f7"
+danger = "#f7768e"
+
+[segments.left]
+order = ["dir", "git_branch"]
+
+[segments.right]
+order = []
+
+[segment.dir]
+color = { fg = "$accent" }
+
+[segment.git_branch]
+color = { fg = "$danger", bold = true }
+"###;
+        let theme = parse_and_validate(toml, "palette-test").unwrap();
+        let dir_fg = theme.segment["dir"].color.as_ref().unwrap().fg.as_deref().unwrap();
+        assert_eq!(dir_fg, "#7aa2f7", "palette var '$accent' should resolve to '#7aa2f7'");
+        let git_fg = theme.segment["git_branch"].color.as_ref().unwrap().fg.as_deref().unwrap();
+        assert_eq!(git_fg, "#f7768e", "palette var '$danger' should resolve to '#f7768e'");
+    }
+
+    #[test]
+    fn unknown_palette_var_left_as_is() {
+        let toml = r###"
+[meta]
+name = "unknown-var"
+
+[colors]
+accent = "#7aa2f7"
+
+[segments.left]
+order = ["dir"]
+
+[segments.right]
+order = []
+
+[segment.dir]
+color = { fg = "$nonexistent" }
+"###;
+        let theme = parse_and_validate(toml, "unknown-var").unwrap();
+        // $nonexistent not in [colors] — left unchanged (may be a valid color name)
+        let fg = theme.segment["dir"].color.as_ref().unwrap().fg.as_deref().unwrap();
+        assert_eq!(fg, "$nonexistent");
+    }
+
+    #[test]
+    fn non_var_colors_unchanged() {
+        let toml = r###"
+[meta]
+name = "literal-colors"
+
+[colors]
+accent = "#7aa2f7"
+
+[segments.left]
+order = ["dir"]
+
+[segments.right]
+order = []
+
+[segment.dir]
+color = { fg = "blue" }
+"###;
+        let theme = parse_and_validate(toml, "literal-colors").unwrap();
+        let fg = theme.segment["dir"].color.as_ref().unwrap().fg.as_deref().unwrap();
+        assert_eq!(fg, "blue", "literal color names must not be modified by palette resolver");
     }
 
     #[test]
