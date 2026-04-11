@@ -11,6 +11,7 @@ lynx-events   = { path = "../lynx-events" }
 lynx-shell    = { path = "../lynx-shell" }
 serde.workspace = true
 thiserror.workspace = true
+tracing.workspace = true
 
 [dev-dependencies]
 tempfile = "3"
