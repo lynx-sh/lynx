@@ -37,9 +37,9 @@ pub async fn run(args: ConfigArgs) -> Result<()> {
         ConfigCommand::Get { key } => cmd_get(&key),
         ConfigCommand::Set { key, value } => cmd_set(&key, &value),
         ConfigCommand::Examples => {
-            return crate::commands::examples::run(
+            crate::commands::examples::run(
                 crate::commands::examples::ExamplesArgs { command: Some("config".into()) }
-            ).await;
+            ).await
         }
     }
 }
@@ -53,7 +53,7 @@ fn cmd_show() -> Result<()> {
 
 fn cmd_edit() -> Result<()> {
     let path = config_path();
-    let snapshot_dir = snapshot(&path.parent().unwrap_or(&path), "config-edit")?;
+    let snapshot_dir = snapshot(path.parent().unwrap_or(&path), "config-edit")?;
     let _ = snapshot_dir;
 
     let snapshot_content = std::fs::read_to_string(&path).unwrap_or_default();

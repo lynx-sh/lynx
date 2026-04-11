@@ -36,9 +36,7 @@ pub fn generate_exec_script(manifest: &PluginManifest, plugin_dir: &Path) -> Res
         "  export LYNX_PLUGIN_DIR='{}'\n",
         dir_str.replace('\'', "'\\''")
     ));
-    out.push_str(&format!(
-        "  source \"$LYNX_PLUGIN_DIR/shell/init.zsh\" 2>/dev/null\n"
-    ));
+    out.push_str("  source \"$LYNX_PLUGIN_DIR/shell/init.zsh\" 2>/dev/null\n");
     for hook in &manifest.load.hooks {
         let fn_name = format!(
             "_{}_plugin_{}",

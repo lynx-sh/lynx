@@ -74,13 +74,12 @@ fn load_plugin_manifests(plugin_dir: &str, enabled: &[String]) -> Vec<PluginMani
     let mut manifests = Vec::new();
     for name in enabled {
         let toml_path = format!("{}/{}/plugin.toml", plugin_dir, name);
-        match std::fs::read_to_string(&toml_path) {
-            Ok(content) => match lynx_manifest::parse_and_validate(&content) {
+        if let Ok(content) = std::fs::read_to_string(&toml_path) {
+            match lynx_manifest::parse_and_validate(&content) {
                 Ok(m) => manifests.push(m),
                 Err(e) => eprintln!("lx: skipping plugin '{}': invalid manifest: {}", name, e),
-            },
-            Err(_) => {} // plugin dir missing or no manifest — silently skip
-        }
+            }
+        } // plugin dir missing or no manifest — silently skip
     }
     manifests
 }

@@ -61,7 +61,7 @@ impl EventBus {
                 if let Some(hs) = lock.get(&event.name) {
                     // Find the handler by pointer identity
                     hs.iter()
-                        .find(|h| *h as *const AsyncHandler == ptr)
+                        .find(|h| std::ptr::eq(*h as *const AsyncHandler, ptr))
                         .map(|h| (h)(event.clone()))
                 } else {
                     None

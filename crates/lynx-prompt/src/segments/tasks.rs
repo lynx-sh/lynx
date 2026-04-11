@@ -95,7 +95,7 @@ pub fn compute_task_summary() -> Option<String> {
 fn read_last_log_entry(path: &PathBuf) -> Option<serde_json::Value> {
     let file = std::fs::File::open(path).ok()?;
     let reader = std::io::BufReader::new(file);
-    let last = reader.lines().filter_map(|l| l.ok()).last()?;
+    let last = reader.lines().map_while(Result::ok).last()?;
     serde_json::from_str(&last).ok()
 }
 

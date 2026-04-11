@@ -104,7 +104,7 @@ fn load_previous_benchmark() -> Vec<(String, u64)> {
     content
         .lines()
         .filter_map(|l| serde_json::from_str::<serde_json::Value>(l).ok())
-        .last()
+        .next_back()
         .and_then(|v| v.as_array().cloned())
         .map(|arr| {
             arr.iter()
@@ -119,7 +119,7 @@ fn load_previous_benchmark() -> Vec<(String, u64)> {
 }
 
 fn print_table(results: &[BenchResult], previous: &[(String, u64)]) {
-    println!("{:<24} {:>8}  {}", "Component", "Time (ms)", "vs last");
+    println!("{:<24} {:>8}  vs last", "Component", "Time (ms)");
     println!("{}", "─".repeat(48));
 
     let mut sorted: Vec<&BenchResult> = results.iter().collect();
@@ -129,7 +129,7 @@ fn print_table(results: &[BenchResult], previous: &[(String, u64)]) {
         let prev = previous.iter().find(|(n, _)| n == &r.component).map(|(_, ms)| *ms);
         let delta = match prev {
             None => "  (new)".to_string(),
-            Some(p) if p == 0 => "  —".to_string(),
+            Some(0) => "  —".to_string(),
             Some(p) => {
                 let pct = (r.avg_ms as f64 - p as f64) / p as f64 * 100.0;
                 if pct > 20.0 {

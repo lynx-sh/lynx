@@ -178,7 +178,7 @@ impl ServiceBackend for LaunchdBackend {
         // launchctl list output contains "PID" key if running.
         if text.contains("\"PID\"") || text.lines().any(|l| {
             let parts: Vec<&str> = l.split_whitespace().collect();
-            parts.len() >= 1 && parts[0] != "-" && parts[0].parse::<u32>().is_ok()
+            !parts.is_empty() && parts[0] != "-" && parts[0].parse::<u32>().is_ok()
         }) {
             Ok(ServiceStatus::Running)
         } else {

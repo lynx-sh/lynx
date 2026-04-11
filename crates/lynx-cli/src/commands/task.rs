@@ -4,7 +4,7 @@ use lynx_task::{
     schema::{OnFail, Task, TasksFile}, validate_task,
 };
 use std::io::{BufRead, BufReader};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Args)]
 pub struct TaskArgs {
@@ -106,7 +106,7 @@ fn log_dir() -> PathBuf {
 }
 
 /// Load tasks.toml as a raw string (returns empty string if missing).
-fn read_tasks_file(path: &PathBuf) -> Result<String> {
+fn read_tasks_file(path: &Path) -> Result<String> {
     if !path.exists() {
         return Ok(String::new());
     }
@@ -122,7 +122,7 @@ fn parse_tasks_file(content: &str) -> Result<TasksFile> {
 }
 
 /// Write a `TasksFile` back to disk.
-fn write_tasks_file(path: &PathBuf, file: &TasksFile) -> Result<()> {
+fn write_tasks_file(path: &Path, file: &TasksFile) -> Result<()> {
     let parent = path.parent().unwrap_or(path);
     std::fs::create_dir_all(parent).context("failed to create config directory")?;
 
@@ -238,14 +238,14 @@ async fn cmd_list() -> Result<()> {
 }
 
 /// Read the last entry from a task's JSONL log. Returns ("never", "—") if no log.
-fn read_last_run(log_dir: &PathBuf, task_name: &str) -> (String, String) {
+fn read_last_run(log_dir: &Path, task_name: &str) -> (String, String) {
     let log_path = log_dir.join(format!("{task_name}.jsonl"));
     let Ok(file) = std::fs::File::open(&log_path) else {
         return ("never".into(), "—".into());
     };
 
     let reader = BufReader::new(file);
-    let last = reader.lines().filter_map(|l| l.ok()).last();
+    let last = reader.lines().map_while(Result::ok).last();
 
     let Some(line) = last else {
         return ("never".into(), "—".into());
@@ -301,7 +301,7 @@ async fn cmd_logs(name: String, tail_n: usize, follow: bool) -> Result<()> {
         // Read last N lines.
         let file = std::fs::File::open(&log_path).context("failed to open log")?;
         let reader = BufReader::new(file);
-        let lines: Vec<String> = reader.lines().filter_map(|l| l.ok()).collect();
+        let lines: Vec<String> = reader.lines().map_while(Result::ok).collect();
 
         let start = lines.len().saturating_sub(tail_n);
         for line in &lines[start..] {
