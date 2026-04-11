@@ -12,5 +12,5 @@ pub use segments::{
     GitStatusSegment, GolangVersionSegment, HostnameSegment, KubectlContextSegment, NewlineSegment,
     NodeVersionSegment, ProfileBadgeSegment, PromptCharSegment, RubyVersionSegment,
     RustVersionSegment, SshIndicatorSegment, TaskStatusSegment, TimeSegment, UsernameSegment,
-    VenvSegment, ViModeSegment,
+    VenvSegment, ViModeSegment, CustomSegment,
 };

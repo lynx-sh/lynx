@@ -1,4 +1,5 @@
 pub mod background_jobs;
+pub mod custom;
 pub mod golang_version;
 pub mod node_version;
 pub mod ruby_version;
@@ -25,6 +26,7 @@ pub mod venv;
 pub mod vi_mode;
 
 pub use background_jobs::BackgroundJobsSegment;
+pub use custom::CustomSegment;
 pub use cmd_duration::CmdDurationSegment;
 pub use conda_env::CondaEnvSegment;
 pub use context_badge::ContextBadgeSegment;

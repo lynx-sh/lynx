@@ -46,7 +46,14 @@ pub async fn evaluate(
     > = order
         .iter()
         .map(|name| {
-            let seg = seg_map.get(name.as_str()).copied();
+            // `custom_*` segments route to the single "custom" Segment impl.
+            let seg = seg_map.get(name.as_str()).copied().or_else(|| {
+                if name.starts_with("custom_") {
+                    seg_map.get("custom").copied()
+                } else {
+                    None
+                }
+            });
             let cfg = configs
                 .get(name)
                 .cloned()
@@ -189,5 +196,28 @@ mod tests {
         let results = evaluate(&segments, &order, &HashMap::new(), &ctx()).await;
         assert_eq!(results[0].text, "slow");
         assert_eq!(results[1].text, "fast");
+    }
+
+    #[tokio::test]
+    async fn custom_prefix_routes_to_custom_segment() {
+        use crate::segments::CustomSegment;
+
+        let segments: Vec<Box<dyn Segment>> = vec![Box::new(CustomSegment)];
+        let order = vec!["custom_greeting".to_string()];
+
+        let mut cfg_map = HashMap::new();
+        let mut seg_cfg = toml::map::Map::new();
+        seg_cfg.insert(
+            "template".to_string(),
+            toml::Value::String("hello $cwd".to_string()),
+        );
+        cfg_map.insert("custom_greeting".to_string(), toml::Value::Table(seg_cfg));
+
+        let mut ctx = ctx();
+        ctx.cwd = "/home/test".to_string();
+
+        let results = evaluate(&segments, &order, &cfg_map, &ctx).await;
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].text, "hello /home/test");
     }
 }
