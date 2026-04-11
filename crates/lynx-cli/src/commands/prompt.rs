@@ -221,7 +221,7 @@ mod tests {
         std::env::set_var("HOME", home.path());
         std::env::remove_var("LYNX_DIR");
         std::env::set_var("PWD", "/");
-        let config_dir = home.path().join(".config/lynx");
+        let config_dir = home.path().join(lynx_core::brand::CONFIG_DIR);
         std::fs::create_dir_all(&config_dir).expect("create config dir");
         std::fs::write(
             config_dir.join("config.toml"),

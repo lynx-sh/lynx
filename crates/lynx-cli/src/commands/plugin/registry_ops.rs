@@ -241,7 +241,7 @@ mod tests {
 
         let install_root = home.path().join(".local/share/lynx/plugins/git");
         std::fs::create_dir_all(install_root.join("shell")).expect("create plugin dir");
-        std::fs::write(install_root.join("plugin.toml"), "x").expect("write plugin.toml");
+        std::fs::write(install_root.join(lynx_core::brand::PLUGIN_MANIFEST), "x").expect("write plugin.toml");
         std::fs::write(install_root.join("shell/init.zsh"), "y").expect("write init");
         let checksum = checksum_plugin_dir(&install_root).expect("checksum");
 
@@ -270,7 +270,7 @@ mod tests {
 
         let install_root = home.path().join(".local/share/lynx/plugins/git");
         std::fs::create_dir_all(install_root.join("shell")).expect("create plugin dir");
-        std::fs::write(install_root.join("plugin.toml"), "x").expect("write plugin.toml");
+        std::fs::write(install_root.join(lynx_core::brand::PLUGIN_MANIFEST), "x").expect("write plugin.toml");
         std::fs::write(install_root.join("shell/init.zsh"), "y").expect("write init");
 
         let lock = LockFile {

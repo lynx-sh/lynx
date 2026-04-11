@@ -44,7 +44,7 @@ disabled_in = ["agent", "minimal"]
 "#,
         name = name
     );
-    std::fs::write(dir.join("plugin.toml"), toml)?;
+    std::fs::write(dir.join(lynx_core::brand::PLUGIN_MANIFEST), toml)?;
 
     let init_zsh = format!(
         "# {name} — init.zsh  (keep this file under 10 lines)\n\

@@ -296,7 +296,7 @@ mod tests {
     }
 
     fn write_valid_config(home: &std::path::Path, enabled_plugins: &[&str]) {
-        let cfg_dir = home.join(".config/lynx");
+        let cfg_dir = home.join(lynx_core::brand::CONFIG_DIR);
         std::fs::create_dir_all(&cfg_dir).expect("create config dir");
         let plugins = if enabled_plugins.is_empty() {
             "[]".to_string()
@@ -354,10 +354,10 @@ mod tests {
         std::env::remove_var("LYNX_DIR");
         write_valid_config(home.path(), &["demo"]);
 
-        let plugin_dir = home.path().join(".config/lynx/plugins/demo");
+        let plugin_dir = home.path().join(lynx_core::brand::CONFIG_DIR).join("plugins/demo");
         std::fs::create_dir_all(&plugin_dir).expect("create plugin dir");
         std::fs::write(
-            plugin_dir.join("plugin.toml"),
+            plugin_dir.join(lynx_core::brand::PLUGIN_MANIFEST),
             r#"[plugin]
 name = "demo"
 version = "0.1.0"
