@@ -60,6 +60,7 @@ mod tests {
                 disabled_in: vec!["agent".into(), "minimal".into()],
             },
             state: StateConfig::default(),
+            shell: ShellConfig::default(),
         }
     }
 

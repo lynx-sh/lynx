@@ -17,6 +17,11 @@ plugins/<name>/
     └── aliases.zsh      # aliases ONLY — never mixed with functions
 ```
 
+Optional layout for completions and ZLE:
+```
+    └── completions/     # zsh completion files (_my_command format)
+```
+
 Optional for Rust-backed plugins:
 ```
     ├── Cargo.toml
@@ -46,6 +51,12 @@ aliases   = []                 # ALL aliases — no wildcards
 
 [contexts]
 disabled_in = ["agent", "minimal"]   # REQUIRED if exports.aliases is non-empty
+
+[shell]
+# Optional — all fields default to empty
+fpath       = ["completions"]            # dirs prepended to $fpath (relative to plugin dir)
+widgets     = ["my_widget"]              # zle -N registrations; fn must be in exports.functions
+keybindings = [{ key = "^F", widget = "my_widget" }]
 ```
 
 ## Function Naming Rules
@@ -65,6 +76,40 @@ _my_plugin_state=""
 - Aliases MUST have `disabled_in = ["agent", "minimal"]` in plugin.toml
 - No alias may shadow a common system command without explicit user opt-in
 - All aliases must be listed in exports.aliases
+
+## ZLE Widgets and Keybindings
+
+Plugins that need ZLE widgets declare them in `[shell]` — never hack them into init.zsh:
+
+```toml
+[shell]
+widgets     = ["my_plugin_widget"]
+keybindings = [{ key = "^F", widget = "my_plugin_widget" }]
+```
+
+`lx plugin exec` emits `zle -N` before `bindkey`, in order. Widget functions must be
+defined in `shell/functions.zsh` and listed in `exports.functions`. The plugin dir
+layout for a ZLE plugin looks like:
+
+```
+shell/
+├── init.zsh          # sources functions.zsh only — no ZLE calls here
+└── functions.zsh     # defines my_plugin_widget() { ... }
+```
+
+## fpath and Completions
+
+To provide zsh completions, add a `completions/` directory with `_command`-named files
+and declare it in `[shell]`:
+
+```toml
+[shell]
+fpath = ["completions"]
+```
+
+`lx plugin exec` prepends `"$LYNX_PLUGIN_DIR/completions"` to `$fpath` **before**
+sourcing `init.zsh`, so completions are available for `compinit`. Do NOT call `compinit`
+inside a plugin — it is called once by Lynx during `lx init`.
 
 ## Segment Cache Protocol
 

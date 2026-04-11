@@ -49,6 +49,14 @@ pub fn generate_exec_script(manifest: &PluginManifest, plugin_dir: &Path) -> Res
         "  LYNX_PLUGIN_DIR='{}'\n",
         dir_str.replace('\'', "'\\''")
     ));
+    // fpath prepends — must come before init.zsh so completions are available to compinit
+    for fpath_dir in &manifest.shell.fpath {
+        let escaped = fpath_dir.replace('\'', "'\\''");
+        out.push_str(&format!(
+            "  fpath=(\"$LYNX_PLUGIN_DIR/{}\" $fpath)\n",
+            escaped
+        ));
+    }
     out.push_str("  source \"$LYNX_PLUGIN_DIR/shell/init.zsh\" 2>/dev/null\n");
     for hook in &manifest.load.hooks {
         let fn_name = format!(
@@ -57,6 +65,18 @@ pub fn generate_exec_script(manifest: &PluginManifest, plugin_dir: &Path) -> Res
             hook
         );
         out.push_str(&format!("  add-zsh-hook {} {}\n", hook, fn_name));
+    }
+    // ZLE widget registrations
+    for widget in &manifest.shell.widgets {
+        out.push_str(&format!("  zle -N {}\n", widget));
+    }
+    // Key bindings
+    for kb in &manifest.shell.keybindings {
+        out.push_str(&format!(
+            "  bindkey '{}' {}\n",
+            kb.key.replace('\'', "'\\''"),
+            kb.widget
+        ));
     }
     // Not exported — guard must not leak into child shells where aliases won't be inherited
     out.push_str(&format!("  typeset -g {}=1\n", guard_var));
@@ -84,6 +104,7 @@ mod tests {
             exports: ExportsConfig::default(),
             contexts: ContextsConfig::default(),
             state: StateConfig::default(),
+            shell: ShellConfig::default(),
         }
     }
 
@@ -158,5 +179,70 @@ mod tests {
         let script = generate_exec_script(&m, tmp.path()).unwrap();
 
         assert!(!script.contains("command -v"));
+    }
+
+    #[test]
+    fn exec_script_emits_fpath_before_source() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(tmp.path().join("shell")).unwrap();
+        std::fs::write(tmp.path().join("shell/init.zsh"), "# stub").unwrap();
+
+        let mut m = simple_manifest("my-plugin");
+        m.shell.fpath = vec!["completions".into()];
+        let script = generate_exec_script(&m, tmp.path()).unwrap();
+
+        assert!(script.contains("fpath=(\"$LYNX_PLUGIN_DIR/completions\" $fpath)"));
+        // fpath must appear before source in the output
+        let fpath_pos = script.find("fpath=(").unwrap();
+        let source_pos = script.find("source \"$LYNX_PLUGIN_DIR/shell/init.zsh\"").unwrap();
+        assert!(fpath_pos < source_pos, "fpath must come before source");
+    }
+
+    #[test]
+    fn exec_script_emits_zle_widget_registration() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(tmp.path().join("shell")).unwrap();
+        std::fs::write(tmp.path().join("shell/init.zsh"), "# stub").unwrap();
+
+        let mut m = simple_manifest("fzf-plugin");
+        m.shell.widgets = vec!["fzf_history_widget".into()];
+        let script = generate_exec_script(&m, tmp.path()).unwrap();
+
+        assert!(script.contains("zle -N fzf_history_widget"));
+    }
+
+    #[test]
+    fn exec_script_emits_keybindings() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(tmp.path().join("shell")).unwrap();
+        std::fs::write(tmp.path().join("shell/init.zsh"), "# stub").unwrap();
+
+        let mut m = simple_manifest("fzf-plugin");
+        m.shell.widgets = vec!["fzf_history_widget".into()];
+        m.shell.keybindings = vec![KeyBinding {
+            key: "^R".into(),
+            widget: "fzf_history_widget".into(),
+        }];
+        let script = generate_exec_script(&m, tmp.path()).unwrap();
+
+        assert!(script.contains("bindkey '^R' fzf_history_widget"));
+        // zle -N must come before bindkey
+        let zle_pos = script.find("zle -N").unwrap();
+        let bindkey_pos = script.find("bindkey").unwrap();
+        assert!(zle_pos < bindkey_pos, "zle -N must precede bindkey");
+    }
+
+    #[test]
+    fn exec_script_no_fpath_when_not_declared() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(tmp.path().join("shell")).unwrap();
+        std::fs::write(tmp.path().join("shell/init.zsh"), "# stub").unwrap();
+
+        let m = simple_manifest("git");
+        let script = generate_exec_script(&m, tmp.path()).unwrap();
+
+        assert!(!script.contains("fpath=("));
+        assert!(!script.contains("zle -N"));
+        assert!(!script.contains("bindkey"));
     }
 }
