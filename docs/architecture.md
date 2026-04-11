@@ -18,7 +18,7 @@ lynx-core          (foundation: types, error, runtime paths — no internal deps
 ├── lynx-events    (async event bus, IPC socket protocol)
 ├── lynx-template  (token substitution engine — used by shell glue generators)
 └── lynx-shell     (zsh glue generator — thin shell script builders)
-    └── lynx-loader    (plugin dep-graph resolver, lifecycle orchestrator)
+    └── lynx-depgraph    (plugin dep-graph resolver, lifecycle orchestrator)
         └── lynx-prompt    (segment evaluation, concurrent rendering)
             └── lynx-theme     (theme TOML loader, color engine, terminal capability)
 
@@ -33,7 +33,7 @@ lynx-cli           (lx binary — assembles all crates, dispatches subcommands)
 
 **Hard rules enforced by convention and CI:**
 - `lynx-core` depends on nothing internal
-- `lynx-prompt` cannot depend on `lynx-loader` (circular)
+- `lynx-prompt` cannot depend on `lynx-depgraph` (circular)
 - `lynx-events` cannot depend on `lynx-plugin` (circular)
 - Nothing depends on `lynx-cli`
 
@@ -69,7 +69,7 @@ in Rust and keeps the shell layer thin and testable.
 ## Plugin Lifecycle
 
 Every plugin passes through four stages before its functions are available in
-the shell. The lifecycle is orchestrated by `lynx-loader`.
+the shell. The lifecycle is orchestrated by `lynx-depgraph`.
 
 ```
 DECLARE → RESOLVE → LOAD → ACTIVATE
@@ -200,7 +200,7 @@ They appear in the eval'd output — never in static `shell/init.zsh` files.
 
 | Operation | Entry point | Key crates | Output |
 |---|---|---|---|
-| Shell init | `.zshrc` sources `init.zsh` | lynx-cli, lynx-loader, lynx-plugin | zsh eval'd in shell |
+| Shell init | `.zshrc` sources `init.zsh` | lynx-cli, lynx-depgraph, lynx-plugin | zsh eval'd in shell |
 | Plugin load | `lx plugin exec <name>` | lynx-plugin, lynx-manifest | zsh eval'd in shell |
 | Prompt render | `lx prompt render` | lynx-prompt, lynx-theme | `PROMPT=` / `RPROMPT=` assignments |
 | Config change | `lx config set <k> <v>` | lynx-config, lynx-core | TOML on disk + event emitted |

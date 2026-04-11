@@ -4,7 +4,7 @@ use lynx_core::error::{LynxError, Result};
 /// Validates a parsed [`PluginManifest`].
 ///
 /// Returns `Ok(())` if valid, or the first `LynxError::Manifest` describing the violation.
-/// Note: binary PATH checks are done here; plugin dep resolution lives in lynx-loader.
+/// Note: binary PATH checks are done here; plugin dep resolution lives in lynx-depgraph.
 pub fn validate(manifest: &PluginManifest) -> Result<()> {
     check_schema_version(manifest)?;
     check_no_wildcard_exports(manifest)?;

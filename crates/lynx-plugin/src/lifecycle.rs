@@ -44,9 +44,9 @@ pub fn declare(plugins_dir: &Path) -> PluginRegistry {
 
 /// RESOLVE stage: apply context filter and record excluded plugins.
 ///
-/// The dep graph sort is done by the assembler (lynx-cli) using lynx-loader,
+/// The dep graph sort is done by the assembler (lynx-cli) using lynx-depgraph,
 /// then the ordered names are passed back in here to mark states.
-/// This keeps lynx-plugin free of a sideways dep on lynx-loader (D-001).
+/// This keeps lynx-plugin free of a sideways dep on lynx-depgraph (D-001).
 pub fn apply_resolve(
     registry: &mut PluginRegistry,
     context: &Context,

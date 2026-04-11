@@ -47,7 +47,7 @@ pub async fn run(args: InitArgs) -> Result<()> {
 
     // Resolve load order: topological sort, binary dep exclusion, lazy/eager split.
     let manifests = load_plugin_manifests(&plugin_dir, &config.enabled_plugins);
-    let enabled_plugins: Vec<String> = match lynx_loader::depgraph::resolve(&manifests) {
+    let enabled_plugins: Vec<String> = match lynx_depgraph::depgraph::resolve(&manifests) {
         Ok(order) => {
             for (name, bin) in &order.excluded {
                 eprintln!("lx: plugin '{}' excluded — missing binary '{}'", name, bin);
