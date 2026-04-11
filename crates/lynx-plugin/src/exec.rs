@@ -83,6 +83,7 @@ mod tests {
             deps: DepsConfig::default(),
             exports: ExportsConfig::default(),
             contexts: ContextsConfig::default(),
+            state: StateConfig::default(),
         }
     }
 

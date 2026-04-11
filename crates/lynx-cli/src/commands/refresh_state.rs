@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::Args;
+use std::process::{Command, Stdio};
 
 use super::git;
 use super::kubectl_state;
@@ -7,14 +8,15 @@ use super::kubectl_state;
 #[derive(Args)]
 pub struct RefreshStateArgs {}
 
-/// `lx refresh-state` — gather state for all enabled plugins concurrently and
-/// emit zsh that updates every plugin's cache in one eval call.
+/// `lx refresh-state` — gather state for all enabled plugins in one eval call.
 ///
-/// Registered as the single `_lynx_precmd` hook by `lx init`. Replaces the
-/// old per-plugin hook pattern where each plugin spawned its own `lx` process
-/// on every precmd — with N plugins that was N spawns per command typed.
+/// Registered as the single precmd hook by `lx init`. One spawn regardless of
+/// how many plugins are enabled.
 ///
-/// Now: always 1 spawn regardless of how many plugins are enabled.
+/// Two gatherer paths (D-014):
+/// - First-party plugins (git, kubectl): native Rust gatherers inside lx — fastest path.
+/// - Community plugins: `state.gather` command declared in plugin.toml, called via
+///   shell and evaled. May be written in any language.
 ///
 /// Called from shell/core/hooks.zsh:
 /// ```zsh
@@ -38,24 +40,53 @@ fn read_enabled_plugins() -> Vec<String> {
         .unwrap_or_default()
 }
 
-/// Gather state for all enabled plugins. Each gatherer runs independently;
-/// failures are silently skipped (plugin not installed / binary missing).
-///
+/// Gather state for all enabled plugins. Failures are silently skipped.
 /// Returns concatenated zsh output ready for eval.
 fn gather_all(enabled: &[String]) -> String {
     let mut out = String::new();
 
-    // Run gatherers for known state-bearing plugins.
-    // Order is stable: git before kubectl (alphabetical within category).
-    if enabled.iter().any(|p| p == "git") {
-        out.push_str(&git::render_zsh(&git::gather_git_state()));
-    }
-
-    if enabled.iter().any(|p| p == "kubectl") {
-        out.push_str(&kubectl_state::render_zsh(&kubectl_state::gather_kubectl_state()));
+    for plugin_name in enabled {
+        match plugin_name.as_str() {
+            // First-party: native Rust gatherers — no extra process spawn.
+            "git" => out.push_str(&git::render_zsh(&git::gather_git_state())),
+            "kubectl" => out.push_str(&kubectl_state::render_zsh(&kubectl_state::gather_kubectl_state())),
+            // Community: look for state.gather in plugin.toml.
+            name => {
+                if let Some(zsh) = gather_community_plugin(name) {
+                    out.push_str(&zsh);
+                }
+            }
+        }
     }
 
     out
+}
+
+/// Read a community plugin's plugin.toml, run its `state.gather` command if set,
+/// and return its stdout for eval. Returns None if no gather command or on failure.
+fn gather_community_plugin(plugin_name: &str) -> Option<String> {
+    let plugin_dir = lynx_core::paths::installed_plugins_dir().join(plugin_name);
+    let manifest_path = plugin_dir.join(lynx_core::brand::PLUGIN_MANIFEST);
+    let content = std::fs::read_to_string(&manifest_path).ok()?;
+    let manifest = lynx_manifest::parse(&content).ok()?;
+    let gather_cmd = manifest.state.gather.as_deref().filter(|s| !s.is_empty())?;
+
+    // Expand $PLUGIN_DIR in the command so plugins can reference their own files.
+    let cmd = gather_cmd.replace("$PLUGIN_DIR", &plugin_dir.to_string_lossy());
+
+    let output = Command::new("zsh")
+        .args(["-c", &cmd])
+        .env("PLUGIN_DIR", &plugin_dir)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .output()
+        .ok()?;
+
+    if output.status.success() {
+        Some(String::from_utf8_lossy(&output.stdout).into_owned())
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]
@@ -69,32 +100,82 @@ mod tests {
     }
 
     #[test]
-    fn unknown_plugin_is_silently_skipped() {
+    fn unknown_community_plugin_without_manifest_is_silently_skipped() {
+        // Plugin has no installed directory — should not panic or error.
         let out = gather_all(&["nonexistent-plugin".to_string()]);
         assert!(out.is_empty());
     }
 
     #[test]
-    fn git_plugin_emits_git_state() {
-        // git is always available in CI (we run git tests elsewhere too)
+    fn git_first_party_emits_git_state() {
         let out = gather_all(&["git".to_string()]);
-        // Will either have state (if in a git repo) or clear state
         assert!(out.contains("_lynx_git_state="));
         assert!(out.contains("LYNX_CACHE_GIT_STATE"));
     }
 
     #[test]
-    fn kubectl_plugin_emits_kubectl_state() {
+    fn kubectl_first_party_emits_kubectl_state() {
         let out = gather_all(&["kubectl".to_string()]);
-        // kubectl may not be installed — either way we get a clear or populated state
         assert!(out.contains("_lynx_kubectl_state="));
         assert!(out.contains("LYNX_CACHE_KUBECTL_STATE"));
     }
 
     #[test]
-    fn multiple_plugins_emit_all_states() {
+    fn multiple_first_party_plugins_emit_all_states() {
         let out = gather_all(&["git".to_string(), "kubectl".to_string()]);
         assert!(out.contains("_lynx_git_state="));
         assert!(out.contains("_lynx_kubectl_state="));
+    }
+
+    #[test]
+    fn community_plugin_state_gather_is_called_and_evaled() {
+        use std::fs;
+        let tmp = tempfile::tempdir().expect("tempdir");
+
+        // Build a fake installed plugin directory with plugin.toml declaring state.gather
+        let plugin_dir = tmp.path().join("plugins").join("myplugin");
+        fs::create_dir_all(&plugin_dir).expect("create plugin dir");
+        fs::write(
+            plugin_dir.join("plugin.toml"),
+            r#"
+[plugin]
+name    = "myplugin"
+version = "0.1.0"
+
+[state]
+gather = "echo \"export LYNX_CACHE_MYPLUGIN_STATE='test'\""
+"#,
+        )
+        .expect("write plugin.toml");
+
+        // Override LYNX_DIR so installed_plugins_dir() resolves to our tmp dir.
+        std::env::set_var(lynx_core::env_vars::LYNX_DIR, tmp.path());
+        let out = gather_community_plugin("myplugin");
+        std::env::remove_var(lynx_core::env_vars::LYNX_DIR);
+
+        let out = out.expect("should produce output");
+        assert!(out.contains("LYNX_CACHE_MYPLUGIN_STATE"), "got: {out}");
+    }
+
+    #[test]
+    fn community_plugin_without_state_gather_is_skipped() {
+        use std::fs;
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let plugin_dir = tmp.path().join("plugins").join("bare");
+        fs::create_dir_all(&plugin_dir).expect("create plugin dir");
+        fs::write(
+            plugin_dir.join("plugin.toml"),
+            r#"[plugin]
+name    = "bare"
+version = "0.1.0"
+"#,
+        )
+        .expect("write plugin.toml");
+
+        std::env::set_var(lynx_core::env_vars::LYNX_DIR, tmp.path());
+        let out = gather_community_plugin("bare");
+        std::env::remove_var(lynx_core::env_vars::LYNX_DIR);
+
+        assert!(out.is_none(), "no state.gather should yield None");
     }
 }

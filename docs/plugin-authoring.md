@@ -74,7 +74,7 @@ authors     = ["Your Name <you@example.com>"]
 
 [load]
 lazy  = false    # true = defer load until a listed export is first called
-hooks = []       # zsh hooks that trigger state refresh, e.g. ["chpwd", "precmd"]
+hooks = []       # per-plugin hook registration is not used — lx refresh-state handles precmd
 
 [deps]
 binaries = []    # required binaries checked at load time, e.g. ["git", "kubectl"]
@@ -90,6 +90,16 @@ aliases   = ["mf"]            # aliases — must also be in [contexts].disabled_
 # Aliases must NEVER load in agent or minimal context (rule D-010).
 # Add "interactive" to skip the entire plugin in non-interactive shells.
 disabled_in = ["agent", "minimal"]
+
+[state]
+# Optional. Community plugins declare a gather command here.
+# lx refresh-state calls this command once per precmd (single process spawn total).
+# $PLUGIN_DIR is set to your plugin's directory before the command runs.
+# Output must be valid zsh. Convention: export LYNX_CACHE_<NAME>_STATE as a JSON
+# string and populate the _lynx_<name>_state assoc array.
+# The command can be any executable: shell script, Go binary, Python, Rust binary, etc.
+# First-party plugins (git, kubectl) use native Rust gatherers — no gather needed.
+gather = ""    # e.g. "$PLUGIN_DIR/bin/my-plugin-state" or "zsh $PLUGIN_DIR/gather.zsh"
 ```
 
 ### Field details
@@ -99,9 +109,16 @@ exported function. On first call, the stub sources `shell/init.zsh`, removes
 itself, and replays the original call. Use lazy for plugins with heavy deps
 (e.g., `kubectl`) where you don't want init-time overhead.
 
-**`[load].hooks`** — List zsh hook names. Lynx will call
-`add-zsh-hook <hook> _<pluginname>_plugin_<hook>` after sourcing `init.zsh`.
-Your `functions.zsh` must define `_<pluginname>_plugin_<hookname>()`.
+**`[load].hooks`** — Reserved for custom hook needs that fall outside normal state
+refresh (e.g., `preexec` to capture command strings). For state that the prompt
+needs, use `[state].gather` instead. State refresh is handled automatically by
+`lx refresh-state`, which Lynx registers as the single shared precmd hook.
+You do **not** need to declare `chpwd` or `precmd` here for state caching.
+
+**`[state].gather`** — Command Lynx runs inside `lx refresh-state` on each precmd.
+The command receives `$PLUGIN_DIR` pointing to your plugin's directory. Output
+must be valid zsh. See [Hooks: Responding to Shell Events](#hooks-responding-to-shell-events)
+for the full contract.
 
 **`[deps].binaries`** — Lynx checks these with `command -v` before loading. If
 any are missing, the plugin is skipped with a diagnostic (not an error). This
@@ -188,48 +205,110 @@ plugin is now fully active.
 
 ## Hooks: Responding to Shell Events
 
-Hooks let your plugin update state when the user navigates or runs a command.
-The most common use case is keeping a state cache fresh for prompt rendering.
+State refresh in Lynx is centralized. Plugins do not self-register `chpwd` or
+`precmd` hooks. Instead, Lynx registers a single shared precmd hook that calls
+`lx refresh-state` — one process spawn per prompt draw, regardless of how many
+plugins are loaded.
 
-### Declaring hooks
+### How state refresh works
 
-In `plugin.toml`:
-```toml
-[load]
-hooks = ["chpwd", "precmd"]
+```
+precmd fires
+  └─ lx refresh-state
+       ├─ runs each plugin's state.gather command (community plugins)
+       └─ runs native Rust gatherers (first-party plugins: git, kubectl, …)
 ```
 
-### Implementing hook functions
+The output of each gather command is `eval`'d by the shell. After all gather
+commands complete, `lx prompt render` reads the populated env vars to build the
+prompt.
 
-In `functions.zsh`, define `_<pluginname>_plugin_<hookname>()`:
+### Community plugins: declare state.gather
+
+Instead of implementing `_<name>_plugin_precmd()`, community plugins declare a
+gather command in `plugin.toml`:
+
+```toml
+[state]
+gather = "$PLUGIN_DIR/bin/my-plugin-state"
+```
+
+`$PLUGIN_DIR` is set to your plugin's directory before the command runs. The
+command can be written in any language — shell script, Go binary, Python script,
+compiled Rust binary, etc.
+
+### The state.gather contract
+
+Your gather command must write valid zsh to stdout. The expected output pattern:
 
 ```zsh
-typeset -gA _my_plugin_state    # global assoc array for state
+# Export a JSON string for lx prompt render (cache key = lowercase plugin name)
+export LYNX_CACHE_MY_PLUGIN_STATE='{"key":"value","other":"data"}'
+# Populate a zsh assoc array for shell-side consumers
+typeset -gA _lynx_my_plugin_state
+_lynx_my_plugin_state=(key "value" other "data")
+```
 
-_my_plugin_chpwd() {
-  __my_plugin_refresh_state
-}
+Rules:
+- Output must be valid zsh — it is passed to `eval`.
+- The `LYNX_CACHE_<NAME>_STATE` env var value must be valid JSON.
+- The gather command must be fast — it runs on every prompt. Offload slow I/O
+  to a background process and write a cached result to a temp file.
+- If the gather command exits non-zero, its output is discarded silently.
 
-_my_plugin_precmd() {
-  __my_plugin_refresh_state
-}
+### First-party plugins
 
-__my_plugin_refresh_state() {
-  # Populate state. This runs on every prompt — keep it fast.
-  _my_plugin_state=(key "value")
+First-party plugins (git, kubectl) use native Rust gatherers compiled into `lx`.
+They do not need a `[state].gather` entry — their state is always collected
+by `lx refresh-state` as part of the built-in gather pass.
+
+### Manual refresh
+
+Users can force an immediate state refresh at any time:
+
+```zsh
+lx refresh-state
+```
+
+Your plugin can also expose a refresh helper that calls the gather command
+directly for immediate feedback without waiting for the next precmd:
+
+```zsh
+my_plugin_refresh() {
+  eval "$(PLUGIN_DIR="${LYNX_PLUGIN_DIR}/my-plugin" "$PLUGIN_DIR/bin/my-plugin-state")"
 }
 ```
 
-The naming convention `_<pluginname>_plugin_<hookname>` is required — Lynx
-derives the function name from your manifest automatically.
+### Custom hooks (non-state use cases)
 
-### Available hooks
+If your plugin needs to respond to `preexec` (e.g., to capture the command
+string before it runs), declare it in `[load].hooks`:
+
+```toml
+[load]
+hooks = ["preexec"]
+```
+
+Then define the function in `functions.zsh`:
+
+```zsh
+_my_plugin_preexec() {
+  local cmd="$1"
+  # respond to the command — e.g. record timing, log commands
+}
+```
+
+`chpwd` and `precmd` should not appear in `[load].hooks` for state-caching
+purposes — use `[state].gather` instead.
+
+### Available hooks (for [load].hooks)
 
 | Hook | Triggers when |
 |---|---|
-| `chpwd` | User changes directory |
-| `precmd` | Before each prompt is drawn |
 | `preexec` | Before each command runs (receives the command string as `$1`) |
+
+`chpwd` and `precmd` are handled by `lx refresh-state` and should not be
+registered per-plugin.
 
 ---
 
@@ -286,19 +365,20 @@ plugins should load in agent context without aliases.
 If your plugin provides state that should show in the prompt (like git status
 or kubectl context), you need to:
 
-1. Cache state in a zsh assoc array from your hook functions
-2. The precmd hook in `shell/core/hooks.zsh` serializes known cache arrays to env
-   vars before calling `lx prompt render`
+1. Declare a `[state].gather` command in `plugin.toml` — your gather command
+   outputs the `LYNX_CACHE_<NAME>_STATE` export (valid JSON) to stdout.
+2. `lx refresh-state` calls your gather command each precmd and `eval`'s the output.
+   No manual serialization in `shell/core/hooks.zsh` is needed.
 
-If your plugin uses a custom cache key, you need to serialize it yourself in
-your `_<pluginname>_plugin_precmd` function:
+Example gather script (`bin/my-plugin-state`):
 
 ```zsh
-_my_plugin_precmd() {
-  __my_plugin_refresh_state
-  # Serialize for lx prompt render
-  export LYNX_CACHE_MY_STATE="{\"key\":\"${_my_plugin_state[key]:-}\"}"
-}
+#!/usr/bin/env zsh
+# Gather script — output must be valid zsh
+local value="computed_value"
+print "export LYNX_CACHE_MY_STATE='{\"key\":\"${value}\"}'"
+print "typeset -gA _lynx_my_plugin_state"
+print "_lynx_my_plugin_state=(key '${value}')"
 ```
 
 Then implement a Rust segment in `lynx-prompt` that reads `cache["my_state"]`.
@@ -385,8 +465,8 @@ description = "Shows current weather in the prompt"
 authors     = ["Your Name <you@example.com>"]
 
 [load]
-lazy  = true             # don't slow down init — load on first use
-hooks = ["chpwd"]        # refresh when changing directories
+lazy  = true    # don't slow down init — load on first use
+hooks = []      # per-plugin hook registration is not used — lx refresh-state handles precmd
 
 [deps]
 binaries = ["curl", "jq"]   # checked before loading — skip cleanly if missing
@@ -397,6 +477,11 @@ aliases   = ["wt"]
 
 [contexts]
 disabled_in = ["agent", "minimal"]
+
+[state]
+# lx refresh-state calls this script each precmd.
+# $PLUGIN_DIR is set to this plugin's directory before execution.
+gather = "$PLUGIN_DIR/bin/weather-state"
 ```
 
 ### shell/init.zsh
@@ -407,45 +492,69 @@ source "${LYNX_PLUGIN_DIR}/weather/shell/functions.zsh"
 source "${LYNX_PLUGIN_DIR}/weather/shell/aliases.zsh"
 ```
 
+### bin/weather-state
+
+This is the gather script called by `lx refresh-state` each precmd. It must be
+executable (`chmod +x bin/weather-state`).
+
+```zsh
+#!/usr/bin/env zsh
+# weather-state — gather script for the weather plugin
+# Called by lx refresh-state; $PLUGIN_DIR is set by the caller.
+# Output is eval'd by the shell — must be valid zsh.
+
+# Use a cache file to avoid a network call on every prompt.
+# The plugin's weather_refresh() function updates this cache file on demand.
+local cache_file="${XDG_CACHE_HOME:-$HOME/.cache}/lynx/weather.json"
+
+if [[ -f "$cache_file" ]]; then
+  local cached
+  cached=$(<"$cache_file")
+  print "export LYNX_CACHE_WEATHER_STATE='${cached}'"
+  print "typeset -gA _lynx_weather_state"
+  # Populate assoc array from the two keys we store
+  local temp desc
+  temp=$(print -- "$cached" | command jq -r '.temp // empty' 2>/dev/null)
+  desc=$(print -- "$cached" | command jq -r '.desc // empty' 2>/dev/null)
+  print "_lynx_weather_state=(temp '${temp}' desc '${desc}')"
+fi
+```
+
 ### shell/functions.zsh
 
 ```zsh
 # weather — functions.zsh
-typeset -gA _weather_state
-typeset -g  _weather_last_dir=""
+# No hook functions needed — state refresh is handled by bin/weather-state
+# via lx refresh-state (called automatically each precmd).
 
-# Hook target — registered via plugin.toml hooks[]
-_weather_plugin_chpwd() {
-  # Only refresh if directory changed (avoid redundant fetches)
-  [[ "$PWD" != "$_weather_last_dir" ]] || return 0
-  _weather_last_dir="$PWD"
-  __weather_fetch_async
-}
-
-# Public function — fetch weather for current location
-weather_refresh() {
-  __weather_fetch_async
-}
-
-# Public function — print current weather
+# Public function — print current weather from state populated by gather script
 weather_current() {
-  local temp="${_weather_state[temp]:-}"
-  local desc="${_weather_state[desc]:-}"
+  local temp="${_lynx_weather_state[temp]:-}"
+  local desc="${_lynx_weather_state[desc]:-}"
   [[ -z "$temp" ]] && echo "weather: no data" && return 0
   echo "${temp}°C ${desc}"
 }
 
-# Internal — fetch in background, update state on completion
-__weather_fetch_async() {
+# Public function — fetch fresh weather data and update the cache file.
+# Also triggers an immediate state refresh so the prompt updates right away
+# without waiting for the next precmd cycle.
+weather_refresh() {
+  local cache_dir="${XDG_CACHE_HOME:-$HOME/.cache}/lynx"
+  mkdir -p "$cache_dir"
   local result
   result=$(curl -sf "https://wttr.in/?format=%t+%C" 2>/dev/null) || return 0
   local temp="${result%% *}"
   local desc="${result#* }"
-  _weather_state=(temp "${temp//+/}" desc "$desc")
-  # Serialize for lx prompt render (if you add a weather segment)
-  export LYNX_CACHE_WEATHER_STATE="{\"temp\":\"${_weather_state[temp]}\",\"desc\":\"${_weather_state[desc]}\"}"
+  local json="{\"temp\":\"${temp//+/}\",\"desc\":\"${desc}\"}"
+  print -- "$json" > "${cache_dir}/weather.json"
+  # Immediate refresh — re-run gather without waiting for next precmd
+  eval "$(PLUGIN_DIR="${LYNX_PLUGIN_DIR}/weather" "${LYNX_PLUGIN_DIR}/weather/bin/weather-state")"
 }
 ```
+
+Note: `weather_refresh()` manually re-invokes the gather script for immediate
+feedback. This is the recommended pattern when a user-triggered update should
+reflect in the current prompt without waiting for the next precmd.
 
 ### shell/aliases.zsh
 

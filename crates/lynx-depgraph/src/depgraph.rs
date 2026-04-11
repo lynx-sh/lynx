@@ -204,6 +204,7 @@ pub fn make_manifest(name: &str, deps: &[&str], lazy: bool, binaries: &[&str]) -
         },
         exports: ExportsConfig::default(),
         contexts: ContextsConfig::default(),
+            state: StateConfig::default(),
     }
 }
 
