@@ -50,6 +50,13 @@ pub fn generate_init_script(params: &InitParams<'_>) -> String {
         dir = shell_quote(params.lynx_dir),
     ));
 
+    // Source command dispatch — defines lx() wrapper that evals output for
+    // subcommands like `theme set` and `context set` that emit shell assignments.
+    out.push_str(&format!(
+        "  source {dir}/shell/lib/commands.zsh 2>/dev/null\n",
+        dir = shell_quote(params.lynx_dir),
+    ));
+
     // Clear any inherited plugin load guards — guards must be shell-session-local.
     // A parent shell may have exported LYNX_PLUGIN_*_LOADED; if inherited, the
     // guard would block loading while aliases (shell-local) are not present.
