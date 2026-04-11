@@ -9,16 +9,18 @@ pub struct ExamplesArgs {
 
 pub async fn run(args: ExamplesArgs) -> Result<()> {
     match args.command.as_deref() {
-        Some("plugin")    => print_plugin_examples(),
-        Some("theme")     => print_theme_examples(),
-        Some("task")      => print_task_examples(),
-        Some("event")     => print_event_examples(),
-        Some("config")    => print_config_examples(),
-        Some("doctor")    => print_doctor_examples(),
-        Some("context")   => print_context_examples(),
-        Some("daemon")    => print_daemon_examples(),
+        Some("plugin") => print_plugin_examples(),
+        Some("theme") => print_theme_examples(),
+        Some("task") => print_task_examples(),
+        Some("event") => print_event_examples(),
+        Some("config") => print_config_examples(),
+        Some("doctor") => print_doctor_examples(),
+        Some("context") => print_context_examples(),
+        Some("daemon") => print_daemon_examples(),
         Some(other) => {
-            eprintln!("lx: unknown command '{other}' — try: plugin, theme, task, event, config, doctor");
+            eprintln!(
+                "lx: unknown command '{other}' — try: plugin, theme, task, event, config, doctor"
+            );
         }
         None => print_quickstart(),
     }
@@ -26,7 +28,8 @@ pub async fn run(args: ExamplesArgs) -> Result<()> {
 }
 
 fn print_quickstart() {
-    println!(r#"
+    println!(
+        r#"
   Lynx — quickstart examples
   ───────────────────────────
 
@@ -60,11 +63,13 @@ fn print_quickstart() {
   lx examples plugin               # plugin workflow
   lx examples theme                # theme workflow
   lx examples task                 # task scheduler workflow
-"#);
+"#
+    );
 }
 
 fn print_plugin_examples() {
-    println!(r#"
+    println!(
+        r#"
   lx plugin — examples
   ─────────────────────
 
@@ -84,11 +89,13 @@ fn print_plugin_examples() {
 
   # See what shell code a plugin generates
   lx plugin exec git-extras
-"#);
+"#
+    );
 }
 
 fn print_theme_examples() {
-    println!(r#"
+    println!(
+        r#"
   lx theme — examples
   ────────────────────
 
@@ -105,11 +112,13 @@ fn print_theme_examples() {
 
   # Reset to default if something looks broken
   lx theme set default && lx doctor
-"#);
+"#
+    );
 }
 
 fn print_task_examples() {
-    println!(r#"
+    println!(
+        r#"
   lx task — examples
   ───────────────────
 
@@ -141,11 +150,13 @@ fn print_task_examples() {
   #   cron    = "0 2 * * *"       # 2am daily
   #   timeout = "5m"
   #   on_fail = "log"
-"#);
+"#
+    );
 }
 
 fn print_event_examples() {
-    println!(r#"
+    println!(
+        r#"
   lx event — examples
   ────────────────────
 
@@ -159,11 +170,13 @@ fn print_event_examples() {
   # (add to your plugin's plugin.toml)
   #   [load]
   #   hooks = ["chpwd"]
-"#);
+"#
+    );
 }
 
 fn print_config_examples() {
-    println!(r#"
+    println!(
+        r#"
   lx config — examples
   ─────────────────────
 
@@ -181,11 +194,13 @@ fn print_config_examples() {
 
   # See config file location
   lx config show | head -1
-"#);
+"#
+    );
 }
 
 fn print_doctor_examples() {
-    println!(r#"
+    println!(
+        r#"
   lx doctor — examples
   ─────────────────────
 
@@ -203,11 +218,13 @@ fn print_doctor_examples() {
   # Fix a specific issue, then re-run doctor
   lx theme set default
   lx doctor
-"#);
+"#
+    );
 }
 
 fn print_context_examples() {
-    println!(r#"
+    println!(
+        r#"
   lx context — examples
   ──────────────────────
 
@@ -220,13 +237,15 @@ fn print_context_examples() {
   # Switch back to interactive
   lx context set interactive
 
-  # Contexts are auto-detected — CLAUDE_CODE or CURSOR_SESSION env vars
+  # Contexts are auto-detected — CLAUDECODE or CURSOR_CLI env vars
   # trigger agent context automatically. Manual override is for testing.
-"#);
+"#
+    );
 }
 
 fn print_daemon_examples() {
-    println!(r#"
+    println!(
+        r#"
   lx daemon — examples
   ─────────────────────
 
@@ -244,5 +263,6 @@ fn print_daemon_examples() {
 
   # Reload daemon config without restart (after editing tasks.toml)
   lx daemon reload
-"#);
+"#
+    );
 }
