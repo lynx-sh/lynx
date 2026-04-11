@@ -48,4 +48,6 @@ pub enum Command {
     Examples(crate::commands::examples::ExamplesArgs),
     /// Manage shell profiles
     Profile(crate::commands::profile::ProfileArgs),
+    /// Render PROMPT/RPROMPT for eval by shell precmd hook
+    Prompt(crate::commands::prompt::PromptArgs),
 }

@@ -39,6 +39,14 @@ pub fn generate_exec_script(manifest: &PluginManifest, plugin_dir: &Path) -> Res
     out.push_str(&format!(
         "  source \"$LYNX_PLUGIN_DIR/shell/init.zsh\" 2>/dev/null\n"
     ));
+    for hook in &manifest.load.hooks {
+        let fn_name = format!(
+            "_{}_plugin_{}",
+            manifest.plugin.name.replace('-', "_"),
+            hook
+        );
+        out.push_str(&format!("  add-zsh-hook {} {}\n", hook, fn_name));
+    }
     out.push_str(&format!("  export {}=1\n", guard_var));
     out.push_str("fi\n");
 
@@ -89,6 +97,20 @@ mod tests {
         let m = simple_manifest("git");
         let script = generate_exec_script(&m, tmp.path()).unwrap();
         assert!(script.contains("LYNX_PLUGIN_GIT_LOADED"));
+    }
+
+    #[test]
+    fn exec_script_wires_hooks() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(tmp.path().join("shell")).unwrap();
+        std::fs::write(tmp.path().join("shell/init.zsh"), "# stub").unwrap();
+
+        let mut m = simple_manifest("git");
+        m.load.hooks = vec!["chpwd".into(), "precmd".into()];
+        let script = generate_exec_script(&m, tmp.path()).unwrap();
+
+        assert!(script.contains("add-zsh-hook chpwd _git_plugin_chpwd"));
+        assert!(script.contains("add-zsh-hook precmd _git_plugin_precmd"));
     }
 
     #[test]

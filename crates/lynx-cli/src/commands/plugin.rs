@@ -46,6 +46,11 @@ pub enum PluginCommand {
         /// Plugin name to exec
         name: String,
     },
+    /// Unload a plugin from the shell (called by eval-bridge on profile switch)
+    Unload {
+        /// Plugin name to unload
+        name: String,
+    },
     /// Show real-world usage examples
     Examples,
     /// Search the plugin registry
@@ -79,6 +84,7 @@ pub async fn run(args: PluginArgs) -> Result<()> {
         PluginCommand::New { name } => cmd_new(&name).await,
         PluginCommand::Reinstall { name } => cmd_reinstall(&name).await,
         PluginCommand::Exec { name } => cmd_exec(&name).await,
+        PluginCommand::Unload { name } => cmd_unload(&name).await,
         PluginCommand::Search { query, refresh } => cmd_search(&query, refresh).await,
         PluginCommand::Info { name } => cmd_info(&name).await,
         PluginCommand::Update { name, all } => cmd_update(name.as_deref(), all).await,
@@ -382,6 +388,54 @@ async fn update_one(name: &str) -> Result<()> {
             println!("updated '{name}' to {latest}");
         }
     }
+    Ok(())
+}
+
+/// Emit zsh that removes the plugin's exported symbols and clears its load guard.
+/// The output is eval'd by the shell (same eval-bridge pattern as cmd_exec).
+async fn cmd_unload(name: &str) -> Result<()> {
+    let lynx_dir = std::env::var("LYNX_DIR")
+        .unwrap_or_else(|_| format!("{}/.local/share/lynx", std::env::var("HOME").unwrap_or_else(|_| ".".into())));
+    let plugin_dir = PathBuf::from(&lynx_dir).join("plugins").join(name);
+    let repo_plugin_dir = PathBuf::from("plugins").join(name);
+    let resolved_dir = if plugin_dir.exists() {
+        plugin_dir
+    } else if repo_plugin_dir.exists() {
+        repo_plugin_dir
+    } else {
+        // Plugin directory not found — still clear the guard so it can reload
+        let guard_var = format!("LYNX_PLUGIN_{}_LOADED", name.to_uppercase().replace('-', "_"));
+        println!("unset {}", guard_var);
+        return Ok(());
+    };
+
+    let manifest_path = resolved_dir.join("plugin.toml");
+    let manifest = if manifest_path.exists() {
+        let content = std::fs::read_to_string(&manifest_path)?;
+        Some(lynx_manifest::parse(&content).map_err(|e| anyhow::anyhow!("{}", e))?)
+    } else {
+        None
+    };
+
+    let guard_var = format!("LYNX_PLUGIN_{}_LOADED", name.to_uppercase().replace('-', "_"));
+    let mut out = String::new();
+
+    if let Some(manifest) = manifest {
+        for func in &manifest.exports.functions {
+            out.push_str(&format!("unfunction {} 2>/dev/null\n", func));
+        }
+        for alias in &manifest.exports.aliases {
+            out.push_str(&format!("unalias {} 2>/dev/null\n", alias));
+        }
+        // Remove registered hooks
+        for hook in &manifest.load.hooks {
+            let fn_name = format!("_{}_plugin_{}", name.replace('-', "_"), hook);
+            out.push_str(&format!("add-zsh-hook -d {} {} 2>/dev/null\n", hook, fn_name));
+        }
+    }
+
+    out.push_str(&format!("unset {}\n", guard_var));
+    print!("{}", out);
     Ok(())
 }
 

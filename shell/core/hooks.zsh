@@ -15,6 +15,10 @@ _lynx_hook_preexec() {
 }
 
 _lynx_hook_precmd() {
+  # Marshal zsh-side state caches into env vars before calling lx prompt render.
+  export LYNX_CACHE_GIT_STATE="{\"branch\":\"${_lynx_git_state[branch]:-}\",\"dirty\":\"${_lynx_git_state[dirty]:-0}\",\"stash\":\"${_lynx_git_state[stash]:-0}\",\"ahead\":\"${_lynx_git_state[ahead]:-0}\",\"behind\":\"${_lynx_git_state[behind]:-0}\"}"
+  export LYNX_CACHE_KUBECTL_STATE="{\"context\":\"${_lynx_kubectl_state[context]:-}\",\"namespace\":\"${_lynx_kubectl_state[namespace]:-default}\"}"
+  eval "$(lx prompt render 2>/dev/null)"
   lx event emit "shell:precmd" 2>/dev/null
   [[ -n "${LYNX_HOOK_DEBUG}" ]] && print -u2 "[lynx:hook] precmd"
 }
