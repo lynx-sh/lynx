@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use futures::future::join_all;
 use lynx_core::types::Context;
-use lynx_theme::schema::Theme;
+use lynx_theme::schema::{SegmentCondition, Theme};
 
 use crate::segment::{RenderContext, RenderedSegment, Segment};
 
@@ -13,7 +13,9 @@ use crate::segment::{RenderContext, RenderedSegment, Segment};
 /// 1. `show_in` in config — only show in listed contexts (overrides everything)
 /// 2. `hide_in` in config — hide in listed contexts
 /// 3. `segment.default_hide_in()` — segment's own default exclusions
-/// 4. No restriction — always show
+/// 4. `show_when` condition — must be true to show (evaluated after context gates)
+/// 5. `hide_when` condition — hides when true (ignored when show_when is set)
+/// 6. No restriction — always show
 fn is_visible(config: &toml::Value, seg: &dyn Segment, ctx: &RenderContext) -> bool {
     let ctx_str = match ctx.shell_context {
         Context::Interactive => "interactive",
@@ -21,13 +23,99 @@ fn is_visible(config: &toml::Value, seg: &dyn Segment, ctx: &RenderContext) -> b
         Context::Minimal => "minimal",
     };
 
+    // Context gate: show_in / hide_in / default_hide_in (same priority as before).
     if let Some(show_in) = config.get("show_in").and_then(|v| v.as_array()) {
-        return show_in.iter().any(|s| s.as_str() == Some(ctx_str));
+        if !show_in.iter().any(|s| s.as_str() == Some(ctx_str)) {
+            return false;
+        }
+    } else if let Some(hide_in) = config.get("hide_in").and_then(|v| v.as_array()) {
+        if hide_in.iter().any(|s| s.as_str() == Some(ctx_str)) {
+            return false;
+        }
+    } else if seg.default_hide_in().contains(&ctx_str) {
+        return false;
     }
-    if let Some(hide_in) = config.get("hide_in").and_then(|v| v.as_array()) {
-        return !hide_in.iter().any(|s| s.as_str() == Some(ctx_str));
+
+    // Condition gate: show_when / hide_when (evaluated after context gate passes).
+    let show_when: Option<SegmentCondition> = config
+        .get("show_when")
+        .and_then(|v| v.clone().try_into().ok());
+    if let Some(cond) = &show_when {
+        return eval_condition(cond, ctx);
     }
-    !seg.default_hide_in().contains(&ctx_str)
+
+    let hide_when: Option<SegmentCondition> = config
+        .get("hide_when")
+        .and_then(|v| v.clone().try_into().ok());
+    if let Some(cond) = &hide_when {
+        return !eval_condition(cond, ctx);
+    }
+
+    true
+}
+
+/// Evaluate a `SegmentCondition` against the current `RenderContext`.
+/// Pure — no I/O, no shell calls.
+fn eval_condition(cond: &SegmentCondition, ctx: &RenderContext) -> bool {
+    match cond {
+        SegmentCondition::EnvSet { env_set } => {
+            ctx.env.get(env_set.as_str()).map(|v| !v.is_empty()).unwrap_or(false)
+        }
+        SegmentCondition::EnvMatches { env_matches } => env_matches.iter().all(|(var, pattern)| {
+            ctx.env
+                .get(var.as_str())
+                .map(|v| glob_match(pattern, v, &ctx.env))
+                .unwrap_or(false)
+        }),
+        SegmentCondition::InGitRepo { in_git_repo } => {
+            let has_git = ctx.cache.contains_key(crate::cache_keys::GIT_STATE);
+            *in_git_repo == has_git
+        }
+        SegmentCondition::CwdMatches { cwd_matches } => {
+            glob_match(cwd_matches, &ctx.cwd, &ctx.env)
+        }
+        SegmentCondition::ExitCodeNonzero { exit_code_nonzero } => {
+            let is_nonzero = ctx
+                .env
+                .get("LYNX_LAST_EXIT_CODE")
+                .map(|v| v != "0" && !v.is_empty())
+                .unwrap_or(false);
+            *exit_code_nonzero == is_nonzero
+        }
+    }
+}
+
+/// Match `value` against a glob `pattern` using `*` (any chars) and `?` (one char).
+/// A leading `~/` in the pattern is expanded using the `HOME` env var.
+fn glob_match(pattern: &str, value: &str, env: &HashMap<String, String>) -> bool {
+    let expanded: String = if let Some(rest) = pattern.strip_prefix("~/") {
+        if let Some(home) = env.get("HOME") {
+            format!("{home}/{rest}")
+        } else {
+            pattern.to_string()
+        }
+    } else {
+        pattern.to_string()
+    };
+
+    // Convert glob to regex.
+    let mut re = String::from("^");
+    for ch in expanded.chars() {
+        match ch {
+            '*' => re.push_str(".*"),
+            '?' => re.push('.'),
+            '.' | '+' | '(' | ')' | '[' | ']' | '{' | '}' | '^' | '$' | '|' | '\\' => {
+                re.push('\\');
+                re.push(ch);
+            }
+            _ => re.push(ch),
+        }
+    }
+    re.push('$');
+
+    regex::Regex::new(&re)
+        .map(|r| r.is_match(value))
+        .unwrap_or(false)
 }
 
 /// Run all segments in the given order concurrently and return the non-None results
@@ -219,5 +307,155 @@ mod tests {
         let results = evaluate(&segments, &order, &cfg_map, &ctx).await;
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].text, "hello /home/test");
+    }
+
+    // ── show_when / hide_when condition tests ────────────────────────────────
+
+    struct AlwaysSegment;
+    impl Segment for AlwaysSegment {
+        fn name(&self) -> &'static str { "always" }
+        fn render(&self, _: &toml::Value, _: &RenderContext) -> Option<RenderedSegment> {
+            Some(RenderedSegment::new("ok"))
+        }
+    }
+
+    fn cfg_from_toml(s: &str) -> toml::Value {
+        toml::from_str::<toml::Value>(&format!("[seg]\n{s}")).unwrap()["seg"].clone()
+    }
+
+    #[test]
+    fn show_when_env_set_present() {
+        let mut ctx = ctx();
+        ctx.env.insert("SSH_CONNECTION".into(), "user@host".into());
+        let cfg = cfg_from_toml(r#"show_when = { env_set = "SSH_CONNECTION" }"#);
+        assert!(is_visible(&cfg, &AlwaysSegment, &ctx));
+    }
+
+    #[test]
+    fn show_when_env_set_absent() {
+        let ctx = ctx(); // SSH_CONNECTION not in env
+        let cfg = cfg_from_toml(r#"show_when = { env_set = "SSH_CONNECTION" }"#);
+        assert!(!is_visible(&cfg, &AlwaysSegment, &ctx));
+    }
+
+    #[test]
+    fn show_when_env_set_empty_string_counts_as_absent() {
+        let mut ctx = ctx();
+        ctx.env.insert("SSH_CONNECTION".into(), "".into());
+        let cfg = cfg_from_toml(r#"show_when = { env_set = "SSH_CONNECTION" }"#);
+        assert!(!is_visible(&cfg, &AlwaysSegment, &ctx));
+    }
+
+    #[test]
+    fn show_when_env_matches_glob() {
+        let mut ctx = ctx();
+        ctx.env.insert("VIRTUAL_ENV".into(), "/home/user/.venv/myproject".into());
+        let cfg = cfg_from_toml(r#"show_when = { env_matches = { VIRTUAL_ENV = "*myproject*" } }"#);
+        assert!(is_visible(&cfg, &AlwaysSegment, &ctx));
+    }
+
+    #[test]
+    fn show_when_env_matches_glob_no_match() {
+        let mut ctx = ctx();
+        ctx.env.insert("VIRTUAL_ENV".into(), "/home/user/.venv/other".into());
+        let cfg = cfg_from_toml(r#"show_when = { env_matches = { VIRTUAL_ENV = "*myproject*" } }"#);
+        assert!(!is_visible(&cfg, &AlwaysSegment, &ctx));
+    }
+
+    #[test]
+    fn show_when_in_git_repo_true_with_git_cache() {
+        let mut ctx = ctx();
+        ctx.cache.insert(
+            crate::cache_keys::GIT_STATE.into(),
+            serde_json::json!({"branch": "main"}),
+        );
+        let cfg = cfg_from_toml(r#"show_when = { in_git_repo = true }"#);
+        assert!(is_visible(&cfg, &AlwaysSegment, &ctx));
+    }
+
+    #[test]
+    fn show_when_in_git_repo_true_without_git_cache() {
+        let ctx = ctx(); // no GIT_STATE in cache
+        let cfg = cfg_from_toml(r#"show_when = { in_git_repo = true }"#);
+        assert!(!is_visible(&cfg, &AlwaysSegment, &ctx));
+    }
+
+    #[test]
+    fn show_when_in_git_repo_false_outside_repo() {
+        let ctx = ctx(); // no GIT_STATE = not in a git repo
+        let cfg = cfg_from_toml(r#"show_when = { in_git_repo = false }"#);
+        assert!(is_visible(&cfg, &AlwaysSegment, &ctx));
+    }
+
+    #[test]
+    fn show_when_cwd_matches_glob() {
+        let mut ctx = ctx();
+        ctx.cwd = "/home/user/work/project".into();
+        let cfg = cfg_from_toml(r#"show_when = { cwd_matches = "/home/user/work/**" }"#);
+        assert!(is_visible(&cfg, &AlwaysSegment, &ctx));
+    }
+
+    #[test]
+    fn show_when_cwd_matches_tilde_expansion() {
+        let mut ctx = ctx();
+        ctx.cwd = "/home/user/work/project".into();
+        ctx.env.insert("HOME".into(), "/home/user".into());
+        let cfg = cfg_from_toml(r#"show_when = { cwd_matches = "~/work/**" }"#);
+        assert!(is_visible(&cfg, &AlwaysSegment, &ctx));
+    }
+
+    #[test]
+    fn show_when_cwd_matches_no_match() {
+        let mut ctx = ctx();
+        ctx.cwd = "/tmp/other".into();
+        ctx.env.insert("HOME".into(), "/home/user".into());
+        let cfg = cfg_from_toml(r#"show_when = { cwd_matches = "~/work/**" }"#);
+        assert!(!is_visible(&cfg, &AlwaysSegment, &ctx));
+    }
+
+    #[test]
+    fn show_when_exit_code_nonzero_true() {
+        let mut ctx = ctx();
+        ctx.env.insert("LYNX_LAST_EXIT_CODE".into(), "1".into());
+        let cfg = cfg_from_toml(r#"show_when = { exit_code_nonzero = true }"#);
+        assert!(is_visible(&cfg, &AlwaysSegment, &ctx));
+    }
+
+    #[test]
+    fn show_when_exit_code_nonzero_false_on_zero() {
+        let mut ctx = ctx();
+        ctx.env.insert("LYNX_LAST_EXIT_CODE".into(), "0".into());
+        let cfg = cfg_from_toml(r#"show_when = { exit_code_nonzero = true }"#);
+        assert!(!is_visible(&cfg, &AlwaysSegment, &ctx));
+    }
+
+    #[test]
+    fn hide_when_env_set_hides_segment() {
+        let mut ctx = ctx();
+        ctx.env.insert("CI".into(), "true".into());
+        let cfg = cfg_from_toml(r#"hide_when = { env_set = "CI" }"#);
+        assert!(!is_visible(&cfg, &AlwaysSegment, &ctx));
+    }
+
+    #[test]
+    fn hide_when_env_set_shows_when_absent() {
+        let ctx = ctx(); // CI not set
+        let cfg = cfg_from_toml(r#"hide_when = { env_set = "CI" }"#);
+        assert!(is_visible(&cfg, &AlwaysSegment, &ctx));
+    }
+
+    #[test]
+    fn show_when_takes_priority_over_hide_when() {
+        // If both show_when and hide_when are set, show_when wins.
+        let mut ctx = ctx();
+        ctx.env.insert("SSH_CONNECTION".into(), "x".into());
+        ctx.env.insert("CI".into(), "true".into());
+        // show_when passes (SSH_CONNECTION set), hide_when would also trigger (CI set)
+        // but show_when takes priority.
+        let cfg = cfg_from_toml(
+            r#"show_when = { env_set = "SSH_CONNECTION" }
+hide_when = { env_set = "CI" }"#,
+        );
+        assert!(is_visible(&cfg, &AlwaysSegment, &ctx));
     }
 }

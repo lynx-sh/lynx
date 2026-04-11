@@ -110,6 +110,48 @@ pub struct SegmentVisibility {
     pub show_in: Option<Vec<String>>,
     /// Hide this segment in these contexts. Ignored when show_in is set.
     pub hide_in: Option<Vec<String>>,
+    /// Show this segment only when condition is true. Evaluated after show_in/hide_in.
+    pub show_when: Option<SegmentCondition>,
+    /// Hide this segment when condition is true. Ignored when show_when is set.
+    pub hide_when: Option<SegmentCondition>,
+}
+
+/// A runtime condition evaluated against `RenderContext` — no I/O, no shell.
+///
+/// Exactly one field should be set per condition (untagged enum: first match wins).
+/// TOML example:
+/// ```toml
+/// [segment.username]
+/// show_when = { env_set = "SSH_CONNECTION" }
+///
+/// [segment.git_branch]
+/// show_when = { in_git_repo = true }
+///
+/// [segment.venv]
+/// show_when = { env_matches = { VIRTUAL_ENV = "*myproject*" } }
+///
+/// [segment.dir]
+/// show_when = { cwd_matches = "~/work/**" }
+///
+/// [segment.exit_code]
+/// show_when = { exit_code_nonzero = true }
+/// ```
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+pub enum SegmentCondition {
+    /// Segment visible only when the named env var is set (non-empty).
+    EnvSet { env_set: String },
+    /// Segment visible only when all listed env vars match their glob patterns.
+    EnvMatches {
+        env_matches: std::collections::HashMap<String, String>,
+    },
+    /// `true` = only in git repos; `false` = only outside git repos.
+    InGitRepo { in_git_repo: bool },
+    /// Segment visible only when cwd matches the glob pattern. `~` is expanded
+    /// using the `HOME` env var from the render context.
+    CwdMatches { cwd_matches: String },
+    /// `true` = only when last exit code is non-zero; `false` = only on zero exit.
+    ExitCodeNonzero { exit_code_nonzero: bool },
 }
 
 /// Shared color/style type — used by individual segment typed configs.
