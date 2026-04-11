@@ -12,6 +12,18 @@ pub const LYNX_CONTEXT: &str = "LYNX_CONTEXT";
 /// Overrides the Lynx installation directory (default: `~/.config/lynx`).
 pub const LYNX_DIR: &str = "LYNX_DIR";
 
+/// Overrides the active theme name. Read by `lx prompt render`.
+pub const LYNX_THEME: &str = "LYNX_THEME";
+
+/// Duration of the last shell command in milliseconds. Set by the precmd hook.
+pub const LYNX_LAST_CMD_MS: &str = "LYNX_LAST_CMD_MS";
+
+/// JSON-serialized git state cache. Set by the git plugin's chpwd/precmd hook.
+pub const LYNX_CACHE_GIT_STATE: &str = "LYNX_CACHE_GIT_STATE";
+
+/// JSON-serialized kubectl context cache. Set by the kubectl plugin.
+pub const LYNX_CACHE_KUBECTL_STATE: &str = "LYNX_CACHE_KUBECTL_STATE";
+
 /// Set by `lx init` to the plugin directory path.
 pub const LYNX_PLUGIN_DIR: &str = "LYNX_PLUGIN_DIR";
 

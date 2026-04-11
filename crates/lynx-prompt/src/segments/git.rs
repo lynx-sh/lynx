@@ -13,7 +13,7 @@ impl Segment for GitBranchSegment {
     }
 
     fn cache_key(&self) -> Option<&'static str> {
-        Some("git_state")
+        Some(crate::cache_keys::GIT_STATE)
     }
 
     fn render(&self, config: &SegmentConfig, ctx: &RenderContext) -> Option<RenderedSegment> {
@@ -35,7 +35,7 @@ impl Segment for GitStatusSegment {
     }
 
     fn cache_key(&self) -> Option<&'static str> {
-        Some("git_state")
+        Some(crate::cache_keys::GIT_STATE)
     }
 
     fn render(&self, config: &SegmentConfig, ctx: &RenderContext) -> Option<RenderedSegment> {
@@ -84,7 +84,7 @@ impl Segment for GitStatusSegment {
             return None;
         }
 
-        Some(RenderedSegment::new(parts.join("")).with_cache_key("git_state"))
+        Some(RenderedSegment::new(parts.join("")).with_cache_key(crate::cache_keys::GIT_STATE))
     }
 }
 
@@ -150,7 +150,7 @@ fn git_branch_from_subprocess(dir: &str) -> Option<String> {
 }
 
 fn git_state_obj(ctx: &RenderContext) -> Option<&serde_json::Map<String, serde_json::Value>> {
-    match ctx.cache.get("git_state")? {
+    match ctx.cache.get(crate::cache_keys::GIT_STATE)? {
         serde_json::Value::Object(obj) => Some(obj),
         _ => None,
     }
@@ -169,7 +169,7 @@ mod tests {
     fn ctx_with_git(branch: &str, staged: bool, modified: bool, untracked: bool) -> RenderContext {
         let mut cache = HashMap::new();
         cache.insert(
-            "git_state".into(),
+            crate::cache_keys::GIT_STATE.into(),
             json!({
                 "branch": branch,
                 "staged": staged,

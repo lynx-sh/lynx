@@ -42,8 +42,10 @@ pub async fn run(args: InitArgs) -> Result<()> {
         None => detected,
     };
 
-    let lynx_dir = resolve_lynx_dir();
-    let plugin_dir = format!("{}/plugins", lynx_dir);
+    let lynx_dir = lynx_core::paths::lynx_dir().to_string_lossy().into_owned();
+    let plugin_dir = lynx_core::paths::installed_plugins_dir()
+        .to_string_lossy()
+        .into_owned();
 
     // Resolve load order: topological sort, binary dep exclusion, lazy/eager split.
     let manifests = load_plugin_manifests(&plugin_dir, &config.enabled_plugins);
@@ -85,11 +87,4 @@ fn load_plugin_manifests(plugin_dir: &str, enabled: &[String]) -> Vec<PluginMani
         } // plugin dir missing or no manifest — silently skip
     }
     manifests
-}
-
-/// Resolve LYNX_DIR: env override → default install location.
-fn resolve_lynx_dir() -> String {
-    lynx_core::paths::lynx_dir()
-        .to_string_lossy()
-        .into_owned()
 }
