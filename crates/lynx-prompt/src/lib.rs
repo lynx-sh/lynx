@@ -7,7 +7,8 @@ pub mod segments;
 
 pub use segment::{RenderContext, RenderedSegment, Segment};
 pub use segments::{
-    BackgroundJobsSegment, CmdDurationSegment, ContextBadgeSegment, DirSegment, ExitCodeSegment,
-    GitBranchSegment, GitStatusSegment, HostnameSegment, KubectlContextSegment, ProfileBadgeSegment,
-    SshIndicatorSegment, TaskStatusSegment, TimeSegment, UsernameSegment, ViModeSegment,
+    BackgroundJobsSegment, CmdDurationSegment, CondaEnvSegment, ContextBadgeSegment, DirSegment,
+    ExitCodeSegment, GitBranchSegment, GitStatusSegment, HostnameSegment, KubectlContextSegment,
+    NewlineSegment, ProfileBadgeSegment, PromptCharSegment, SshIndicatorSegment, TaskStatusSegment,
+    TimeSegment, UsernameSegment, VenvSegment, ViModeSegment,
 };

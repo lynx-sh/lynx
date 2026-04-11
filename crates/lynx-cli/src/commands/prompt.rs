@@ -7,9 +7,10 @@ use lynx_prompt::{
     evaluator::evaluate_theme,
     renderer::render_prompt,
     segment::RenderContext,
-    BackgroundJobsSegment, CmdDurationSegment, ContextBadgeSegment, DirSegment, ExitCodeSegment,
-    GitBranchSegment, GitStatusSegment, HostnameSegment, KubectlContextSegment, ProfileBadgeSegment,
-    SshIndicatorSegment, TaskStatusSegment, TimeSegment, UsernameSegment, ViModeSegment,
+    BackgroundJobsSegment, CmdDurationSegment, CondaEnvSegment, ContextBadgeSegment, DirSegment,
+    ExitCodeSegment, GitBranchSegment, GitStatusSegment, HostnameSegment, KubectlContextSegment,
+    NewlineSegment, ProfileBadgeSegment, PromptCharSegment, SshIndicatorSegment, TaskStatusSegment,
+    TimeSegment, UsernameSegment, VenvSegment, ViModeSegment,
 };
 use lynx_theme::loader::load as load_theme;
 use std::collections::HashMap;
@@ -63,6 +64,8 @@ async fn cmd_render() -> Result<()> {
         Box::new(GitBranchSegment),
         Box::new(GitStatusSegment),
         Box::new(KubectlContextSegment),
+        Box::new(VenvSegment),
+        Box::new(CondaEnvSegment),
         Box::new(ProfileBadgeSegment),
         Box::new(TaskStatusSegment),
         Box::new(CmdDurationSegment),
@@ -71,6 +74,8 @@ async fn cmd_render() -> Result<()> {
         Box::new(ViModeSegment),
         Box::new(TimeSegment),
         Box::new(ContextBadgeSegment),
+        Box::new(NewlineSegment),
+        Box::new(PromptCharSegment),
     ];
 
     // --- Evaluate and render ---

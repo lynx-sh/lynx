@@ -50,7 +50,7 @@ fn assemble(segs: &[RenderedSegment], theme: &Theme) -> String {
         parts.push(text);
     }
 
-    format!("{} $ ", parts.join(" "))
+    format!("{} ", parts.join(" "))
 }
 
 /// Apply color + bold to text, wrapping ANSI sequences in zsh `%{...%}`.
