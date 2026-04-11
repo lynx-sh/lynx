@@ -4,7 +4,7 @@ description = "Clean, minimal default theme"
 author = "proxikal"
 
 [segments.left]
-order = ["dir", "git_branch", "git_status"]
+order = ["dir", "git_branch", "git_status", "prompt_char"]
 
 [segments.right]
 order = ["cmd_duration", "task_status", "context_badge"]
@@ -34,6 +34,11 @@ color = { fg = "yellow" }
 show_in = ["agent"]
 label = { agent = "AI", minimal = "MIN" }
 color = { fg = "magenta", bold = true }
+
+[segment.prompt_char]
+symbol = "❯"
+error_symbol = "❯"
+color = { fg = "green" }
 
 [colors]
 accent  = "#7aa2f7"
