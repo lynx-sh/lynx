@@ -2,11 +2,14 @@ use std::time::Duration;
 
 use serde::Deserialize;
 
-use crate::segment::{RenderContext, RenderedSegment, Segment};
+use crate::segment::{apply_format, RenderContext, RenderedSegment, Segment};
 
 #[derive(Deserialize, Default)]
 struct GitBranchConfig {
     icon: Option<String>,
+    /// Format template. Available vars: `$icon`, `$branch`.
+    /// Default: `"$icon$branch"`.
+    format: Option<String>,
 }
 
 #[derive(Deserialize, Default)]
@@ -19,6 +22,9 @@ struct GitStatusConfig {
     staged: Option<StatusIconConfig>,
     modified: Option<StatusIconConfig>,
     untracked: Option<StatusIconConfig>,
+    /// Format template. Available vars: `$staged`, `$modified`, `$untracked`.
+    /// Default: `"$staged$modified$untracked"` (concatenated, each empty when clean).
+    format: Option<String>,
 }
 
 /// Shows the current git branch name.
@@ -40,7 +46,11 @@ impl Segment for GitBranchSegment {
             return None;
         }
         let icon = cfg.icon.as_deref().unwrap_or(" ");
-        Some(RenderedSegment::new(format!("{icon}{branch}")).with_cache_key("git_branch"))
+        let text = match cfg.format.as_deref() {
+            Some(tmpl) => apply_format(tmpl, &[("icon", icon), ("branch", &branch)]),
+            None => format!("{icon}{branch}"),
+        };
+        Some(RenderedSegment::new(text).with_cache_key("git_branch"))
     }
 }
 
@@ -79,7 +89,21 @@ impl Segment for GitStatusSegment {
             return None;
         }
 
-        Some(RenderedSegment::new(parts.join("")).with_cache_key(crate::cache_keys::GIT_STATE))
+        let text = match cfg.format.as_deref() {
+            Some(tmpl) => {
+                let staged_icon = cfg.staged.as_ref().and_then(|s| s.icon.as_deref()).unwrap_or("+");
+                let modified_icon = cfg.modified.as_ref().and_then(|s| s.icon.as_deref()).unwrap_or("!");
+                let untracked_icon = cfg.untracked.as_ref().and_then(|s| s.icon.as_deref()).unwrap_or("?");
+                let state = git_state_obj(ctx).unwrap();
+                let staged_val = if state.get("staged").and_then(|v| v.as_bool()).unwrap_or(false) { staged_icon } else { "" };
+                let modified_val = if state.get("modified").and_then(|v| v.as_bool()).unwrap_or(false) { modified_icon } else { "" };
+                let untracked_val = if state.get("untracked").and_then(|v| v.as_bool()).unwrap_or(false) { untracked_icon } else { "" };
+                apply_format(tmpl, &[("staged", staged_val), ("modified", modified_val), ("untracked", untracked_val)])
+            }
+            None => parts.join(""),
+        };
+
+        Some(RenderedSegment::new(text).with_cache_key(crate::cache_keys::GIT_STATE))
     }
 }
 
@@ -236,5 +260,34 @@ mod tests {
         assert!(text.contains('+'));
         assert!(text.contains('!'));
         assert!(text.contains('?'));
+    }
+
+    #[test]
+    fn branch_custom_format_changes_layout() {
+        let cfg: toml::Value = toml::from_str(r#"format = "[$branch] ""#).unwrap();
+        let r = GitBranchSegment.render(&cfg, &ctx_with_git("main", false, false, false)).unwrap();
+        assert_eq!(r.text, "[main] ");
+    }
+
+    #[test]
+    fn branch_default_format_matches_current_output() {
+        let r_default = GitBranchSegment.render(&empty_config(), &ctx_with_git("main", false, false, false)).unwrap();
+        let cfg: toml::Value = toml::from_str(r#"format = "$icon$branch""#).unwrap();
+        let r_format = GitBranchSegment.render(&cfg, &ctx_with_git("main", false, false, false)).unwrap();
+        assert_eq!(r_default.text, r_format.text);
+    }
+
+    #[test]
+    fn status_custom_format_with_brackets() {
+        let cfg: toml::Value = toml::from_str(r#"format = "[$staged$modified$untracked]""#).unwrap();
+        let r = GitStatusSegment.render(&cfg, &ctx_with_git("main", true, false, true)).unwrap();
+        assert_eq!(r.text, "[+?]");
+    }
+
+    #[test]
+    fn status_unknown_format_var_is_empty() {
+        let cfg: toml::Value = toml::from_str(r#"format = "$staged$unknown""#).unwrap();
+        let r = GitStatusSegment.render(&cfg, &ctx_with_git("main", true, false, false)).unwrap();
+        assert_eq!(r.text, "+");
     }
 }
