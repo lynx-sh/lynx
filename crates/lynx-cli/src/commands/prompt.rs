@@ -45,8 +45,12 @@ async fn cmd_render() -> Result<()> {
     .await;
 
     // --- Load theme ---
-    let theme_name = std::env::var(env_vars::LYNX_THEME)
+    // Priority: LYNX_THEME env var (runtime override) → config.active_theme
+    // (user's configured choice) → brand::DEFAULT_THEME (last-resort fallback).
+    let config_theme = load_config()
+        .map(|c| c.active_theme)
         .unwrap_or_else(|_| brand::DEFAULT_THEME.into());
+    let theme_name = std::env::var(env_vars::LYNX_THEME).unwrap_or(config_theme);
     let theme = load_theme(&theme_name).or_else(|_| load_theme(brand::DEFAULT_THEME))?;
 
     // --- Build segment registry ---
