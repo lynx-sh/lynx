@@ -5,7 +5,9 @@ use anyhow::{bail, Context, Result};
 use sha2::{Digest, Sha256};
 use tracing::{debug, info};
 
-use crate::index::{get_index, load_lock_from, plugins_install_dir, save_lock_to, lock_path};
+use crate::index::{
+    get_index, load_lock_from, lock_path, plugins_install_dir, save_lock_to, validate_index,
+};
 use crate::schema::LockEntry;
 
 /// Options for a fetch operation.
@@ -25,21 +27,20 @@ pub struct FetchOptions {
 ///
 /// Returns the path to the installed plugin directory.
 pub fn fetch_plugin(name: &str, opts: &FetchOptions) -> Result<PathBuf> {
-    // 1. Resolve from index.
+    // 1. Resolve from index — validate structure before trusting checksum data.
     let idx = get_index(opts.refresh_index, opts.index_url.as_deref())?;
+    validate_index(&idx).context("registry index failed validation — run `lx plugin refresh`")?;
     let entry = idx
         .find(name)
         .with_context(|| format!("plugin '{name}' not found in registry"))?;
 
     let version_str = opts.version.as_deref();
-    let pv = entry
-        .resolve_version(version_str)
-        .with_context(|| {
-            format!(
-                "version '{}' not found for plugin '{name}'",
-                version_str.unwrap_or("latest")
-            )
-        })?;
+    let pv = entry.resolve_version(version_str).with_context(|| {
+        format!(
+            "version '{}' not found for plugin '{name}'",
+            version_str.unwrap_or("latest")
+        )
+    })?;
 
     // 2. Check if already installed.
     let install_dir = plugins_install_dir().join(name);
@@ -55,9 +56,8 @@ pub fn fetch_plugin(name: &str, opts: &FetchOptions) -> Result<PathBuf> {
     let archive_path = tmp_dir.path().join(format!("{name}.tar.gz"));
 
     info!("downloading {} v{} from {}", name, pv.version, pv.url);
-    download_file(&pv.url, &archive_path).with_context(|| {
-        format!("failed to download {} from {}", name, pv.url)
-    })?;
+    download_file(&pv.url, &archive_path)
+        .with_context(|| format!("failed to download {} from {}", name, pv.url))?;
 
     // 4. Verify checksum — abort and clean up if mismatch.
     let actual = sha256_hex(&archive_path).context("failed to compute checksum")?;
@@ -89,22 +89,32 @@ pub fn fetch_plugin(name: &str, opts: &FetchOptions) -> Result<PathBuf> {
     // 7. Update lynx.lock.
     let lock_file = lock_path();
     let mut lock = load_lock_from(&lock_file).unwrap_or_default();
+    let installed_checksum = checksum_plugin_dir(&install_dir)?;
     lock.upsert(LockEntry {
         name: name.to_string(),
         version: pv.version.clone(),
         checksum_sha256: pv.checksum_sha256.clone(),
+        installed_checksum_sha256: Some(installed_checksum),
         url: pv.url.clone(),
         source: "registry".to_string(),
     });
     save_lock_to(&lock, &lock_file).context("failed to update lynx.lock")?;
 
-    info!("installed '{name}' v{} to {}", pv.version, install_dir.display());
+    info!(
+        "installed '{name}' v{} to {}",
+        pv.version,
+        install_dir.display()
+    );
     Ok(install_dir)
 }
 
 /// Check if a newer version of an installed plugin is available in the registry.
 /// Returns `Some((current_version, new_version))` if an upgrade is available.
-pub fn check_for_update(name: &str, refresh: bool, index_url: Option<&str>) -> Result<Option<(String, String)>> {
+pub fn check_for_update(
+    name: &str,
+    refresh: bool,
+    index_url: Option<&str>,
+) -> Result<Option<(String, String)>> {
     let lock_file = lock_path();
     let lock = load_lock_from(&lock_file).unwrap_or_default();
     let locked = match lock.find(name) {
@@ -145,15 +155,14 @@ fn download_file(url: &str, dest: &Path) -> Result<()> {
         .with_context(|| format!("GET {url}"))?
         .error_for_status()
         .with_context(|| format!("server error for {url}"))?;
-    let mut file = std::fs::File::create(dest)
-        .with_context(|| format!("create {}", dest.display()))?;
+    let mut file =
+        std::fs::File::create(dest).with_context(|| format!("create {}", dest.display()))?;
     std::io::copy(&mut resp, &mut file).context("write download")?;
     Ok(())
 }
 
 fn sha256_hex(path: &Path) -> Result<String> {
-    let mut file = std::fs::File::open(path)
-        .with_context(|| format!("open {}", path.display()))?;
+    let mut file = std::fs::File::open(path).with_context(|| format!("open {}", path.display()))?;
     let mut hasher = Sha256::new();
     let mut buf = [0u8; 65536];
     loop {
@@ -184,7 +193,8 @@ fn extract_tar_gz(archive: &Path, dest: &Path) -> Result<()> {
         if let Some(parent) = out_path.parent() {
             std::fs::create_dir_all(parent).context("create extract dir")?;
         }
-        entry.unpack(&out_path)
+        entry
+            .unpack(&out_path)
             .with_context(|| format!("unpack {}", stripped.display()))?;
     }
     Ok(())
@@ -198,12 +208,9 @@ fn validate_plugin_dir(dir: &Path, name: &str) -> Result<()> {
             manifest_path.display()
         );
     }
-    let content = std::fs::read_to_string(&manifest_path)
-        .context("read extracted plugin.toml")?;
-    let manifest: lynx_manifest::schema::PluginManifest =
-        toml::from_str(&content).with_context(|| {
-            format!("plugin '{name}' has invalid plugin.toml after extraction")
-        })?;
+    let content = std::fs::read_to_string(&manifest_path).context("read extracted plugin.toml")?;
+    let manifest: lynx_manifest::schema::PluginManifest = toml::from_str(&content)
+        .with_context(|| format!("plugin '{name}' has invalid plugin.toml after extraction"))?;
     if manifest.plugin.name != name {
         bail!(
             "plugin '{name}' plugin.toml declares name '{}' — must match",
@@ -219,6 +226,64 @@ fn validate_plugin_dir(dir: &Path, name: &str) -> Result<()> {
 /// This is the same function used internally for verification — same result.
 pub fn checksum_file(path: &Path) -> Result<String> {
     sha256_hex(path)
+}
+
+/// Compute a deterministic SHA-256 checksum for all files in a directory.
+/// Hash input includes relative file paths and file bytes; path order is sorted.
+pub fn checksum_plugin_dir(dir: &Path) -> Result<String> {
+    if !dir.exists() {
+        bail!("plugin directory does not exist: {}", dir.display());
+    }
+
+    let mut files = Vec::new();
+    collect_files_sorted(dir, dir, &mut files)?;
+    files.sort();
+
+    let mut hasher = Sha256::new();
+    for rel in files {
+        hasher.update(rel.as_bytes());
+        hasher.update([0u8]);
+        let full = dir.join(&rel);
+        let mut file =
+            std::fs::File::open(&full).with_context(|| format!("open {}", full.display()))?;
+        let mut buf = [0u8; 65536];
+        loop {
+            let n = file
+                .read(&mut buf)
+                .context("read plugin file for checksum")?;
+            if n == 0 {
+                break;
+            }
+            hasher.update(&buf[..n]);
+        }
+    }
+
+    Ok(hex::encode(hasher.finalize()))
+}
+
+fn collect_files_sorted(root: &Path, current: &Path, out: &mut Vec<String>) -> Result<()> {
+    let mut entries: Vec<std::path::PathBuf> = std::fs::read_dir(current)
+        .with_context(|| format!("read dir {}", current.display()))?
+        .map(|entry| entry.map(|e| e.path()))
+        .collect::<std::io::Result<Vec<_>>>()
+        .context("read directory entries")?;
+    entries.sort();
+
+    for path in entries {
+        let meta =
+            std::fs::symlink_metadata(&path).with_context(|| format!("stat {}", path.display()))?;
+        if meta.is_dir() {
+            collect_files_sorted(root, &path, out)?;
+        } else if meta.is_file() {
+            let rel = path
+                .strip_prefix(root)
+                .with_context(|| format!("strip prefix for {}", path.display()))?
+                .to_string_lossy()
+                .replace('\\', "/");
+            out.push(rel);
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -244,6 +309,38 @@ mod tests {
         std::fs::write(&p1, b"aaa").unwrap();
         std::fs::write(&p2, b"bbb").unwrap();
         assert_ne!(checksum_file(&p1).unwrap(), checksum_file(&p2).unwrap());
+    }
+
+    #[test]
+    fn checksum_plugin_dir_changes_when_content_changes() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("plugin.toml"), "a").unwrap();
+        std::fs::create_dir_all(dir.path().join("shell")).unwrap();
+        std::fs::write(dir.path().join("shell/init.zsh"), "b").unwrap();
+
+        let before = checksum_plugin_dir(dir.path()).unwrap();
+        std::fs::write(dir.path().join("shell/init.zsh"), "changed").unwrap();
+        let after = checksum_plugin_dir(dir.path()).unwrap();
+        assert_ne!(before, after);
+    }
+
+    #[test]
+    fn checksum_plugin_dir_independent_of_file_creation_order() {
+        let d1 = tempfile::tempdir().unwrap();
+        let d2 = tempfile::tempdir().unwrap();
+
+        std::fs::create_dir_all(d1.path().join("shell")).unwrap();
+        std::fs::write(d1.path().join("shell/functions.zsh"), "x").unwrap();
+        std::fs::write(d1.path().join("plugin.toml"), "y").unwrap();
+
+        std::fs::write(d2.path().join("plugin.toml"), "y").unwrap();
+        std::fs::create_dir_all(d2.path().join("shell")).unwrap();
+        std::fs::write(d2.path().join("shell/functions.zsh"), "x").unwrap();
+
+        assert_eq!(
+            checksum_plugin_dir(d1.path()).unwrap(),
+            checksum_plugin_dir(d2.path()).unwrap()
+        );
     }
 
     #[test]

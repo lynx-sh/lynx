@@ -28,10 +28,22 @@ pub fn generate_exec_script(manifest: &PluginManifest, plugin_dir: &Path) -> Res
         manifest.plugin.name.to_uppercase().replace('-', "_")
     );
 
-    out.push_str(&format!(
-        "if [[ -z \"${{{}}}\" ]]; then\n",
-        guard_var
-    ));
+    // Binary dependency guards — emitted into the generated eval output (not static shell).
+    // This is the authoritative location for binary checks; plugin shell/init.zsh must not
+    // duplicate this logic (D-001: no logic in static shell files).
+    for binary in &manifest.deps.binaries {
+        out.push_str(&format!(
+            "if ! command -v {binary} &>/dev/null; then\n"
+        ));
+        out.push_str(&format!(
+            "  echo \"lynx: plugin '{}' requires '{binary}' — install it first\" >&2\n",
+            manifest.plugin.name
+        ));
+        out.push_str("  return 1\n");
+        out.push_str("fi\n");
+    }
+
+    out.push_str(&format!("if [[ -z \"${{{}}}\" ]]; then\n", guard_var));
     out.push_str(&format!(
         "  export LYNX_PLUGIN_DIR='{}'\n",
         dir_str.replace('\'', "'\\''")
@@ -117,5 +129,31 @@ mod tests {
         let m = simple_manifest("broken");
         let err = generate_exec_script(&m, tmp.path()).unwrap_err();
         assert!(err.to_string().contains("no shell/init.zsh"));
+    }
+
+    #[test]
+    fn exec_script_emits_binary_guard_for_declared_deps() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(tmp.path().join("shell")).unwrap();
+        std::fs::write(tmp.path().join("shell/init.zsh"), "# stub").unwrap();
+
+        let mut m = simple_manifest("kubectl");
+        m.deps.binaries = vec!["kubectl".into()];
+        let script = generate_exec_script(&m, tmp.path()).unwrap();
+
+        assert!(script.contains("command -v kubectl"));
+        assert!(script.contains("return 1"));
+    }
+
+    #[test]
+    fn exec_script_no_binary_guard_when_no_deps() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(tmp.path().join("shell")).unwrap();
+        std::fs::write(tmp.path().join("shell/init.zsh"), "# stub").unwrap();
+
+        let m = simple_manifest("git");
+        let script = generate_exec_script(&m, tmp.path()).unwrap();
+
+        assert!(!script.contains("command -v"));
     }
 }
