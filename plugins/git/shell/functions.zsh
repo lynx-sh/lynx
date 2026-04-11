@@ -23,3 +23,6 @@ git_ahead_behind() {
   [[ "$a" == "0" && "$b" == "0" ]] && return 0
   echo "+${a}/-${b}"
 }
+
+# Returns the active repo operation (merge/rebase/cherry-pick/bisect) or empty
+git_action() { echo "${_lynx_git_state[action]}" }

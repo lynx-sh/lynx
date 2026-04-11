@@ -8,9 +8,10 @@ use lynx_prompt::{
     renderer::render_prompt,
     segment::RenderContext,
     BackgroundJobsSegment, CmdDurationSegment, CondaEnvSegment, ContextBadgeSegment, DirSegment,
-    ExitCodeSegment, GitBranchSegment, GitStatusSegment, HostnameSegment, KubectlContextSegment,
-    NewlineSegment, ProfileBadgeSegment, PromptCharSegment, SshIndicatorSegment, TaskStatusSegment,
-    TimeSegment, UsernameSegment, VenvSegment, ViModeSegment,
+    ExitCodeSegment, GitActionSegment, GitAheadBehindSegment, GitBranchSegment, GitStashSegment,
+    GitStatusSegment, HostnameSegment, KubectlContextSegment, NewlineSegment, ProfileBadgeSegment,
+    PromptCharSegment, SshIndicatorSegment, TaskStatusSegment, TimeSegment, UsernameSegment,
+    VenvSegment, ViModeSegment,
 };
 use lynx_theme::loader::load as load_theme;
 use std::collections::HashMap;
@@ -63,6 +64,9 @@ async fn cmd_render() -> Result<()> {
         Box::new(DirSegment),
         Box::new(GitBranchSegment),
         Box::new(GitStatusSegment),
+        Box::new(GitActionSegment),
+        Box::new(GitAheadBehindSegment),
+        Box::new(GitStashSegment),
         Box::new(KubectlContextSegment),
         Box::new(VenvSegment),
         Box::new(CondaEnvSegment),
