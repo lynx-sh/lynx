@@ -107,9 +107,8 @@ color    = { fg = "blue", bold = true }
 
 # Git section — rendered in top_right slot, only appears when inside a git repo.
 [segment.custom_git_open]
-template  = "["
-show_when = { in_git_repo = true }
-color     = { fg = "blue", bold = true }
+template = "["
+color    = { fg = "blue", bold = true }
 
 [segment.git_branch]
 icon   = ""
@@ -123,9 +122,8 @@ untracked = { icon = "✈" }
 color     = { fg = "yellow" }
 
 [segment.custom_git_close]
-template  = "]"
-show_when = { in_git_repo = true }
-color     = { fg = "blue", bold = true }
+template = "]"
+color    = { fg = "blue", bold = true }
 
 # ── ls_colors ─────────────────────────────────────────────────────────────────
 [ls_colors]
