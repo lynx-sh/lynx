@@ -263,7 +263,7 @@ fn validate_segment_names(theme: &Theme, name: &str) {
         .chain(theme.segments.right.order.iter());
 
     for seg in all_segments {
-        if !KNOWN_SEGMENTS.contains(&seg.as_str()) {
+        if !KNOWN_SEGMENTS.contains(&seg.as_str()) && !seg.starts_with("custom_") {
             warn!("theme '{name}': unknown segment '{seg}' in order array — ignoring");
         }
     }

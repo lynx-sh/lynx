@@ -12,7 +12,7 @@ use lynx_prompt::{
     GitStatusSegment, GolangVersionSegment, HostnameSegment, KubectlContextSegment, NewlineSegment,
     NodeVersionSegment, ProfileBadgeSegment, PromptCharSegment, RubyVersionSegment,
     RustVersionSegment, SshIndicatorSegment, TaskStatusSegment, TimeSegment, UsernameSegment,
-    VenvSegment, ViModeSegment,
+    VenvSegment, ViModeSegment, CustomSegment,
 };
 use lynx_theme::loader::load as load_theme;
 use std::collections::HashMap;
@@ -85,6 +85,7 @@ async fn cmd_render(transient: bool) -> Result<()> {
         Box::new(ExitCodeSegment),
         Box::new(BackgroundJobsSegment),
         Box::new(ViModeSegment),
+        Box::new(CustomSegment),
         Box::new(TimeSegment),
         Box::new(ContextBadgeSegment),
         Box::new(NewlineSegment),
