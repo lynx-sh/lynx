@@ -26,9 +26,17 @@ pub async fn evaluate(
             let seg = seg_map.get(name.as_str()).copied();
             let cfg = configs.get(name).cloned().unwrap_or_default();
             let ctx = ctx.clone();
+            let name = name.clone();
             Box::pin(async move {
                 if let Some(seg) = seg {
-                    seg.render(&cfg, &ctx)
+                    seg.render(&cfg, &ctx).map(|mut r| {
+                        // Tag with segment name so the renderer can look up theme colors.
+                        // Only set if the segment didn't already provide a cache_key.
+                        if r.cache_key.is_none() {
+                            r.cache_key = Some(name);
+                        }
+                        r
+                    })
                 } else {
                     None
                 }

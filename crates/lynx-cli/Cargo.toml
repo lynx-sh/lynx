@@ -30,3 +30,7 @@ tokio.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 which = "6"
+
+[dev-dependencies]
+lynx-test-utils = { path = "../lynx-test-utils" }
+tempfile = { workspace = true }

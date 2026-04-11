@@ -5,7 +5,7 @@ use clap::{Parser, Subcommand};
     name = "lx",
     about = "Lynx — the shell framework that doesn't suck",
     version,
-    propagate_version = true,
+    propagate_version = true
 )]
 pub struct Cli {
     #[command(subcommand)]
@@ -16,6 +16,8 @@ pub struct Cli {
 pub enum Command {
     /// Initialize Lynx in a new shell session
     Init(crate::commands::init::InitArgs),
+    /// Install Lynx files to LYNX_DIR and optionally patch .zshrc
+    Install(crate::commands::install::InstallArgs),
     /// Emit or subscribe to events
     Event(crate::commands::event::EventArgs),
     /// Manage plugins
