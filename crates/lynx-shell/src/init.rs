@@ -44,10 +44,19 @@ pub fn generate_init_script(params: &InitParams<'_>) -> String {
         dir = shell_quote(params.lynx_dir),
     ));
 
+    // Clear any inherited plugin load guards — guards must be shell-session-local.
+    // A parent shell may have exported LYNX_PLUGIN_*_LOADED; if inherited, the
+    // guard would block loading while aliases (shell-local) are not present.
+    for plugin in params.enabled_plugins {
+        let guard = format!(
+            "LYNX_PLUGIN_{}_LOADED",
+            plugin.to_uppercase().replace('-', "_")
+        );
+        out.push_str(&format!("  unset {guard}\n"));
+    }
+
     // Eval-bridge calls for each enabled plugin
     for plugin in params.enabled_plugins {
-        // In agent/minimal contexts, plugin aliases are suppressed by the plugin itself
-        // via disabled_in — we still call the bridge so functions load.
         out.push_str(&format!("  lynx_eval_plugin {}\n", shell_quote(plugin)));
     }
 

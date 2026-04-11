@@ -44,8 +44,9 @@ pub fn generate_exec_script(manifest: &PluginManifest, plugin_dir: &Path) -> Res
     }
 
     out.push_str(&format!("if [[ -z \"${{{}}}\" ]]; then\n", guard_var));
+    // Not exported — LYNX_PLUGIN_DIR is shell-local state used only during plugin sourcing
     out.push_str(&format!(
-        "  export LYNX_PLUGIN_DIR='{}'\n",
+        "  LYNX_PLUGIN_DIR='{}'\n",
         dir_str.replace('\'', "'\\''")
     ));
     out.push_str("  source \"$LYNX_PLUGIN_DIR/shell/init.zsh\" 2>/dev/null\n");
@@ -57,7 +58,8 @@ pub fn generate_exec_script(manifest: &PluginManifest, plugin_dir: &Path) -> Res
         );
         out.push_str(&format!("  add-zsh-hook {} {}\n", hook, fn_name));
     }
-    out.push_str(&format!("  export {}=1\n", guard_var));
+    // Not exported — guard must not leak into child shells where aliases won't be inherited
+    out.push_str(&format!("  typeset -g {}=1\n", guard_var));
     out.push_str("fi\n");
 
     Ok(out)
