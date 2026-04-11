@@ -194,19 +194,24 @@ fn check_shell_integration() -> Check {
     let zshrc = home.join(".zshrc");
     match std::fs::read_to_string(&zshrc) {
         Ok(content) => {
-            if content.contains("eval \"$(lx init") || content.contains("eval \"$(lx") {
+            if content.contains(r#"source "${HOME}/.config/lynx/shell/init.zsh""#)
+                || content.contains("eval \"$(lx init")
+            {
                 Check {
                     name: "shell integration in .zshrc",
                     status: Status::Pass,
-                    detail: "LYNX_SOURCE_LINE found".to_string(),
+                    detail: "Lynx source line found".to_string(),
                     fix: None,
                 }
             } else {
                 Check {
                     name: "shell integration in .zshrc",
                     status: Status::Fail,
-                    detail: "lx init line not found in ~/.zshrc".to_string(),
-                    fix: Some(r#"echo 'eval "$(lx init)"' >> ~/.zshrc"#.to_string()),
+                    detail: "Lynx source line not found in ~/.zshrc".to_string(),
+                    fix: Some(
+                        r#"echo 'source "${HOME}/.config/lynx/shell/init.zsh"' >> ~/.zshrc"#
+                            .to_string(),
+                    ),
                 }
             }
         }
@@ -214,7 +219,9 @@ fn check_shell_integration() -> Check {
             name: "shell integration in .zshrc",
             status: Status::Warn,
             detail: "~/.zshrc not found".to_string(),
-            fix: Some(r#"echo 'eval "$(lx init)"' >> ~/.zshrc"#.to_string()),
+            fix: Some(
+                r#"echo 'source "${HOME}/.config/lynx/shell/init.zsh"' >> ~/.zshrc"#.to_string(),
+            ),
         },
     }
 }

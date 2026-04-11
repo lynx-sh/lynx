@@ -45,7 +45,7 @@ teardown() {
   local target="${HOME}/.config/lynx"
   run lx install --source "$LYNX_SOURCE_DIR" --dir "$target" --zshrc
   [ "$status" -eq 0 ]
-  grep -q 'eval "$(lx init)"' "${HOME}/.zshrc"
+  grep -q 'source "${HOME}/.config/lynx/shell/init.zsh"' "${HOME}/.zshrc"
 }
 
 @test "lx install --zshrc is idempotent" {
@@ -53,7 +53,7 @@ teardown() {
   lx install --source "$LYNX_SOURCE_DIR" --dir "$target" --zshrc
   lx install --source "$LYNX_SOURCE_DIR" --dir "$target" --zshrc
   local count
-  count=$(grep -c 'eval "$(lx init)"' "${HOME}/.zshrc")
+  count=$(grep -c 'source "${HOME}/.config/lynx/shell/init.zsh"' "${HOME}/.zshrc")
   [ "$count" -eq 1 ]
 }
 

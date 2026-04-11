@@ -23,11 +23,10 @@ teardown() {
   [[ "$output" == *"LYNX_CONTEXT=agent"* ]]
 }
 
-@test "lx init emits daemon auto-start check" {
+@test "lx init does not auto-start daemon (daemon is opt-in)" {
   run lx init --context interactive
   [ "$status" -eq 0 ]
-  [[ "$output" == *"lx daemon status --quiet"* ]]
-  [[ "$output" == *"lx daemon start --detach"* ]]
+  [[ "$output" != *"lx daemon"* ]]
 }
 
 @test "agent context detected from CLAUDE_CODE env var" {
