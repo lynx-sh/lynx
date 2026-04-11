@@ -79,8 +79,8 @@ check_grep() {
 }
 
 CONTEXT_SRC="$REPO_ROOT/crates/lynx-shell/src/context.rs"
-check_grep "CLAUDE_CODE in detector source" "CLAUDE_CODE" "$CONTEXT_SRC"
-check_grep "CURSOR_SESSION in detector source" "CURSOR_SESSION" "$CONTEXT_SRC"
+check_grep "CLAUDECODE in detector source" "CLAUDECODE" "$CONTEXT_SRC"
+check_grep "CURSOR_CLI in detector source" "CURSOR_CLI" "$CONTEXT_SRC"
 check_grep "CI → minimal mapping in source" "MINIMAL_ENV_VARS" "$CONTEXT_SRC"
 check_grep "context value 'interactive' in types" "Interactive" "$REPO_ROOT/crates/lynx-core/src/types.rs"
 check_grep "context value 'agent' in types" "Agent" "$REPO_ROOT/crates/lynx-core/src/types.rs"
