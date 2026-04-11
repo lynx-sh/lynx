@@ -242,7 +242,7 @@ mod tests {
         let config_dir = home.path().join(lynx_core::brand::CONFIG_DIR);
         std::fs::create_dir_all(&config_dir).expect("create config dir");
         std::fs::write(
-            config_dir.join("config.toml"),
+            config_dir.join(lynx_core::brand::CONFIG_FILE),
             r#"schema_version = 1
 enabled_plugins = []
 active_theme = "default"

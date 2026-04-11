@@ -1,3 +1,4 @@
+use crate::env_vars;
 use crate::error::{LynxError, Result};
 use std::path::PathBuf;
 
@@ -18,10 +19,10 @@ pub fn runtime_dir() -> Result<PathBuf> {
 }
 
 fn resolve_runtime_dir() -> PathBuf {
-    if let Ok(dir) = std::env::var("LYNX_RUNTIME_DIR") {
+    if let Ok(dir) = std::env::var(env_vars::LYNX_RUNTIME_DIR) {
         return PathBuf::from(dir);
     }
-    if let Ok(xdg) = std::env::var("XDG_RUNTIME_DIR") {
+    if let Ok(xdg) = std::env::var(env_vars::XDG_RUNTIME_DIR) {
         return PathBuf::from(xdg).join("lynx");
     }
     let uid = get_uid();
