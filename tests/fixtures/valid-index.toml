@@ -1,0 +1,10 @@
+[[plugin]]
+name = "git"
+description = "Git integration"
+author = "proxikal"
+latest_version = "1.0.0"
+
+[[plugin.versions]]
+version = "1.0.0"
+url = "https://example.com/git-1.0.0.tar.gz"
+checksum_sha256 = "abc123"

@@ -70,9 +70,7 @@ fn measure_startup() -> Result<Vec<(String, Duration)>> {
     // For now we report the total startup time as a single measurement.
     let _ = status;
 
-    Ok(vec![
-        ("shell startup".to_string(), total),
-    ])
+    Ok(vec![("shell startup".to_string(), total)])
 }
 
 fn average_runs(runs: &[Vec<(String, Duration)>]) -> Vec<BenchResult> {
@@ -85,7 +83,8 @@ fn average_runs(runs: &[Vec<(String, Duration)>]) -> Vec<BenchResult> {
         .iter()
         .enumerate()
         .map(|(i, (name, _))| {
-            let total_ms: u128 = runs.iter()
+            let total_ms: u128 = runs
+                .iter()
                 .filter_map(|r| r.get(i))
                 .map(|(_, d)| d.as_millis())
                 .sum();
@@ -126,7 +125,10 @@ fn print_table(results: &[BenchResult], previous: &[(String, u64)]) {
     sorted.sort_by(|a, b| b.avg_ms.cmp(&a.avg_ms));
 
     for r in sorted {
-        let prev = previous.iter().find(|(n, _)| n == &r.component).map(|(_, ms)| *ms);
+        let prev = previous
+            .iter()
+            .find(|(n, _)| n == &r.component)
+            .map(|(_, ms)| *ms);
         let delta = match prev {
             None => "  (new)".to_string(),
             Some(0) => "  —".to_string(),
@@ -151,9 +153,10 @@ fn save_benchmark(results: &[BenchResult]) -> Result<()> {
         std::fs::create_dir_all(parent)?;
     }
 
-    let json_arr: Vec<serde_json::Value> = results.iter().map(|r| {
-        serde_json::json!({ "component": r.component, "ms": r.avg_ms })
-    }).collect();
+    let json_arr: Vec<serde_json::Value> = results
+        .iter()
+        .map(|r| serde_json::json!({ "component": r.component, "ms": r.avg_ms }))
+        .collect();
 
     // Append as a new JSONL entry.
     use std::io::Write;

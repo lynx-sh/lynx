@@ -76,7 +76,7 @@ lx doctor     # diagnoses any issues with your install
 
 ```bash
 lx theme list           # see available themes
-lx theme switch minimal # switch to a theme
+lx theme set minimal    # switch to a theme
 ```
 
 ### 3. Add a plugin
@@ -96,7 +96,7 @@ lx context set interactive
 ### 5. Run a background task
 
 ```bash
-lx task run "backup" "tar czf ~/backup.tar.gz ~/code" --schedule "0 2 * * *"
+lx task add backup --run "tar czf ~/backup.tar.gz ~/code" --cron "0 2 * * *"
 lx task list
 ```
 
@@ -113,8 +113,12 @@ environment and adjusts what loads:
 - **Agent** — plugins load without aliases; minimal prompt; no interference with agent commands
 - **Minimal** — only `dir` segment; no plugins
 
-Detection is automatic: `CLAUDE_CODE=1`, `CURSOR_IDE=1`, and `CI=true` all
-trigger agent context. No user configuration required.
+Detection is automatic with canonical env vars:
+- `CLAUDE_CODE=1` or `CURSOR_SESSION=<id>` -> `agent`
+- `CI=true` -> `minimal`
+- otherwise -> `interactive`
+
+`LYNX_CONTEXT` can explicitly override detection (`interactive|agent|minimal`) when needed.
 
 ### Plugin isolation
 
@@ -135,7 +139,7 @@ Themes are TOML files. Segments are evaluated concurrently. Switch themes
 instantly without restarting your shell:
 
 ```bash
-lx theme switch powerline
+lx theme set powerline
 ```
 
 ### Task scheduler
@@ -143,7 +147,7 @@ lx theme switch powerline
 Run commands on a schedule, in the background, with persistent logs:
 
 ```bash
-lx task run "sync" "lx sync push" --schedule "*/30 * * * *"
+lx task add sync --run "lx sync push" --cron "*/30 * * * *"
 lx task logs sync
 ```
 
@@ -152,7 +156,7 @@ lx task logs sync
 Sync your config across machines via git:
 
 ```bash
-lx sync init --remote git@github.com:you/lynx-config.git
+lx sync init git@github.com:you/lynx-config.git
 lx sync push
 lx sync pull    # on another machine
 ```
@@ -162,8 +166,8 @@ lx sync pull    # on another machine
 Every config change is snapshotted. Roll back to any point:
 
 ```bash
-lx rollback list
-lx rollback apply <snapshot-id>
+lx rollback
+lx rollback --last
 ```
 
 ---

@@ -40,7 +40,9 @@ pub fn run_scheduler(tasks: Vec<ValidatedTask>, log_dir: PathBuf) -> SchedulerHa
     let handle = tokio::spawn(async move {
         scheduler_loop(tasks, &log_dir).await;
     });
-    SchedulerHandle { abort: handle.abort_handle() }
+    SchedulerHandle {
+        abort: handle.abort_handle(),
+    }
 }
 
 async fn scheduler_loop(tasks: Vec<ValidatedTask>, log_dir: &Path) {
@@ -186,10 +188,7 @@ async fn run_task(vt: &ValidatedTask) -> TaskRunLog {
     }
 }
 
-async fn read_capped(
-    handle: Option<impl tokio::io::AsyncRead + Unpin>,
-    cap: usize,
-) -> Vec<u8> {
+async fn read_capped(handle: Option<impl tokio::io::AsyncRead + Unpin>, cap: usize) -> Vec<u8> {
     let Some(reader) = handle else {
         return Vec::new();
     };
@@ -248,9 +247,7 @@ async fn write_log(log_dir: &Path, log: &TaskRunLog) {
 async fn send_notification(task_name: &str, log: &TaskRunLog) {
     let message = format!(
         "Lynx task '{}' failed (exit {:?}, {}ms)",
-        task_name,
-        log.exit_code,
-        log.duration_ms
+        task_name, log.exit_code, log.duration_ms
     );
 
     #[cfg(target_os = "macos")]
@@ -284,10 +281,7 @@ mod futures {
             F: std::future::Future + Send + 'static,
             F::Output: Send + 'static,
         {
-            let handles: Vec<_> = futs
-                .into_iter()
-                .map(|f| tokio::spawn(f))
-                .collect();
+            let handles: Vec<_> = futs.into_iter().map(|f| tokio::spawn(f)).collect();
             for h in handles {
                 let _ = h.await;
             }
@@ -328,7 +322,11 @@ mod tests {
     async fn task_captures_stdout() {
         let vt = make_validated("echo hello_world", None);
         let log = run_task(&vt).await;
-        assert!(log.stdout_tail.contains("hello_world"), "got: {:?}", log.stdout_tail);
+        assert!(
+            log.stdout_tail.contains("hello_world"),
+            "got: {:?}",
+            log.stdout_tail
+        );
     }
 
     #[tokio::test]
@@ -344,7 +342,10 @@ mod tests {
         let log = run_task(&vt).await;
         assert!(log.timed_out, "expected timed_out=true");
         assert!(log.exit_code.is_none());
-        assert!(log.duration_ms < 5_000, "should complete quickly after kill");
+        assert!(
+            log.duration_ms < 5_000,
+            "should complete quickly after kill"
+        );
     }
 
     #[tokio::test]
@@ -362,7 +363,10 @@ mod tests {
 
     #[test]
     fn tail_lines_caps_at_limit() {
-        let many = (0..2000).map(|i| format!("line {i}")).collect::<Vec<_>>().join("\n");
+        let many = (0..2000)
+            .map(|i| format!("line {i}"))
+            .collect::<Vec<_>>()
+            .join("\n");
         let result = tail_lines(many.as_bytes(), 1000);
         assert_eq!(result.lines().count(), 1000);
         assert!(result.contains("line 1999"));

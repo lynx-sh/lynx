@@ -1,5 +1,5 @@
-use lynx_core::error::{LynxError, Result};
 use crate::schema::LynxConfig;
+use lynx_core::error::{LynxError, Result};
 
 /// Validate a config before writing it to disk (D-007).
 ///
@@ -59,7 +59,10 @@ mod tests {
 
     #[test]
     fn empty_theme_fails_with_hint() {
-        let cfg = LynxConfig { active_theme: "".into(), ..base() };
+        let cfg = LynxConfig {
+            active_theme: "".into(),
+            ..base()
+        };
         let err = validate_before_apply(&cfg).unwrap_err().to_string();
         assert!(err.contains("active_theme"), "{err}");
         assert!(err.contains("lx theme"), "{err}");
@@ -67,7 +70,10 @@ mod tests {
 
     #[test]
     fn path_traversal_theme_rejected() {
-        let cfg = LynxConfig { active_theme: "../etc/passwd".into(), ..base() };
+        let cfg = LynxConfig {
+            active_theme: "../etc/passwd".into(),
+            ..base()
+        };
         assert!(validate_before_apply(&cfg).is_err());
     }
 

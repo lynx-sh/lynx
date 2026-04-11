@@ -64,9 +64,10 @@ pub async fn run(args: EventArgs) -> Result<()> {
             }
         }
         EventCommand::Examples => {
-            crate::commands::examples::run(
-                crate::commands::examples::ExamplesArgs { command: Some("event".into()) }
-            ).await?;
+            crate::commands::examples::run(crate::commands::examples::ExamplesArgs {
+                command: Some("event".into()),
+            })
+            .await?;
         }
     }
     Ok(())

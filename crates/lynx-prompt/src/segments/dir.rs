@@ -38,7 +38,8 @@ fn shorten(
             if let Some(serde_json::Value::String(root)) = obj.get("repo_root") {
                 if let Some(rel) = cwd.strip_prefix(root.as_str()) {
                     let rel = rel.trim_start_matches('/');
-                    let repo_name = Path::new(root).file_name()
+                    let repo_name = Path::new(root)
+                        .file_name()
                         .and_then(|n| n.to_str())
                         .unwrap_or("repo");
                     if rel.is_empty() {
@@ -82,7 +83,11 @@ mod tests {
     #[test]
     fn full_path_when_max_depth_zero() {
         let seg = DirSegment;
-        let cfg = SegmentConfig { max_depth: Some(0), truncate_to_repo: Some(false), ..Default::default() };
+        let cfg = SegmentConfig {
+            max_depth: Some(0),
+            truncate_to_repo: Some(false),
+            ..Default::default()
+        };
         let r = seg.render(&cfg, &ctx("/home/user/projects/lynx")).unwrap();
         assert_eq!(r.text, "/home/user/projects/lynx");
     }
@@ -90,7 +95,11 @@ mod tests {
     #[test]
     fn truncates_at_max_depth() {
         let seg = DirSegment;
-        let cfg = SegmentConfig { max_depth: Some(2), truncate_to_repo: Some(false), ..Default::default() };
+        let cfg = SegmentConfig {
+            max_depth: Some(2),
+            truncate_to_repo: Some(false),
+            ..Default::default()
+        };
         let r = seg.render(&cfg, &ctx("/a/b/c/d/e")).unwrap();
         assert_eq!(r.text, "…/d/e");
     }
@@ -98,7 +107,11 @@ mod tests {
     #[test]
     fn no_truncation_when_short() {
         let seg = DirSegment;
-        let cfg = SegmentConfig { max_depth: Some(3), truncate_to_repo: Some(false), ..Default::default() };
+        let cfg = SegmentConfig {
+            max_depth: Some(3),
+            truncate_to_repo: Some(false),
+            ..Default::default()
+        };
         let r = seg.render(&cfg, &ctx("/a/b")).unwrap();
         assert_eq!(r.text, "/a/b");
     }

@@ -110,9 +110,7 @@ pub fn load_lock() -> Result<LockFile> {
 
 pub fn load_lock_from(path: &Path) -> Result<LockFile> {
     match std::fs::read_to_string(path) {
-        Ok(content) => {
-            toml::from_str(&content).context("failed to parse lynx.lock")
-        }
+        Ok(content) => toml::from_str(&content).context("failed to parse lynx.lock"),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(LockFile::default()),
         Err(e) => Err(e).context("failed to read lynx.lock"),
     }
@@ -168,20 +166,18 @@ mod tests {
 
     fn sample_index() -> RegistryIndex {
         RegistryIndex {
-            plugins: vec![
-                RegistryEntry {
-                    name: "git".into(),
-                    description: "Git integration".into(),
-                    author: "proxikal".into(),
-                    latest_version: "1.0.0".into(),
-                    versions: vec![PluginVersion {
-                        version: "1.0.0".into(),
-                        url: "https://example.com/git-1.0.0.tar.gz".into(),
-                        checksum_sha256: "abc123".into(),
-                        min_lynx_version: None,
-                    }],
-                },
-            ],
+            plugins: vec![RegistryEntry {
+                name: "git".into(),
+                description: "Git integration".into(),
+                author: "proxikal".into(),
+                latest_version: "1.0.0".into(),
+                versions: vec![PluginVersion {
+                    version: "1.0.0".into(),
+                    url: "https://example.com/git-1.0.0.tar.gz".into(),
+                    checksum_sha256: "abc123".into(),
+                    min_lynx_version: None,
+                }],
+            }],
         }
     }
 
@@ -229,6 +225,7 @@ mod tests {
             name: "git".into(),
             version: "1.0.0".into(),
             checksum_sha256: "abc".into(),
+            installed_checksum_sha256: Some("abc".into()),
             url: "https://x.com/git.tar.gz".into(),
             source: "registry".into(),
         });

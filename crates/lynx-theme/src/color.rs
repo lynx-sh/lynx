@@ -98,14 +98,14 @@ fn rgb_to_16(r: u8, g: u8, b: u8) -> u8 {
 
 fn named_to_256(name: &str) -> Option<u8> {
     match name {
-        "black"   => Some(0),
-        "red"     => Some(1),
-        "green"   => Some(2),
-        "yellow"  => Some(3),
-        "blue"    => Some(4),
+        "black" => Some(0),
+        "red" => Some(1),
+        "green" => Some(2),
+        "yellow" => Some(3),
+        "blue" => Some(4),
         "magenta" => Some(5),
-        "cyan"    => Some(6),
-        "white"   => Some(7),
+        "cyan" => Some(6),
+        "white" => Some(7),
         "grey" | "gray" => Some(8),
         _ => None,
     }
@@ -131,7 +131,11 @@ mod tests {
 
     #[test]
     fn named_blue_all_modes() {
-        for cap in [TermCapability::TrueColor, TermCapability::Ansi256, TermCapability::Basic16] {
+        for cap in [
+            TermCapability::TrueColor,
+            TermCapability::Ansi256,
+            TermCapability::Basic16,
+        ] {
             let c = Color::Named("blue".into());
             let s = c.render_fg(cap);
             assert!(!s.is_empty(), "named blue should produce output in {cap:?}");

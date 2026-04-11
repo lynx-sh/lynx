@@ -51,10 +51,8 @@ pub fn resolve(manifests: &[PluginManifest]) -> Result<LoadOrder> {
     let active_names: HashSet<&str> = active.iter().map(|m| m.plugin.name.as_str()).collect();
 
     // in-degree and adjacency for Kahn's
-    let mut in_degree: HashMap<&str, usize> = active
-        .iter()
-        .map(|m| (m.plugin.name.as_str(), 0))
-        .collect();
+    let mut in_degree: HashMap<&str, usize> =
+        active.iter().map(|m| (m.plugin.name.as_str(), 0)).collect();
 
     let mut dependents: HashMap<&str, Vec<&str>> = HashMap::new(); // dep → plugins that need it
 
@@ -128,7 +126,11 @@ pub fn resolve(manifests: &[PluginManifest]) -> Result<LoadOrder> {
     // Suppress unused import warning — name_to_idx used for lookup above
     let _ = name_to_idx;
 
-    Ok(LoadOrder { eager, lazy, excluded })
+    Ok(LoadOrder {
+        eager,
+        lazy,
+        excluded,
+    })
 }
 
 /// Attempt to find and describe a cycle among the unsorted nodes (for error messages).
@@ -141,11 +143,7 @@ fn find_cycle<'a>(manifests: &[&'a PluginManifest], unsorted: &HashSet<&'a str>)
             return cycle;
         }
     }
-    unsorted
-        .iter()
-        .cloned()
-        .collect::<Vec<_>>()
-        .join(" → ")
+    unsorted.iter().cloned().collect::<Vec<_>>().join(" → ")
 }
 
 fn dfs_cycle<'a>(
@@ -206,7 +204,10 @@ pub fn make_manifest(name: &str, deps: &[&str], lazy: bool, binaries: &[&str]) -
             description: String::new(),
             authors: vec![],
         },
-        load: LoadConfig { lazy, hooks: vec![] },
+        load: LoadConfig {
+            lazy,
+            hooks: vec![],
+        },
         deps: DepsConfig {
             binaries: binaries.iter().map(|s| s.to_string()).collect(),
             plugins: deps.iter().map(|s| s.to_string()).collect(),
@@ -229,7 +230,12 @@ mod tests {
             make_manifest("c", &["b"], false, &[]),
         ];
         let order = resolve(&manifests).unwrap();
-        let pos: HashMap<_, _> = order.eager.iter().enumerate().map(|(i, n)| (n.as_str(), i)).collect();
+        let pos: HashMap<_, _> = order
+            .eager
+            .iter()
+            .enumerate()
+            .map(|(i, n)| (n.as_str(), i))
+            .collect();
         assert!(pos["a"] < pos["b"]);
         assert!(pos["b"] < pos["c"]);
         assert!(order.lazy.is_empty());

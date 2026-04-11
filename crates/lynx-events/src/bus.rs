@@ -4,9 +4,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 
-type AsyncHandler = Box<
-    dyn Fn(Event) -> Pin<Box<dyn Future<Output = ()> + Send>> + Send + Sync,
->;
+type AsyncHandler = Arc<dyn Fn(Event) -> Pin<Box<dyn Future<Output = ()> + Send>> + Send + Sync>;
 
 /// A simple async event bus.
 ///
@@ -30,7 +28,7 @@ impl EventBus {
         F: Fn(Event) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = ()> + Send + 'static,
     {
-        let boxed: AsyncHandler = Box::new(move |ev| Box::pin(handler(ev)));
+        let boxed: AsyncHandler = Arc::new(move |ev| Box::pin(handler(ev)));
         self.handlers
             .lock()
             .expect("event bus mutex poisoned")
@@ -44,32 +42,17 @@ impl EventBus {
     /// Handlers are called sequentially in registration order.
     /// Returns the number of handlers invoked.
     pub async fn emit(&self, event: Event) -> usize {
-        let handlers: Vec<*const AsyncHandler> = {
+        let handlers: Vec<AsyncHandler> = {
             let lock = self.handlers.lock().expect("event bus mutex poisoned");
             match lock.get(&event.name) {
                 None => return 0,
-                Some(hs) => hs.iter().map(|h| h as *const AsyncHandler).collect(),
+                Some(hs) => hs.clone(),
             }
         };
 
-        // Safety: handlers are stored in an Arc<Mutex<...>> that lives as long
-        // as EventBus. We hold no lock here so re-entrant emit is possible.
         let count = handlers.len();
-        for ptr in handlers {
-            let fut = {
-                let lock = self.handlers.lock().expect("event bus mutex poisoned");
-                if let Some(hs) = lock.get(&event.name) {
-                    // Find the handler by pointer identity
-                    hs.iter()
-                        .find(|h| std::ptr::eq(*h as *const AsyncHandler, ptr))
-                        .map(|h| (h)(event.clone()))
-                } else {
-                    None
-                }
-            };
-            if let Some(fut) = fut {
-                fut.await;
-            }
+        for handler in handlers {
+            (handler)(event.clone()).await;
         }
         count
     }
@@ -100,7 +83,9 @@ mod tests {
         let c = counter.clone();
         bus.subscribe(SHELL_CHPWD, move |_ev| {
             let c = c.clone();
-            async move { c.fetch_add(1, Ordering::SeqCst); }
+            async move {
+                c.fetch_add(1, Ordering::SeqCst);
+            }
         });
         bus.emit(Event::new(SHELL_CHPWD, "/home/user")).await;
         assert_eq!(counter.load(Ordering::SeqCst), 1);
@@ -114,7 +99,9 @@ mod tests {
             let c = counter.clone();
             bus.subscribe(SHELL_CHPWD, move |_| {
                 let c = c.clone();
-                async move { c.fetch_add(1, Ordering::SeqCst); }
+                async move {
+                    c.fetch_add(1, Ordering::SeqCst);
+                }
             });
         }
         bus.emit(Event::named(SHELL_CHPWD)).await;
@@ -128,7 +115,9 @@ mod tests {
         let c = counter.clone();
         bus.subscribe("other:event", move |_| {
             let c = c.clone();
-            async move { c.fetch_add(1, Ordering::SeqCst); }
+            async move {
+                c.fetch_add(1, Ordering::SeqCst);
+            }
         });
         bus.emit(Event::named(SHELL_CHPWD)).await;
         assert_eq!(counter.load(Ordering::SeqCst), 0);
@@ -141,7 +130,9 @@ mod tests {
         let r = received.clone();
         bus.subscribe(SHELL_CHPWD, move |ev| {
             let r = r.clone();
-            async move { *r.lock().unwrap() = ev.data.clone(); }
+            async move {
+                *r.lock().unwrap() = ev.data.clone();
+            }
         });
         bus.emit(Event::new(SHELL_CHPWD, "/tmp/test")).await;
         assert_eq!(*received.lock().unwrap(), "/tmp/test");

@@ -27,7 +27,10 @@ pub struct RenderedSegment {
 
 impl RenderedSegment {
     pub fn new(text: impl Into<String>) -> Self {
-        Self { text: text.into(), cache_key: None }
+        Self {
+            text: text.into(),
+            cache_key: None,
+        }
     }
 
     pub fn with_cache_key(mut self, key: impl Into<String>) -> Self {
@@ -48,9 +51,5 @@ pub trait Segment: Send + Sync {
         None
     }
 
-    fn render(
-        &self,
-        config: &SegmentConfig,
-        ctx: &RenderContext,
-    ) -> Option<RenderedSegment>;
+    fn render(&self, config: &SegmentConfig, ctx: &RenderContext) -> Option<RenderedSegment>;
 }

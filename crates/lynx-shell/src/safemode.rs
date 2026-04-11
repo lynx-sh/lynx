@@ -35,14 +35,23 @@ mod tests {
     #[test]
     fn safemode_script_sets_env_var() {
         let script = generate_safemode_script("active_theme must not be empty");
-        assert!(script.contains("LYNX_SAFE_MODE=1"), "must set LYNX_SAFE_MODE: {script}");
-        assert!(script.contains("LYNX_CONTEXT=minimal"), "must set minimal context: {script}");
+        assert!(
+            script.contains("LYNX_SAFE_MODE=1"),
+            "must set LYNX_SAFE_MODE: {script}"
+        );
+        assert!(
+            script.contains("LYNX_CONTEXT=minimal"),
+            "must set minimal context: {script}"
+        );
     }
 
     #[test]
     fn safemode_script_prints_fix_hint() {
         let script = generate_safemode_script("bad config");
-        assert!(script.contains("lx doctor"), "must suggest lx doctor: {script}");
+        assert!(
+            script.contains("lx doctor"),
+            "must suggest lx doctor: {script}"
+        );
     }
 
     #[test]

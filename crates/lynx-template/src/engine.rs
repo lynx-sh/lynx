@@ -75,7 +75,10 @@ mod tests {
     use super::*;
 
     fn vals(pairs: &[(&str, &str)]) -> HashMap<String, String> {
-        pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect()
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
     }
 
     #[test]
@@ -110,11 +113,7 @@ mod tests {
 
     #[test]
     fn multiple_tokens() {
-        let result = render(
-            "{{A}} and {{B}}",
-            &vals(&[("A", "foo"), ("B", "bar")]),
-        )
-        .unwrap();
+        let result = render("{{A}} and {{B}}", &vals(&[("A", "foo"), ("B", "bar")])).unwrap();
         assert_eq!(result, "foo and bar");
     }
 

@@ -89,9 +89,7 @@ fn load_plugin_manifests(plugin_dir: &str, enabled: &[String]) -> Vec<PluginMani
 
 /// Resolve LYNX_DIR: env override → default install location.
 fn resolve_lynx_dir() -> String {
-    if let Ok(dir) = std::env::var("LYNX_DIR") {
-        return dir;
-    }
-    let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
-    format!("{}/.config/lynx", home)
+    lynx_core::paths::lynx_dir()
+        .to_string_lossy()
+        .into_owned()
 }

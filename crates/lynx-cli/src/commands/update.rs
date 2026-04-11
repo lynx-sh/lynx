@@ -63,10 +63,7 @@ async fn do_update(version: &str, yes: bool) -> Result<()> {
     }
 
     let platform = detect_platform();
-    let url = format!(
-        "{}/releases/download/{version}/lx-{platform}",
-        brand::REPO
-    );
+    let url = format!("{}/releases/download/{version}/lx-{platform}", brand::REPO);
 
     println!("Downloading {version} for {platform}...");
     let bytes = download(&url).await?;

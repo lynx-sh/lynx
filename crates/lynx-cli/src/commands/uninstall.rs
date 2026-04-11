@@ -5,7 +5,7 @@ use clap::Args;
 
 use lynx_core::brand;
 
-const LYNX_INIT_PATTERN: &str = r#"source "${HOME}/.config/lynx/shell/init.zsh""#;
+use lynx_core::brand::ZSHRC_INIT_LINE;
 
 #[derive(Args)]
 pub struct UninstallArgs {
@@ -85,7 +85,7 @@ fn remove_from_zshrc(home: &Path) -> Result<()> {
     let content = std::fs::read_to_string(&zshrc)?;
     let filtered: Vec<&str> = content
         .lines()
-        .filter(|l| !l.contains(LYNX_INIT_PATTERN))
+        .filter(|l| !l.contains(ZSHRC_INIT_LINE))
         .collect();
 
     if filtered.len() == content.lines().count() {
@@ -103,9 +103,9 @@ fn stop_daemon() {
     #[cfg(target_os = "macos")]
     {
         let plist = format!(
-            "{}/Library/LaunchAgents/com.proxikal.{}.plist",
-            std::env::var("HOME").unwrap_or_default(),
-            brand::DAEMON_NAME,
+            "{}/Library/LaunchAgents/{}.plist",
+            std::env::var(lynx_core::env_vars::HOME).unwrap_or_default(),
+            lynx_core::brand::LAUNCHD_LABEL,
         );
         if std::path::Path::new(&plist).exists() {
             let _ = std::process::Command::new("launchctl")
@@ -120,10 +120,10 @@ fn stop_daemon() {
     #[cfg(target_os = "linux")]
     {
         let _ = std::process::Command::new("systemctl")
-            .args(["--user", "stop", brand::DAEMON_NAME])
+            .args(["--user", "stop", lynx_core::brand::SYSTEMD_SERVICE])
             .status();
         let _ = std::process::Command::new("systemctl")
-            .args(["--user", "disable", brand::DAEMON_NAME])
+            .args(["--user", "disable", lynx_core::brand::SYSTEMD_SERVICE])
             .status();
     }
 }

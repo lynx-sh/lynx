@@ -167,11 +167,9 @@ fn check_plugin_binary_deps() -> Check {
 
 /// Resolve plugin.toml under ~/.config/lynx/plugins/<name>.
 fn plugin_manifest_path(plugin: &str) -> Option<std::path::PathBuf> {
-    let home = std::env::var_os("HOME").map(std::path::PathBuf::from)?;
-    let path = home
-        .join(".config/lynx/plugins")
+    let path = lynx_core::paths::installed_plugins_dir()
         .join(plugin)
-        .join("plugin.toml");
+        .join(lynx_core::brand::PLUGIN_MANIFEST);
     if path.exists() {
         Some(path)
     } else {
@@ -194,7 +192,7 @@ fn check_shell_integration() -> Check {
     let zshrc = home.join(".zshrc");
     match std::fs::read_to_string(&zshrc) {
         Ok(content) => {
-            if content.contains(r#"source "${HOME}/.config/lynx/shell/init.zsh""#)
+            if content.contains(lynx_core::brand::ZSHRC_INIT_LINE)
                 || content.contains("eval \"$(lx init")
             {
                 Check {
@@ -208,10 +206,10 @@ fn check_shell_integration() -> Check {
                     name: "shell integration in .zshrc",
                     status: Status::Fail,
                     detail: "Lynx source line not found in ~/.zshrc".to_string(),
-                    fix: Some(
-                        r#"echo 'source "${HOME}/.config/lynx/shell/init.zsh"' >> ~/.zshrc"#
-                            .to_string(),
-                    ),
+                    fix: Some(format!(
+                        "echo '{}' >> ~/.zshrc",
+                        lynx_core::brand::ZSHRC_INIT_LINE
+                    )),
                 }
             }
         }
@@ -219,9 +217,10 @@ fn check_shell_integration() -> Check {
             name: "shell integration in .zshrc",
             status: Status::Warn,
             detail: "~/.zshrc not found".to_string(),
-            fix: Some(
-                r#"echo 'source "${HOME}/.config/lynx/shell/init.zsh"' >> ~/.zshrc"#.to_string(),
-            ),
+            fix: Some(format!(
+                "echo '{}' >> ~/.zshrc",
+                lynx_core::brand::ZSHRC_INIT_LINE
+            )),
         },
     }
 }
@@ -336,9 +335,10 @@ mod tests {
     #[test]
     fn config_valid_check_passes_for_clean_config() {
         let _lock = env_lock().lock().expect("lock");
-        let _guard = EnvGuard::new(&["HOME"]);
+        let _guard = EnvGuard::new(&["HOME", "LYNX_DIR"]);
         let home = temp_home();
         std::env::set_var("HOME", home.path());
+        std::env::remove_var("LYNX_DIR");
         write_valid_config(home.path(), &[]);
 
         let check = check_config_valid();
@@ -348,9 +348,10 @@ mod tests {
     #[test]
     fn plugin_binary_deps_warns_when_binary_missing() {
         let _lock = env_lock().lock().expect("lock");
-        let _guard = EnvGuard::new(&["HOME"]);
+        let _guard = EnvGuard::new(&["HOME", "LYNX_DIR"]);
         let home = temp_home();
         std::env::set_var("HOME", home.path());
+        std::env::remove_var("LYNX_DIR");
         write_valid_config(home.path(), &["demo"]);
 
         let plugin_dir = home.path().join(".config/lynx/plugins/demo");
@@ -389,9 +390,10 @@ disabled_in = ["agent", "minimal"]
     #[test]
     fn plugin_binary_deps_passes_when_no_plugins_enabled() {
         let _lock = env_lock().lock().expect("lock");
-        let _guard = EnvGuard::new(&["HOME"]);
+        let _guard = EnvGuard::new(&["HOME", "LYNX_DIR"]);
         let home = temp_home();
         std::env::set_var("HOME", home.path());
+        std::env::remove_var("LYNX_DIR");
         write_valid_config(home.path(), &[]);
 
         let check = check_plugin_binary_deps();
@@ -401,9 +403,10 @@ disabled_in = ["agent", "minimal"]
     #[test]
     fn shell_integration_warns_when_zshrc_missing() {
         let _lock = env_lock().lock().expect("lock");
-        let _guard = EnvGuard::new(&["HOME"]);
+        let _guard = EnvGuard::new(&["HOME", "LYNX_DIR"]);
         let home = temp_home();
         std::env::set_var("HOME", home.path());
+        std::env::remove_var("LYNX_DIR");
 
         let check = check_shell_integration();
         assert_eq!(check.status, Status::Warn);

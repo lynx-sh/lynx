@@ -1,8 +1,7 @@
 use crate::{ServiceBackend, ServiceStatus};
 use anyhow::{Context, Result};
+use lynx_core::{brand, env_vars};
 use std::path::PathBuf;
-
-const SERVICE_NAME: &str = "lynx-daemon.service";
 
 pub struct SystemdBackend {
     unit_path: PathBuf,
@@ -11,26 +10,25 @@ pub struct SystemdBackend {
 
 impl SystemdBackend {
     pub fn new() -> Self {
-        let config_home = std::env::var("XDG_CONFIG_HOME")
-            .unwrap_or_else(|_| {
-                let home = std::env::var("HOME").unwrap_or_default();
-                format!("{home}/.config")
-            });
+        let config_home = std::env::var("XDG_CONFIG_HOME").unwrap_or_else(|_| {
+            let home = std::env::var(env_vars::HOME).unwrap_or_default();
+            format!("{home}/.config")
+        });
 
         Self {
             unit_path: PathBuf::from(&config_home)
                 .join("systemd/user")
-                .join(SERVICE_NAME),
+                .join(brand::SYSTEMD_SERVICE),
             binary_path: Self::find_binary(),
         }
     }
 
     fn find_binary() -> PathBuf {
-        if let Ok(p) = std::env::var("LYNX_DAEMON_BIN") {
+        if let Ok(p) = std::env::var(env_vars::LYNX_DAEMON_BIN) {
             return PathBuf::from(p);
         }
         if let Ok(output) = std::process::Command::new("which")
-            .arg("lynx-daemon")
+            .arg(brand::DAEMON_NAME)
             .output()
         {
             if output.status.success() {
@@ -40,7 +38,7 @@ impl SystemdBackend {
                 }
             }
         }
-        PathBuf::from("/usr/local/bin/lynx-daemon")
+        PathBuf::from("/usr/local/bin/").join(brand::DAEMON_NAME)
     }
 
     fn unit_content(&self) -> String {
@@ -90,7 +88,8 @@ impl ServiceBackend for SystemdBackend {
         self.systemctl(&["daemon-reload"])
             .context("systemctl daemon-reload failed")?;
 
-        let out = self.systemctl(&["enable", "--now", SERVICE_NAME])
+        let out = self
+            .systemctl(&["enable", "--now", brand::SYSTEMD_SERVICE])
             .context("systemctl enable failed")?;
 
         if !out.status.success() {
@@ -104,11 +103,10 @@ impl ServiceBackend for SystemdBackend {
     }
 
     fn uninstall(&self) -> Result<()> {
-        let _ = self.systemctl(&["disable", "--now", SERVICE_NAME]);
+        let _ = self.systemctl(&["disable", "--now", brand::SYSTEMD_SERVICE]);
 
         if self.unit_path.exists() {
-            std::fs::remove_file(&self.unit_path)
-                .context("failed to remove systemd unit file")?;
+            std::fs::remove_file(&self.unit_path).context("failed to remove systemd unit file")?;
         }
 
         let _ = self.systemctl(&["daemon-reload"]);
@@ -116,7 +114,7 @@ impl ServiceBackend for SystemdBackend {
     }
 
     fn start(&self) -> Result<()> {
-        let out = self.systemctl(&["start", SERVICE_NAME])?;
+        let out = self.systemctl(&["start", brand::SYSTEMD_SERVICE])?;
         if !out.status.success() {
             anyhow::bail!(
                 "systemctl start failed: {}",
@@ -127,7 +125,7 @@ impl ServiceBackend for SystemdBackend {
     }
 
     fn stop(&self) -> Result<()> {
-        let out = self.systemctl(&["stop", SERVICE_NAME])?;
+        let out = self.systemctl(&["stop", brand::SYSTEMD_SERVICE])?;
         if !out.status.success() {
             anyhow::bail!(
                 "systemctl stop failed: {}",
@@ -138,7 +136,7 @@ impl ServiceBackend for SystemdBackend {
     }
 
     fn restart(&self) -> Result<()> {
-        let out = self.systemctl(&["restart", SERVICE_NAME])?;
+        let out = self.systemctl(&["restart", brand::SYSTEMD_SERVICE])?;
         if !out.status.success() {
             anyhow::bail!(
                 "systemctl restart failed: {}",
@@ -149,7 +147,7 @@ impl ServiceBackend for SystemdBackend {
     }
 
     fn status(&self) -> Result<ServiceStatus> {
-        let out = self.systemctl(&["is-active", SERVICE_NAME])?;
+        let out = self.systemctl(&["is-active", brand::SYSTEMD_SERVICE])?;
         let text = String::from_utf8_lossy(&out.stdout).trim().to_string();
 
         Ok(match text.as_str() {

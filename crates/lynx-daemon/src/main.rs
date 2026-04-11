@@ -68,7 +68,7 @@ impl DispatchState {
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt()
-        .with_env_filter(std::env::var("LYNX_LOG").unwrap_or_else(|_| "info".into()))
+        .with_env_filter(std::env::var(lynx_core::env_vars::LYNX_LOG).unwrap_or_else(|_| "info".into()))
         .init();
 
     info!("lynx-daemon starting");
@@ -214,13 +214,11 @@ fn validate_subscriber_name(zsh_fn: &str) -> Result<()> {
 }
 
 fn tasks_toml_path() -> PathBuf {
-    let home = std::env::var("HOME").unwrap_or_default();
-    PathBuf::from(home).join(".config/lynx/tasks.toml")
+    lynx_core::paths::tasks_file()
 }
 
 fn log_dir_path() -> PathBuf {
-    let home = std::env::var("HOME").unwrap_or_default();
-    PathBuf::from(home).join(".config/lynx/logs")
+    lynx_core::paths::logs_dir()
 }
 
 fn load_tasks_safe(path: &Path) -> Vec<lynx_task::ValidatedTask> {

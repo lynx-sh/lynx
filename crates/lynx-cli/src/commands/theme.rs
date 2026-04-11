@@ -4,7 +4,7 @@ use std::process::Command;
 use anyhow::{bail, Context as _, Result};
 use clap::{Args, Subcommand};
 
-use lynx_config::{config_path, load, save_to};
+use lynx_config::{load, snapshot::mutate_config_transaction};
 use lynx_theme::loader::{list, load as load_theme, user_theme_dir};
 
 #[derive(Args)]
@@ -34,40 +34,35 @@ pub async fn run(args: ThemeArgs) -> Result<()> {
         ThemeCommand::List => cmd_list(),
         ThemeCommand::Edit => cmd_edit(),
         ThemeCommand::Examples => {
-            crate::commands::examples::run(
-                crate::commands::examples::ExamplesArgs { command: Some("theme".into()) }
-            ).await
+            crate::commands::examples::run(crate::commands::examples::ExamplesArgs {
+                command: Some("theme".into()),
+            })
+            .await
         }
     }
 }
 
 fn cmd_set(name: &str) -> Result<()> {
     // Validate theme exists.
-    load_theme(name)
-        .with_context(|| format!("theme '{name}' not found"))?;
+    load_theme(name).with_context(|| format!("theme '{name}' not found"))?;
 
-    let mut cfg = load().context("failed to load config")?;
-    let snapshot = cfg.clone();
-    let cfg_path = config_path();
-
-    cfg.active_theme = name.to_string();
-    save_to(&cfg, &cfg_path).with_context(|| "failed to save config")?;
+    mutate_config_transaction(&format!("theme-set-{name}"), |cfg| {
+        cfg.active_theme = name.to_string();
+        Ok(())
+    })
+    .with_context(|| "failed to save config")?;
 
     // Emit theme:changed event so the shell can reload via precmd.
     emit_theme_changed(name);
 
     println!("theme set to '{name}'");
-    drop(snapshot); // snapshot held for D-007 audit; in a real failure path we'd restore
     Ok(())
 }
 
 fn cmd_random() -> Result<()> {
     let cfg = load().context("failed to load config")?;
     let current = &cfg.active_theme;
-    let available: Vec<String> = list()
-        .into_iter()
-        .filter(|n| n != current)
-        .collect();
+    let available: Vec<String> = list().into_iter().filter(|n| n != current).collect();
 
     if available.is_empty() {
         bail!("no other themes available to switch to");
@@ -153,7 +148,7 @@ fn copy_builtin_to_user(name: &str) -> Result<PathBuf> {
     // We load the theme to validate it, then write the raw TOML.
     // Since built-ins are bundled via include_str!, find them through the loader.
     drop(theme); // validated above
-    // Use the raw content from the loader.
+                 // Use the raw content from the loader.
     let content = lynx_theme::loader::builtin_content(name)
         .with_context(|| format!("built-in theme '{name}' content unavailable"))?;
     std::fs::write(&dest, content).context("failed to write theme file")?;

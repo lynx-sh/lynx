@@ -1,17 +1,14 @@
 # Lynx hook bridge — translates zsh hooks into lx events.
-# Pure forwarders only. No logic. Failures are always silent.
-# Set LYNX_HOOK_DEBUG=1 to enable verbose output for debugging.
+# Pure forwarders only. No business logic. Failures are always silent.
 
 autoload -Uz add-zsh-hook
 
 _lynx_hook_chpwd() {
   lx event emit "shell:chpwd" --data "$PWD" 2>/dev/null
-  [[ -n "${LYNX_HOOK_DEBUG}" ]] && print -u2 "[lynx:hook] chpwd -> $PWD"
 }
 
 _lynx_hook_preexec() {
   lx event emit "shell:preexec" --data "$1" 2>/dev/null
-  [[ -n "${LYNX_HOOK_DEBUG}" ]] && print -u2 "[lynx:hook] preexec -> $1"
 }
 
 _lynx_hook_precmd() {
@@ -20,7 +17,6 @@ _lynx_hook_precmd() {
   export LYNX_CACHE_KUBECTL_STATE="{\"context\":\"${_lynx_kubectl_state[context]:-}\",\"namespace\":\"${_lynx_kubectl_state[namespace]:-default}\"}"
   eval "$(lx prompt render 2>/dev/null)"
   lx event emit "shell:precmd" 2>/dev/null
-  [[ -n "${LYNX_HOOK_DEBUG}" ]] && print -u2 "[lynx:hook] precmd"
 }
 
 add-zsh-hook chpwd   _lynx_hook_chpwd

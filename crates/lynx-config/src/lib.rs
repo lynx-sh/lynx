@@ -12,10 +12,7 @@ use std::path::{Path, PathBuf};
 
 /// Resolve config file path: `$HOME/.config/lynx/config.toml`.
 pub fn config_path() -> PathBuf {
-    let home = std::env::var_os("HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("."));
-    home.join(".config/lynx/config.toml")
+    lynx_core::paths::config_file()
 }
 
 /// Load config from disk. Returns `LynxConfig::default()` if the file is missing.
@@ -27,8 +24,8 @@ pub fn load() -> Result<LynxConfig> {
 pub fn load_from(path: &Path) -> Result<LynxConfig> {
     match std::fs::read_to_string(path) {
         Ok(content) => {
-            let mut cfg: LynxConfig = toml::from_str(&content)
-                .map_err(|e| LynxError::Config(e.to_string()))?;
+            let mut cfg: LynxConfig =
+                toml::from_str(&content).map_err(|e| LynxError::Config(e.to_string()))?;
             migrate::migrate(&mut cfg)?;
             Ok(cfg)
         }
@@ -47,8 +44,7 @@ pub fn save_to(config: &LynxConfig, path: &Path) -> Result<()> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(LynxError::IoRaw)?;
     }
-    let content = toml::to_string_pretty(config)
-        .map_err(|e| LynxError::Config(e.to_string()))?;
+    let content = toml::to_string_pretty(config).map_err(|e| LynxError::Config(e.to_string()))?;
     std::fs::write(path, content).map_err(LynxError::IoRaw)
 }
 

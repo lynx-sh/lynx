@@ -5,9 +5,30 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "lowercase")]
 pub enum Context {
     #[default]
-    Interactive,  // normal shell use
-    Agent,        // AI agentic coding (Claude Code, Cursor, etc.)
-    Minimal,      // bare minimum — scripts, SSH, CI
+    Interactive, // normal shell use
+    Agent,   // AI agentic coding (Claude Code, Cursor, etc.)
+    Minimal, // bare minimum — scripts, SSH, CI
+}
+
+impl Context {
+    /// Canonical lowercase string representation — use this instead of match arms on string literals.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Context::Interactive => "interactive",
+            Context::Agent => "agent",
+            Context::Minimal => "minimal",
+        }
+    }
+
+    /// Parse from a lowercase string. Returns `None` for unrecognized values.
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s {
+            "interactive" => Some(Context::Interactive),
+            "agent" => Some(Context::Agent),
+            "minimal" => Some(Context::Minimal),
+            _ => None,
+        }
+    }
 }
 
 /// Load strategy for a plugin or module.
@@ -15,8 +36,8 @@ pub enum Context {
 #[serde(rename_all = "lowercase")]
 pub enum LoadStrategy {
     #[default]
-    Eager,   // load at startup
-    Lazy,    // defer until first use
+    Eager, // load at startup
+    Lazy, // defer until first use
 }
 
 #[cfg(test)]

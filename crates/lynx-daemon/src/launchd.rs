@@ -1,8 +1,7 @@
 use crate::{ServiceBackend, ServiceStatus};
 use anyhow::{Context, Result};
+use lynx_core::{brand, env_vars, paths};
 use std::path::PathBuf;
-
-const LABEL: &str = "com.lynx.daemon";
 
 pub struct LaunchdBackend {
     plist_path: PathBuf,
@@ -11,23 +10,23 @@ pub struct LaunchdBackend {
 
 impl LaunchdBackend {
     pub fn new() -> Self {
-        let home = std::env::var("HOME").unwrap_or_default();
+        let home = std::env::var(env_vars::HOME).unwrap_or_default();
         Self {
             plist_path: PathBuf::from(&home)
                 .join("Library/LaunchAgents")
-                .join(format!("{LABEL}.plist")),
+                .join(format!("{}.plist", brand::LAUNCHD_LABEL)),
             binary_path: Self::find_binary(),
         }
     }
 
     fn find_binary() -> PathBuf {
         // Prefer $LYNX_DAEMON_BIN override (used in tests / custom installs).
-        if let Ok(p) = std::env::var("LYNX_DAEMON_BIN") {
+        if let Ok(p) = std::env::var(env_vars::LYNX_DAEMON_BIN) {
             return PathBuf::from(p);
         }
         // Fall back to `which lynx-daemon`.
         if let Ok(output) = std::process::Command::new("which")
-            .arg("lynx-daemon")
+            .arg(brand::DAEMON_NAME)
             .output()
         {
             if output.status.success() {
@@ -37,13 +36,13 @@ impl LaunchdBackend {
                 }
             }
         }
-        PathBuf::from("/usr/local/bin/lynx-daemon")
+        PathBuf::from("/usr/local/bin/").join(brand::DAEMON_NAME)
     }
 
     fn plist_content(&self) -> String {
-        let log_dir = std::env::var("HOME")
-            .map(|h| format!("{h}/.config/lynx/logs"))
-            .unwrap_or_else(|_| "/tmp/lynx-logs".into());
+        let log_dir = paths::logs_dir()
+            .to_string_lossy()
+            .into_owned();
 
         format!(
             r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -52,7 +51,7 @@ impl LaunchdBackend {
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>{LABEL}</string>
+  <string>{label}</string>
   <key>ProgramArguments</key>
   <array>
     <string>{bin}</string>
@@ -73,8 +72,9 @@ impl LaunchdBackend {
 </dict>
 </plist>
 "#,
+            label = brand::LAUNCHD_LABEL,
             bin = self.binary_path.display(),
-            home = std::env::var("HOME").unwrap_or_default(),
+            home = std::env::var(env_vars::HOME).unwrap_or_default(),
         )
     }
 }
@@ -89,8 +89,7 @@ impl ServiceBackend for LaunchdBackend {
     fn install(&self) -> Result<()> {
         // Ensure LaunchAgents directory exists.
         if let Some(parent) = self.plist_path.parent() {
-            std::fs::create_dir_all(parent)
-                .context("failed to create LaunchAgents directory")?;
+            std::fs::create_dir_all(parent).context("failed to create LaunchAgents directory")?;
         }
 
         std::fs::write(&self.plist_path, self.plist_content())
@@ -122,8 +121,7 @@ impl ServiceBackend for LaunchdBackend {
             .output();
 
         if self.plist_path.exists() {
-            std::fs::remove_file(&self.plist_path)
-                .context("failed to remove plist")?;
+            std::fs::remove_file(&self.plist_path).context("failed to remove plist")?;
         }
 
         Ok(())
@@ -131,7 +129,7 @@ impl ServiceBackend for LaunchdBackend {
 
     fn start(&self) -> Result<()> {
         let out = std::process::Command::new("launchctl")
-            .args(["start", LABEL])
+            .args(["start", brand::LAUNCHD_LABEL])
             .output()
             .context("launchctl start failed")?;
 
@@ -146,7 +144,7 @@ impl ServiceBackend for LaunchdBackend {
 
     fn stop(&self) -> Result<()> {
         let out = std::process::Command::new("launchctl")
-            .args(["stop", LABEL])
+            .args(["stop", brand::LAUNCHD_LABEL])
             .output()
             .context("launchctl stop failed")?;
 
@@ -166,7 +164,7 @@ impl ServiceBackend for LaunchdBackend {
 
     fn status(&self) -> Result<ServiceStatus> {
         let out = std::process::Command::new("launchctl")
-            .args(["list", LABEL])
+            .args(["list", brand::LAUNCHD_LABEL])
             .output()
             .context("launchctl list failed")?;
 
@@ -176,10 +174,12 @@ impl ServiceBackend for LaunchdBackend {
 
         let text = String::from_utf8_lossy(&out.stdout);
         // launchctl list output contains "PID" key if running.
-        if text.contains("\"PID\"") || text.lines().any(|l| {
-            let parts: Vec<&str> = l.split_whitespace().collect();
-            !parts.is_empty() && parts[0] != "-" && parts[0].parse::<u32>().is_ok()
-        }) {
+        if text.contains("\"PID\"")
+            || text.lines().any(|l| {
+                let parts: Vec<&str> = l.split_whitespace().collect();
+                !parts.is_empty() && parts[0] != "-" && parts[0].parse::<u32>().is_ok()
+            })
+        {
             Ok(ServiceStatus::Running)
         } else {
             Ok(ServiceStatus::Stopped)
@@ -195,7 +195,7 @@ mod tests {
     fn plist_contains_label() {
         let backend = LaunchdBackend::new();
         let content = backend.plist_content();
-        assert!(content.contains(LABEL));
+        assert!(content.contains(brand::LAUNCHD_LABEL));
     }
 
     #[test]
