@@ -8,6 +8,7 @@ authors.workspace = true
 lynx-core = { path = "../lynx-core" }
 lynx-config = { path = "../lynx-config" }
 serde.workspace = true
+sha2.workspace = true
 toml.workspace = true
 anyhow.workspace = true
 thiserror.workspace = true

@@ -5,6 +5,7 @@ use anyhow::{bail, Result};
 use clap::Args;
 
 use lynx_core::brand;
+use lynx_theme::loader::{resync_builtin_themes, user_theme_dir};
 
 const CHECK_CACHE_TTL_SECS: u64 = 3600; // 1 hour
 
@@ -87,6 +88,15 @@ async fn do_update(version: &str, yes: bool) -> Result<()> {
 
     std::fs::rename(&tmp, &current_bin)
         .map_err(|e| anyhow::anyhow!("failed to replace binary: {e}"))?;
+
+    // Resync built-in themes: overwrite stock user theme files with new embedded content.
+    let themes_dir = user_theme_dir();
+    if themes_dir.exists() {
+        let n = resync_builtin_themes(&themes_dir);
+        if n > 0 {
+            println!("  ✓ resynced {n} built-in theme(s) in {}", themes_dir.display());
+        }
+    }
 
     println!("Updated to {version}. Restart your shell or run: exec lx");
     Ok(())
