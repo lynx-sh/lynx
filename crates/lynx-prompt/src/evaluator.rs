@@ -1,37 +1,64 @@
 use std::collections::HashMap;
 
 use futures::future::join_all;
-use lynx_theme::schema::{SegmentConfig, Theme};
+use lynx_core::types::Context;
+use lynx_theme::schema::Theme;
 
 use crate::segment::{RenderContext, RenderedSegment, Segment};
+
+/// Determine whether a segment should be rendered given its raw config and the
+/// active shell context. Evaluated before `render` is called.
+///
+/// Priority order:
+/// 1. `show_in` in config — only show in listed contexts (overrides everything)
+/// 2. `hide_in` in config — hide in listed contexts
+/// 3. `segment.default_hide_in()` — segment's own default exclusions
+/// 4. No restriction — always show
+fn is_visible(config: &toml::Value, seg: &dyn Segment, ctx: &RenderContext) -> bool {
+    let ctx_str = match ctx.shell_context {
+        Context::Interactive => "interactive",
+        Context::Agent => "agent",
+        Context::Minimal => "minimal",
+    };
+
+    if let Some(show_in) = config.get("show_in").and_then(|v| v.as_array()) {
+        return show_in.iter().any(|s| s.as_str() == Some(ctx_str));
+    }
+    if let Some(hide_in) = config.get("hide_in").and_then(|v| v.as_array()) {
+        return !hide_in.iter().any(|s| s.as_str() == Some(ctx_str));
+    }
+    !seg.default_hide_in().contains(&ctx_str)
+}
 
 /// Run all segments in the given order concurrently and return the non-None results
 /// in order.
 pub async fn evaluate(
     segments: &[Box<dyn Segment>],
     order: &[String],
-    configs: &HashMap<String, SegmentConfig>,
+    configs: &HashMap<String, toml::Value>,
     ctx: &RenderContext,
 ) -> Vec<RenderedSegment> {
-    // Build a map from name → segment impl.
     let seg_map: HashMap<&str, &dyn Segment> =
         segments.iter().map(|s| (s.name(), s.as_ref())).collect();
 
-    // Spawn all segments concurrently via tokio tasks.
     let futures: Vec<
         std::pin::Pin<Box<dyn std::future::Future<Output = Option<RenderedSegment>> + Send>>,
     > = order
         .iter()
         .map(|name| {
             let seg = seg_map.get(name.as_str()).copied();
-            let cfg = configs.get(name).cloned().unwrap_or_default();
+            let cfg = configs
+                .get(name)
+                .cloned()
+                .unwrap_or_else(|| toml::Value::Table(toml::map::Map::new()));
             let ctx = ctx.clone();
             let name = name.clone();
             Box::pin(async move {
                 if let Some(seg) = seg {
+                    if !is_visible(&cfg, seg, &ctx) {
+                        return None;
+                    }
                     seg.render(&cfg, &ctx).map(|mut r| {
-                        // Tag with segment name so the renderer can look up theme colors.
-                        // Only set if the segment didn't already provide a cache_key.
                         if r.cache_key.is_none() {
                             r.cache_key = Some(name);
                         }
@@ -65,7 +92,6 @@ pub async fn evaluate_theme(
 mod tests {
     use super::*;
     use lynx_core::types::Context;
-    use lynx_theme::schema::SegmentConfig;
     use std::collections::HashMap;
     use std::time::{Duration, Instant};
 
@@ -82,7 +108,7 @@ mod tests {
             self.name
         }
 
-        fn render(&self, _config: &SegmentConfig, _ctx: &RenderContext) -> Option<RenderedSegment> {
+        fn render(&self, _config: &toml::Value, _ctx: &RenderContext) -> Option<RenderedSegment> {
             std::thread::sleep(Duration::from_millis(self.delay_ms));
             Some(RenderedSegment::new(self.name))
         }

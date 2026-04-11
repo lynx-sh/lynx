@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use lynx_core::error::{LynxError, Result};
 use tracing::warn;
 
-use crate::schema::{SegmentColor, Theme, KNOWN_SEGMENTS};
+use crate::schema::{Theme, KNOWN_SEGMENTS};
 
 /// Built-in themes bundled via `include_str!` so they ship with the binary
 /// but remain editable in the `themes/` source directory.
@@ -69,49 +69,47 @@ pub fn parse_and_validate(content: &str, name: &str) -> Result<Theme> {
     Ok(theme)
 }
 
-/// Resolve `$varname` color strings in all segment configs against the `[colors]`
+/// Resolve `$varname` strings in all segment config values against the `[colors]`
 /// palette table. Runs once at load time — segments see plain hex/named values.
+///
+/// Walks the entire TOML value tree recursively so all string fields (color fg/bg,
+/// status icon colors, any future fields) are resolved without enumerating field names.
 ///
 /// Rules:
 /// - Only strings starting with `$` are resolved.
-/// - If the palette key is not found the value is left unchanged (may be a valid
-///   named color or hex — the renderer will handle it).
+/// - Unknown palette keys are left unchanged (may be a valid named color or hex).
 /// - The `[colors]` table itself is never mutated.
 fn resolve_palette(theme: &mut Theme) {
     if theme.colors.is_empty() {
         return;
     }
     let palette = theme.colors.clone();
-
     for config in theme.segment.values_mut() {
-        resolve_segment_color(&mut config.color, &palette);
-        if let Some(ref mut si) = config.staged {
-            resolve_opt_string(&mut si.color, &palette);
-        }
-        if let Some(ref mut si) = config.modified {
-            resolve_opt_string(&mut si.color, &palette);
-        }
-        if let Some(ref mut si) = config.untracked {
-            resolve_opt_string(&mut si.color, &palette);
-        }
+        resolve_value(&mut *config, &palette);
     }
 }
 
-fn resolve_segment_color(color: &mut Option<SegmentColor>, palette: &HashMap<String, String>) {
-    if let Some(ref mut c) = color {
-        resolve_opt_string(&mut c.fg, palette);
-        resolve_opt_string(&mut c.bg, palette);
-    }
-}
-
-/// If `s` starts with `$`, look up the remainder in `palette` and replace.
-fn resolve_opt_string(s: &mut Option<String>, palette: &HashMap<String, String>) {
-    if let Some(ref mut val) = s {
-        if let Some(key) = val.strip_prefix('$') {
-            if let Some(resolved) = palette.get(key) {
-                *val = resolved.clone();
+/// Recursively resolve `$varname` strings in a `toml::Value`.
+fn resolve_value(value: &mut toml::Value, palette: &HashMap<String, String>) {
+    match value {
+        toml::Value::String(s) => {
+            if let Some(key) = s.strip_prefix('$') {
+                if let Some(resolved) = palette.get(key) {
+                    *s = resolved.clone();
+                }
             }
         }
+        toml::Value::Table(map) => {
+            for (_, v) in map.iter_mut() {
+                resolve_value(v, palette);
+            }
+        }
+        toml::Value::Array(arr) => {
+            for v in arr.iter_mut() {
+                resolve_value(v, palette);
+            }
+        }
+        _ => {}
     }
 }
 
@@ -208,7 +206,7 @@ order = []
         let theme = parse_and_validate(toml, "no-colors").unwrap();
         // No colors table — defaults to empty HashMap
         assert!(theme.colors.is_empty());
-        // dir segment has no config — falls back to SegmentConfig::default()
+        // dir segment has no config — evaluator uses empty toml::Value table
         assert!(!theme.segment.contains_key("dir"));
     }
 
@@ -255,9 +253,11 @@ color = { fg = "$accent" }
 color = { fg = "$danger", bold = true }
 "###;
         let theme = parse_and_validate(toml, "palette-test").unwrap();
-        let dir_fg = theme.segment["dir"].color.as_ref().unwrap().fg.as_deref().unwrap();
+        let dir_fg = theme.segment["dir"]
+            .get("color").and_then(|c| c.get("fg")).and_then(|v| v.as_str()).unwrap();
         assert_eq!(dir_fg, "#7aa2f7", "palette var '$accent' should resolve to '#7aa2f7'");
-        let git_fg = theme.segment["git_branch"].color.as_ref().unwrap().fg.as_deref().unwrap();
+        let git_fg = theme.segment["git_branch"]
+            .get("color").and_then(|c| c.get("fg")).and_then(|v| v.as_str()).unwrap();
         assert_eq!(git_fg, "#f7768e", "palette var '$danger' should resolve to '#f7768e'");
     }
 
@@ -281,7 +281,8 @@ color = { fg = "$nonexistent" }
 "###;
         let theme = parse_and_validate(toml, "unknown-var").unwrap();
         // $nonexistent not in [colors] — left unchanged (may be a valid color name)
-        let fg = theme.segment["dir"].color.as_ref().unwrap().fg.as_deref().unwrap();
+        let fg = theme.segment["dir"]
+            .get("color").and_then(|c| c.get("fg")).and_then(|v| v.as_str()).unwrap();
         assert_eq!(fg, "$nonexistent");
     }
 
@@ -304,7 +305,8 @@ order = []
 color = { fg = "blue" }
 "###;
         let theme = parse_and_validate(toml, "literal-colors").unwrap();
-        let fg = theme.segment["dir"].color.as_ref().unwrap().fg.as_deref().unwrap();
+        let fg = theme.segment["dir"]
+            .get("color").and_then(|c| c.get("fg")).and_then(|v| v.as_str()).unwrap();
         assert_eq!(fg, "blue", "literal color names must not be modified by palette resolver");
     }
 

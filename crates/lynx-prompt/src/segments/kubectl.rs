@@ -1,6 +1,11 @@
-use lynx_theme::schema::SegmentConfig;
+use serde::Deserialize;
 
 use crate::segment::{RenderContext, RenderedSegment, Segment};
+
+#[derive(Deserialize, Default)]
+struct KubectlConfig {
+    prod_pattern: Option<String>,
+}
 
 /// Shows the current kubectl context and namespace.
 /// Hidden when kubectl is not installed or no context is active.
@@ -16,7 +21,8 @@ impl Segment for KubectlContextSegment {
         Some(crate::cache_keys::KUBECTL_STATE)
     }
 
-    fn render(&self, config: &SegmentConfig, ctx: &RenderContext) -> Option<RenderedSegment> {
+    fn render(&self, config: &toml::Value, ctx: &RenderContext) -> Option<RenderedSegment> {
+        let cfg: KubectlConfig = config.clone().try_into().unwrap_or_default();
         let state = ctx.cache.get(crate::cache_keys::KUBECTL_STATE)?;
 
         let context = state.get("context")?.as_str()?;
@@ -29,7 +35,7 @@ impl Segment for KubectlContextSegment {
             .and_then(|v| v.as_str())
             .unwrap_or("default");
 
-        let is_prod = config
+        let is_prod = cfg
             .prod_pattern
             .as_deref()
             .map(|pattern| {
@@ -40,10 +46,8 @@ impl Segment for KubectlContextSegment {
             .unwrap_or(false);
 
         let text = format!("⎈ {context}:{namespace}");
-
         let mut seg = RenderedSegment::new(text).with_cache_key(crate::cache_keys::KUBECTL_STATE);
         if is_prod {
-            // Signal prod context — consumers can apply red styling via theme color config
             seg.text = format!("[PROD] {}", seg.text);
         }
 
@@ -54,6 +58,7 @@ impl Segment for KubectlContextSegment {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::segment::empty_config;
     use std::collections::HashMap;
 
     fn ctx_with_kubectl(context: &str, namespace: &str) -> RenderContext {
@@ -81,21 +86,19 @@ mod tests {
 
     #[test]
     fn hidden_without_cache() {
-        let r = KubectlContextSegment.render(&Default::default(), &empty_ctx());
+        let r = KubectlContextSegment.render(&empty_config(), &empty_ctx());
         assert!(r.is_none());
     }
 
     #[test]
     fn hidden_when_context_is_default() {
-        let r = KubectlContextSegment
-            .render(&Default::default(), &ctx_with_kubectl("default", "default"));
+        let r = KubectlContextSegment.render(&empty_config(), &ctx_with_kubectl("default", "default"));
         assert!(r.is_none());
     }
 
     #[test]
     fn shows_context_and_namespace() {
-        let r =
-            KubectlContextSegment.render(&Default::default(), &ctx_with_kubectl("staging", "web"));
+        let r = KubectlContextSegment.render(&empty_config(), &ctx_with_kubectl("staging", "web"));
         assert!(r.is_some());
         let text = r.unwrap().text;
         assert!(text.contains("staging"));
@@ -104,22 +107,16 @@ mod tests {
 
     #[test]
     fn prod_pattern_marks_context() {
-        let config = SegmentConfig {
-            prod_pattern: Some("prod.*".to_string()),
-            ..Default::default()
-        };
-        let r = KubectlContextSegment.render(&config, &ctx_with_kubectl("prod-us-east", "api"));
+        let cfg: toml::Value = toml::from_str(r#"prod_pattern = "prod.*""#).unwrap();
+        let r = KubectlContextSegment.render(&cfg, &ctx_with_kubectl("prod-us-east", "api"));
         assert!(r.is_some());
         assert!(r.unwrap().text.contains("[PROD]"));
     }
 
     #[test]
     fn non_prod_context_no_marker() {
-        let config = SegmentConfig {
-            prod_pattern: Some("prod.*".to_string()),
-            ..Default::default()
-        };
-        let r = KubectlContextSegment.render(&config, &ctx_with_kubectl("staging", "api"));
+        let cfg: toml::Value = toml::from_str(r#"prod_pattern = "prod.*""#).unwrap();
+        let r = KubectlContextSegment.render(&cfg, &ctx_with_kubectl("staging", "api"));
         assert!(r.is_some());
         assert!(!r.unwrap().text.contains("[PROD]"));
     }

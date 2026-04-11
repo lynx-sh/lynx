@@ -1,5 +1,4 @@
 use crate::segment::{RenderContext, RenderedSegment, Segment};
-use lynx_theme::schema::SegmentConfig;
 use std::io::BufRead;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -21,8 +20,7 @@ impl Segment for TaskStatusSegment {
         Some(CACHE_KEY)
     }
 
-    fn render(&self, _config: &SegmentConfig, ctx: &RenderContext) -> Option<RenderedSegment> {
-        // Use cached result if present — refreshed by precmd event at most once per minute.
+    fn render(&self, _config: &toml::Value, ctx: &RenderContext) -> Option<RenderedSegment> {
         if let Some(cached) = ctx.cache.get(CACHE_KEY) {
             let text = cached.as_str()?.to_string();
             if text.is_empty() {
@@ -31,7 +29,6 @@ impl Segment for TaskStatusSegment {
             return Some(RenderedSegment::new(text).with_cache_key(CACHE_KEY));
         }
 
-        // No cache — compute inline (first render or cache miss).
         let summary = compute_task_summary()?;
         Some(RenderedSegment::new(summary).with_cache_key(CACHE_KEY))
     }
@@ -45,7 +42,6 @@ pub fn compute_task_summary() -> Option<String> {
         return None;
     }
 
-    // Count enabled tasks from tasks.toml.
     let content = std::fs::read_to_string(&tasks_path).ok()?;
     let file: toml::Value = toml::from_str(&content).ok()?;
     let tasks = file.get("task")?.as_array()?;
@@ -61,7 +57,6 @@ pub fn compute_task_summary() -> Option<String> {
         .unwrap_or_default()
         .as_secs();
 
-    // Check all task logs for recent failures.
     let mut any_recent_failure = false;
 
     for task in tasks {
@@ -110,7 +105,7 @@ fn task_log_dir() -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::segment::RenderContext;
+    use crate::segment::{empty_config, RenderContext};
     use lynx_core::types::Context;
     use std::collections::HashMap;
     use tempfile::TempDir;
@@ -129,14 +124,14 @@ mod tests {
     #[test]
     fn hidden_when_cache_entry_is_empty_string() {
         let ctx = make_ctx_with_cache(CACHE_KEY, "");
-        let result = TaskStatusSegment.render(&Default::default(), &ctx);
+        let result = TaskStatusSegment.render(&empty_config(), &ctx);
         assert!(result.is_none());
     }
 
     #[test]
     fn uses_cached_value_when_present() {
         let ctx = make_ctx_with_cache(CACHE_KEY, "󱐌 3");
-        let result = TaskStatusSegment.render(&Default::default(), &ctx).unwrap();
+        let result = TaskStatusSegment.render(&empty_config(), &ctx).unwrap();
         assert_eq!(result.text, "󱐌 3");
         assert_eq!(result.cache_key.as_deref(), Some(CACHE_KEY));
     }

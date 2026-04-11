@@ -1,6 +1,11 @@
-use lynx_theme::schema::SegmentConfig;
+use serde::Deserialize;
 
 use crate::segment::{RenderContext, RenderedSegment, Segment};
+
+#[derive(Deserialize, Default)]
+struct CmdDurationConfig {
+    min_ms: Option<u64>,
+}
 
 pub struct CmdDurationSegment;
 
@@ -9,14 +14,14 @@ impl Segment for CmdDurationSegment {
         "cmd_duration"
     }
 
-    fn render(&self, config: &SegmentConfig, ctx: &RenderContext) -> Option<RenderedSegment> {
+    fn render(&self, config: &toml::Value, ctx: &RenderContext) -> Option<RenderedSegment> {
+        let cfg: CmdDurationConfig = config.clone().try_into().unwrap_or_default();
         let ms = ctx.last_cmd_ms?;
-        let threshold = config.min_ms.unwrap_or(500);
+        let threshold = cfg.min_ms.unwrap_or(500);
         if ms < threshold {
             return None;
         }
-        let display = format_duration(ms);
-        Some(RenderedSegment::new(display))
+        Some(RenderedSegment::new(format_duration(ms)))
     }
 }
 
@@ -34,6 +39,7 @@ fn format_duration(ms: u64) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::segment::empty_config;
     use std::collections::HashMap;
 
     fn ctx(ms: Option<u64>) -> RenderContext {
@@ -45,29 +51,23 @@ mod tests {
         }
     }
 
+    fn cfg(s: &str) -> toml::Value {
+        toml::from_str(s).unwrap()
+    }
+
     #[test]
     fn hides_under_threshold() {
-        let cfg = SegmentConfig {
-            min_ms: Some(500),
-            ..Default::default()
-        };
-        assert!(CmdDurationSegment.render(&cfg, &ctx(Some(200))).is_none());
+        assert!(CmdDurationSegment.render(&cfg("min_ms = 500"), &ctx(Some(200))).is_none());
     }
 
     #[test]
     fn shows_when_over_threshold() {
-        let cfg = SegmentConfig {
-            min_ms: Some(500),
-            ..Default::default()
-        };
-        assert!(CmdDurationSegment.render(&cfg, &ctx(Some(1500))).is_some());
+        assert!(CmdDurationSegment.render(&cfg("min_ms = 500"), &ctx(Some(1500))).is_some());
     }
 
     #[test]
     fn hides_when_no_duration() {
-        assert!(CmdDurationSegment
-            .render(&Default::default(), &ctx(None))
-            .is_none());
+        assert!(CmdDurationSegment.render(&empty_config(), &ctx(None)).is_none());
     }
 
     #[test]

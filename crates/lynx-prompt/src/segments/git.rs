@@ -1,8 +1,25 @@
 use std::time::Duration;
 
-use lynx_theme::schema::SegmentConfig;
+use serde::Deserialize;
 
 use crate::segment::{RenderContext, RenderedSegment, Segment};
+
+#[derive(Deserialize, Default)]
+struct GitBranchConfig {
+    icon: Option<String>,
+}
+
+#[derive(Deserialize, Default)]
+struct StatusIconConfig {
+    icon: Option<String>,
+}
+
+#[derive(Deserialize, Default)]
+struct GitStatusConfig {
+    staged: Option<StatusIconConfig>,
+    modified: Option<StatusIconConfig>,
+    untracked: Option<StatusIconConfig>,
+}
 
 /// Shows the current git branch name.
 pub struct GitBranchSegment;
@@ -16,12 +33,13 @@ impl Segment for GitBranchSegment {
         Some(crate::cache_keys::GIT_STATE)
     }
 
-    fn render(&self, config: &SegmentConfig, ctx: &RenderContext) -> Option<RenderedSegment> {
+    fn render(&self, config: &toml::Value, ctx: &RenderContext) -> Option<RenderedSegment> {
+        let cfg: GitBranchConfig = config.clone().try_into().unwrap_or_default();
         let branch = git_branch(ctx)?;
         if branch.is_empty() {
             return None;
         }
-        let icon = config.icon.as_deref().unwrap_or(" ");
+        let icon = cfg.icon.as_deref().unwrap_or(" ");
         Some(RenderedSegment::new(format!("{icon}{branch}")).with_cache_key("git_branch"))
     }
 }
@@ -38,45 +56,22 @@ impl Segment for GitStatusSegment {
         Some(crate::cache_keys::GIT_STATE)
     }
 
-    fn render(&self, config: &SegmentConfig, ctx: &RenderContext) -> Option<RenderedSegment> {
+    fn render(&self, config: &toml::Value, ctx: &RenderContext) -> Option<RenderedSegment> {
+        let cfg: GitStatusConfig = config.clone().try_into().unwrap_or_default();
         let state = git_state_obj(ctx)?;
 
         let mut parts = Vec::new();
 
-        if state
-            .get("staged")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false)
-        {
-            let icon = config
-                .staged
-                .as_ref()
-                .and_then(|s| s.icon.as_deref())
-                .unwrap_or("+");
+        if state.get("staged").and_then(|v| v.as_bool()).unwrap_or(false) {
+            let icon = cfg.staged.as_ref().and_then(|s| s.icon.as_deref()).unwrap_or("+");
             parts.push(icon.to_string());
         }
-        if state
-            .get("modified")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false)
-        {
-            let icon = config
-                .modified
-                .as_ref()
-                .and_then(|s| s.icon.as_deref())
-                .unwrap_or("!");
+        if state.get("modified").and_then(|v| v.as_bool()).unwrap_or(false) {
+            let icon = cfg.modified.as_ref().and_then(|s| s.icon.as_deref()).unwrap_or("!");
             parts.push(icon.to_string());
         }
-        if state
-            .get("untracked")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false)
-        {
-            let icon = config
-                .untracked
-                .as_ref()
-                .and_then(|s| s.icon.as_deref())
-                .unwrap_or("?");
+        if state.get("untracked").and_then(|v| v.as_bool()).unwrap_or(false) {
+            let icon = cfg.untracked.as_ref().and_then(|s| s.icon.as_deref()).unwrap_or("?");
             parts.push(icon.to_string());
         }
 
@@ -96,19 +91,15 @@ impl Segment for GitStatusSegment {
 ///
 /// The fallback means the branch segment works even without the git plugin loaded.
 fn git_branch(ctx: &RenderContext) -> Option<String> {
-    // 1. Try cache first (zero overhead when git plugin is active).
     if let Some(branch) = git_state_str(ctx, "branch") {
         if !branch.is_empty() {
             return Some(branch.to_string());
         }
     }
-
-    // 2. Fallback: run git in cwd with a timeout.
     git_branch_from_subprocess(&ctx.cwd)
 }
 
 /// Call `git -C <dir> symbolic-ref --short HEAD` with a 200ms wall-clock timeout.
-/// Returns None if not in a git repo, git is not on PATH, or the call times out.
 fn git_branch_from_subprocess(dir: &str) -> Option<String> {
     use std::process::{Command, Stdio};
 
@@ -119,7 +110,6 @@ fn git_branch_from_subprocess(dir: &str) -> Option<String> {
         .spawn()
         .ok()?;
 
-    // Poll with short sleeps — we don't want to block the prompt.
     let timeout = Duration::from_millis(200);
     let start = std::time::Instant::now();
     let poll_interval = Duration::from_millis(10);
@@ -129,9 +119,7 @@ fn git_branch_from_subprocess(dir: &str) -> Option<String> {
             Ok(Some(status)) => {
                 if status.success() {
                     let output = child.wait_with_output().ok()?;
-                    let branch = String::from_utf8_lossy(&output.stdout)
-                        .trim()
-                        .to_string();
+                    let branch = String::from_utf8_lossy(&output.stdout).trim().to_string();
                     return if branch.is_empty() { None } else { Some(branch) };
                 } else {
                     return None;
@@ -163,6 +151,7 @@ fn git_state_str<'a>(ctx: &'a RenderContext, key: &str) -> Option<&'a str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::segment::empty_config;
     use serde_json::json;
     use std::collections::HashMap;
 
@@ -185,10 +174,9 @@ mod tests {
         }
     }
 
-    /// A context with no cache and a cwd that is not inside a git repo.
     fn no_git_ctx() -> RenderContext {
         RenderContext {
-            cwd: "/".into(), // filesystem root — never a git repo
+            cwd: "/".into(),
             shell_context: lynx_core::types::Context::Interactive,
             last_cmd_ms: None,
             cache: HashMap::new(),
@@ -197,25 +185,19 @@ mod tests {
 
     #[test]
     fn branch_shows_when_in_repo() {
-        let r = GitBranchSegment.render(
-            &Default::default(),
-            &ctx_with_git("main", false, false, false),
-        );
+        let r = GitBranchSegment.render(&empty_config(), &ctx_with_git("main", false, false, false));
         assert!(r.is_some());
         assert!(r.unwrap().text.contains("main"));
     }
 
     #[test]
     fn branch_returns_none_outside_repo() {
-        // cwd="/" is never a git repo — fallback subprocess must return None.
-        let r = GitBranchSegment.render(&Default::default(), &no_git_ctx());
+        let r = GitBranchSegment.render(&empty_config(), &no_git_ctx());
         assert!(r.is_none());
     }
 
     #[test]
     fn branch_fallback_works_in_real_repo() {
-        // Run git in the actual workspace root — should find a branch.
-        // CARGO_MANIFEST_DIR = crates/lynx-prompt → parent → crates → parent → workspace root
         let workspace_root = std::env::var("CARGO_MANIFEST_DIR")
             .map(|d| {
                 std::path::PathBuf::from(d)
@@ -235,26 +217,19 @@ mod tests {
 
     #[test]
     fn status_hides_when_clean() {
-        let r = GitStatusSegment.render(
-            &Default::default(),
-            &ctx_with_git("main", false, false, false),
-        );
+        let r = GitStatusSegment.render(&empty_config(), &ctx_with_git("main", false, false, false));
         assert!(r.is_none());
     }
 
     #[test]
     fn status_shows_staged_icon() {
-        let r = GitStatusSegment.render(
-            &Default::default(),
-            &ctx_with_git("main", true, false, false),
-        );
+        let r = GitStatusSegment.render(&empty_config(), &ctx_with_git("main", true, false, false));
         assert!(r.unwrap().text.contains('+'));
     }
 
     #[test]
     fn status_combined_icons() {
-        let r =
-            GitStatusSegment.render(&Default::default(), &ctx_with_git("main", true, true, true));
+        let r = GitStatusSegment.render(&empty_config(), &ctx_with_git("main", true, true, true));
         let text = r.unwrap().text;
         assert!(text.contains('+'));
         assert!(text.contains('!'));

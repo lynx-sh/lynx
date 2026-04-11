@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 use lynx_core::types::Context;
-use lynx_theme::schema::SegmentConfig;
 
 /// Data passed to every segment at render time.
 #[derive(Debug, Clone)]
@@ -39,7 +38,16 @@ impl RenderedSegment {
     }
 }
 
+/// Return an empty segment config (no fields set). Convenience for tests.
+pub fn empty_config() -> toml::Value {
+    toml::Value::Table(toml::map::Map::new())
+}
+
 /// All segment implementations must implement this trait.
+///
+/// `render` receives the raw TOML table for this segment. Each segment
+/// deserializes its own typed config from it. Universal fields (`show_in`,
+/// `hide_in`) are handled by the evaluator before render is called.
 ///
 /// `render` returns `None` when the segment should be hidden entirely.
 /// Segments MUST NOT perform blocking I/O — slow data must come from the cache.
@@ -51,5 +59,11 @@ pub trait Segment: Send + Sync {
         None
     }
 
-    fn render(&self, config: &SegmentConfig, ctx: &RenderContext) -> Option<RenderedSegment>;
+    /// Contexts this segment hides in by default when no `hide_in` or `show_in`
+    /// is set in config. The evaluator checks this before calling render.
+    fn default_hide_in(&self) -> &[&str] {
+        &[]
+    }
+
+    fn render(&self, config: &toml::Value, ctx: &RenderContext) -> Option<RenderedSegment>;
 }

@@ -30,14 +30,15 @@ fn assemble(segs: &[RenderedSegment], theme: &Theme) -> String {
 
     for seg in segs {
         // Look up color config by the segment's cache_key (which is the segment name).
-        let color_cfg = seg
+        let color_cfg: Option<lynx_theme::schema::SegmentColor> = seg
             .cache_key
             .as_deref()
             .and_then(|name| theme.segment.get(name))
-            .and_then(|sc| sc.color.as_ref());
+            .and_then(|sc| sc.get("color"))
+            .and_then(|c| c.clone().try_into().ok());
 
         let text = if cap != TermCapability::None {
-            if let Some(color) = color_cfg {
+            if let Some(ref color) = color_cfg {
                 apply_color_zsh(&seg.text, color, cap)
             } else {
                 seg.text.clone()

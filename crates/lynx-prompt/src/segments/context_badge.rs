@@ -1,7 +1,13 @@
-use lynx_core::types::Context;
-use lynx_theme::schema::SegmentConfig;
+use std::collections::HashMap;
+
+use serde::Deserialize;
 
 use crate::segment::{RenderContext, RenderedSegment, Segment};
+
+#[derive(Deserialize, Default)]
+struct ContextBadgeConfig {
+    label: Option<HashMap<String, String>>,
+}
 
 pub struct ContextBadgeSegment;
 
@@ -10,38 +16,32 @@ impl Segment for ContextBadgeSegment {
         "context_badge"
     }
 
-    fn render(&self, config: &SegmentConfig, ctx: &RenderContext) -> Option<RenderedSegment> {
-        // Only show in agent / minimal contexts — or if show_in is configured.
-        let should_show = if let Some(show_in) = &config.show_in {
-            let ctx_str = match ctx.shell_context {
-                Context::Agent => "agent",
-                Context::Minimal => "minimal",
-                Context::Interactive => "interactive",
-            };
-            show_in.iter().any(|s| s == ctx_str)
-        } else {
-            // Default: show only in non-interactive contexts.
-            !matches!(ctx.shell_context, Context::Interactive)
+    /// Hide in interactive by default — show only in agent/minimal unless
+    /// the theme explicitly configures show_in/hide_in.
+    fn default_hide_in(&self) -> &[&str] {
+        &["interactive"]
+    }
+
+    fn render(&self, config: &toml::Value, ctx: &RenderContext) -> Option<RenderedSegment> {
+        use lynx_core::types::Context;
+
+        let cfg: ContextBadgeConfig = config.clone().try_into().unwrap_or_default();
+
+        let ctx_key = match ctx.shell_context {
+            Context::Agent => "agent",
+            Context::Minimal => "minimal",
+            Context::Interactive => "interactive",
         };
 
-        if !should_show {
-            return None;
-        }
-
-        let label = config.label.as_ref().and_then(|m| {
-            let key = match ctx.shell_context {
-                Context::Agent => "agent",
-                Context::Minimal => "minimal",
-                Context::Interactive => "interactive",
-            };
-            m.get(key).cloned()
-        });
-
-        let text = label.unwrap_or_else(|| match ctx.shell_context {
-            Context::Agent => "AI".to_string(),
-            Context::Minimal => "MIN".to_string(),
-            Context::Interactive => "INT".to_string(),
-        });
+        let text = cfg
+            .label
+            .as_ref()
+            .and_then(|m| m.get(ctx_key).cloned())
+            .unwrap_or_else(|| match ctx.shell_context {
+                Context::Agent => "AI".to_string(),
+                Context::Minimal => "MIN".to_string(),
+                Context::Interactive => "INT".to_string(),
+            });
 
         Some(RenderedSegment::new(text))
     }
@@ -50,47 +50,51 @@ impl Segment for ContextBadgeSegment {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashMap;
+    use crate::segment::empty_config;
+    use lynx_core::types::Context;
 
     fn ctx(shell_context: Context) -> RenderContext {
         RenderContext {
             cwd: "/".into(),
             shell_context,
             last_cmd_ms: None,
-            cache: HashMap::new(),
+            cache: std::collections::HashMap::new(),
         }
     }
 
-    #[test]
-    fn hides_in_interactive() {
-        let r = ContextBadgeSegment.render(&Default::default(), &ctx(Context::Interactive));
-        assert!(r.is_none());
-    }
+    // Note: show_in/hide_in visibility is enforced by the evaluator, not the segment.
+    // These tests verify render output only.
 
     #[test]
-    fn shows_in_agent() {
-        let r = ContextBadgeSegment.render(&Default::default(), &ctx(Context::Agent));
-        assert!(r.is_some());
+    fn renders_ai_in_agent_context() {
+        let r = ContextBadgeSegment.render(&empty_config(), &ctx(Context::Agent));
         assert_eq!(r.unwrap().text, "AI");
     }
 
     #[test]
-    fn shows_in_minimal() {
-        let r = ContextBadgeSegment.render(&Default::default(), &ctx(Context::Minimal));
-        assert!(r.is_some());
+    fn renders_min_in_minimal_context() {
+        let r = ContextBadgeSegment.render(&empty_config(), &ctx(Context::Minimal));
         assert_eq!(r.unwrap().text, "MIN");
     }
 
     #[test]
+    fn renders_int_in_interactive_context() {
+        // render() always produces output — evaluator decides visibility
+        let r = ContextBadgeSegment.render(&empty_config(), &ctx(Context::Interactive));
+        assert_eq!(r.unwrap().text, "INT");
+    }
+
+    #[test]
     fn custom_label_from_config() {
-        let mut labels = std::collections::HashMap::new();
-        labels.insert("agent".to_string(), "🤖".to_string());
-        let cfg = SegmentConfig {
-            show_in: Some(vec!["agent".into()]),
-            label: Some(labels),
-            ..Default::default()
-        };
+        let cfg: toml::Value = toml::from_str(r#"[label]
+agent = "🤖"
+"#).unwrap();
         let r = ContextBadgeSegment.render(&cfg, &ctx(Context::Agent));
         assert_eq!(r.unwrap().text, "🤖");
+    }
+
+    #[test]
+    fn default_hide_in_includes_interactive() {
+        assert!(ContextBadgeSegment.default_hide_in().contains(&"interactive"));
     }
 }

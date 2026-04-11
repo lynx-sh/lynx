@@ -1,8 +1,14 @@
 use std::path::Path;
 
-use lynx_theme::schema::SegmentConfig;
+use serde::Deserialize;
 
 use crate::segment::{RenderContext, RenderedSegment, Segment};
+
+#[derive(Deserialize, Default)]
+struct DirConfig {
+    max_depth: Option<u32>,
+    truncate_to_repo: Option<bool>,
+}
 
 pub struct DirSegment;
 
@@ -11,12 +17,12 @@ impl Segment for DirSegment {
         "dir"
     }
 
-    fn render(&self, config: &SegmentConfig, ctx: &RenderContext) -> Option<RenderedSegment> {
-        let max_depth = config.max_depth.unwrap_or(3);
-        let truncate_to_repo = config.truncate_to_repo.unwrap_or(true);
+    fn render(&self, config: &toml::Value, ctx: &RenderContext) -> Option<RenderedSegment> {
+        let cfg: DirConfig = config.clone().try_into().unwrap_or_default();
+        let max_depth = cfg.max_depth.unwrap_or(3);
+        let truncate_to_repo = cfg.truncate_to_repo.unwrap_or(true);
 
         let display = if max_depth == 0 {
-            // max_depth == 0 means show full path
             ctx.cwd.clone()
         } else {
             shorten(&ctx.cwd, max_depth, truncate_to_repo, &ctx.cache)
@@ -32,7 +38,6 @@ fn shorten(
     truncate_to_repo: bool,
     cache: &std::collections::HashMap<String, serde_json::Value>,
 ) -> String {
-    // If truncate_to_repo, find the repo root from cache and show relative path.
     if truncate_to_repo {
         if let Some(serde_json::Value::Object(obj)) = cache.get(crate::cache_keys::GIT_STATE) {
             if let Some(serde_json::Value::String(root)) = obj.get("repo_root") {
@@ -52,7 +57,6 @@ fn shorten(
         }
     }
 
-    // No repo root — shorten from the tail.
     shorten_components(cwd, max_depth)
 }
 
@@ -71,6 +75,8 @@ mod tests {
     use super::*;
     use std::collections::HashMap;
 
+    use crate::segment::empty_config;
+
     fn ctx(cwd: &str) -> RenderContext {
         RenderContext {
             cwd: cwd.to_string(),
@@ -80,39 +86,37 @@ mod tests {
         }
     }
 
+    fn cfg(s: &str) -> toml::Value {
+        toml::from_str(s).unwrap()
+    }
+
     #[test]
     fn full_path_when_max_depth_zero() {
-        let seg = DirSegment;
-        let cfg = SegmentConfig {
-            max_depth: Some(0),
-            truncate_to_repo: Some(false),
-            ..Default::default()
-        };
-        let r = seg.render(&cfg, &ctx("/home/user/projects/lynx")).unwrap();
+        let r = DirSegment
+            .render(&cfg("max_depth = 0\ntruncate_to_repo = false"), &ctx("/home/user/projects/lynx"))
+            .unwrap();
         assert_eq!(r.text, "/home/user/projects/lynx");
     }
 
     #[test]
     fn truncates_at_max_depth() {
-        let seg = DirSegment;
-        let cfg = SegmentConfig {
-            max_depth: Some(2),
-            truncate_to_repo: Some(false),
-            ..Default::default()
-        };
-        let r = seg.render(&cfg, &ctx("/a/b/c/d/e")).unwrap();
+        let r = DirSegment
+            .render(&cfg("max_depth = 2\ntruncate_to_repo = false"), &ctx("/a/b/c/d/e"))
+            .unwrap();
         assert_eq!(r.text, "…/d/e");
     }
 
     #[test]
     fn no_truncation_when_short() {
-        let seg = DirSegment;
-        let cfg = SegmentConfig {
-            max_depth: Some(3),
-            truncate_to_repo: Some(false),
-            ..Default::default()
-        };
-        let r = seg.render(&cfg, &ctx("/a/b")).unwrap();
+        let r = DirSegment
+            .render(&cfg("max_depth = 3\ntruncate_to_repo = false"), &ctx("/a/b"))
+            .unwrap();
         assert_eq!(r.text, "/a/b");
+    }
+
+    #[test]
+    fn default_config_renders() {
+        let r = DirSegment.render(&empty_config(), &ctx("/a/b/c")).unwrap();
+        assert!(!r.text.is_empty());
     }
 }

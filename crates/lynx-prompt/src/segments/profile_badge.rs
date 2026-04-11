@@ -1,10 +1,15 @@
-use lynx_theme::schema::SegmentConfig;
+use serde::Deserialize;
 
 use crate::segment::{RenderContext, RenderedSegment, Segment};
 
+#[derive(Deserialize, Default)]
+struct ProfileBadgeConfig {
+    icon: Option<String>,
+}
+
 /// Shows the active profile name in the prompt.
-/// Hidden when no profile is active or when running in agent/minimal context.
-/// Add to your theme layout with segment name "profile_badge".
+/// Hidden when no profile is active.
+/// Defaults to hiding in agent and minimal contexts.
 pub struct ProfileBadgeSegment;
 
 impl Segment for ProfileBadgeSegment {
@@ -16,13 +21,12 @@ impl Segment for ProfileBadgeSegment {
         Some(crate::cache_keys::PROFILE_STATE)
     }
 
-    fn render(&self, config: &SegmentConfig, ctx: &RenderContext) -> Option<RenderedSegment> {
-        use lynx_core::types::Context;
+    fn default_hide_in(&self) -> &[&str] {
+        &["agent", "minimal"]
+    }
 
-        // Only show in interactive context — not useful in agent/minimal.
-        if ctx.shell_context != Context::Interactive {
-            return None;
-        }
+    fn render(&self, config: &toml::Value, ctx: &RenderContext) -> Option<RenderedSegment> {
+        let cfg: ProfileBadgeConfig = config.clone().try_into().unwrap_or_default();
 
         let profile_name = ctx
             .cache
@@ -34,14 +38,18 @@ impl Segment for ProfileBadgeSegment {
             return None;
         }
 
-        let icon = config.icon.as_deref().unwrap_or("⬡ ");
-        Some(RenderedSegment::new(format!("{icon}{profile_name}")).with_cache_key(crate::cache_keys::PROFILE_STATE))
+        let icon = cfg.icon.as_deref().unwrap_or("⬡ ");
+        Some(
+            RenderedSegment::new(format!("{icon}{profile_name}"))
+                .with_cache_key(crate::cache_keys::PROFILE_STATE),
+        )
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::segment::empty_config;
     use std::collections::HashMap;
 
     fn ctx_with_profile(name: &str, shell_ctx: lynx_core::types::Context) -> RenderContext {
@@ -67,16 +75,19 @@ mod tests {
         }
     }
 
+    // Note: agent/minimal hiding is enforced by the evaluator via default_hide_in().
+    // render() here only tests output — not visibility.
+
     #[test]
     fn hidden_without_cache() {
-        let r = ProfileBadgeSegment.render(&Default::default(), &empty_ctx());
+        let r = ProfileBadgeSegment.render(&empty_config(), &empty_ctx());
         assert!(r.is_none());
     }
 
     #[test]
-    fn shows_profile_name_in_interactive() {
+    fn shows_profile_name() {
         let r = ProfileBadgeSegment.render(
-            &Default::default(),
+            &empty_config(),
             &ctx_with_profile("work", lynx_core::types::Context::Interactive),
         );
         assert!(r.is_some());
@@ -84,20 +95,9 @@ mod tests {
     }
 
     #[test]
-    fn hidden_in_agent_context() {
-        let r = ProfileBadgeSegment.render(
-            &Default::default(),
-            &ctx_with_profile("work", lynx_core::types::Context::Agent),
-        );
-        assert!(r.is_none());
-    }
-
-    #[test]
-    fn hidden_in_minimal_context() {
-        let r = ProfileBadgeSegment.render(
-            &Default::default(),
-            &ctx_with_profile("work", lynx_core::types::Context::Minimal),
-        );
-        assert!(r.is_none());
+    fn default_hide_in_excludes_agent_and_minimal() {
+        let hide = ProfileBadgeSegment.default_hide_in();
+        assert!(hide.contains(&"agent"));
+        assert!(hide.contains(&"minimal"));
     }
 }
