@@ -1,24 +1,48 @@
 # Theme Authoring Guide
 
-Lynx themes are TOML files that control which segments appear in your prompt,
-their order, and their appearance. This guide covers the full theme schema,
-every available segment, and how to add a new segment in Rust.
+A Lynx theme is a TOML file that owns the **complete shell visual experience**:
+prompt segments, prompt character, file listing colors (`LS_COLORS`, `EZA_COLORS`),
+and more surfaces as the system grows. Switching a theme changes everything — not
+just the prompt.
+
+This guide covers the full theme schema, every available segment, and how to add
+a new segment in Rust.
 
 > **Note on planned segments:** This guide only documents segments that are
-> fully implemented. Segments marked as *planned* (`git_ahead_behind`,
-> `exit_code`, `venv`) exist in the roadmap but are not yet available.
+> fully implemented. Segments marked as *planned* exist in the roadmap
+> (tracked in `pt issues P2 themes`) but are not yet available.
+
+---
+
+## Design Philosophy (vs. Starship / OMZ)
+
+| Concern | Starship / OMZ | Lynx |
+|---|---|---|
+| **Prompt config** | TOML / zsh | TOML |
+| **File listing colors** | Manual (`LS_COLORS` DIY) | Defined in theme `[ls_colors]` |
+| **Color palette** | Per-segment hex values | `[colors]` palette, referenced by name (`$accent`) |
+| **Segment visibility** | Per-segment flags, inconsistent | Universal `show_in` / `hide_in` on every segment |
+| **Segment config** | Shared config blocks | Each segment owns its typed config |
+| **Context awareness** | Limited / opt-in | First-class (interactive / agent / minimal) |
+
+The key difference: **one theme switch = cohesive terminal**. Colors, prompt,
+and file listings are all derived from the same palette.
 
 ---
 
 ## Table of Contents
 
-1. [Theme File Structure](#theme-file-structure)
-2. [Segment Layout](#segment-layout)
-3. [Segment Reference](#segment-reference)
-4. [Color Formats](#color-formats)
-5. [Worked Example: Powerline-Style Theme](#worked-example-powerline-style-theme)
-6. [Testing Your Theme](#testing-your-theme)
-7. [Adding a Custom Segment in Rust](#adding-a-custom-segment-in-rust)
+1. [Design Philosophy](#design-philosophy-vs-starship--omz)
+2. [Theme File Structure](#theme-file-structure)
+3. [Palette System](#palette-system)
+4. [Segment Layout](#segment-layout)
+5. [Universal Visibility](#universal-visibility)
+6. [Segment Reference](#segment-reference)
+7. [File Listing Colors](#file-listing-colors)
+8. [Color Formats](#color-formats)
+9. [Worked Example: Powerline-Style Theme](#worked-example-powerline-style-theme)
+10. [Testing Your Theme](#testing-your-theme)
+11. [Adding a Custom Segment in Rust](#adding-a-custom-segment-in-rust)
 
 ---
 
@@ -33,24 +57,53 @@ name        = "my-theme"          # required — must match the filename
 description = "A clean theme"     # shown in lx theme list
 author      = "Your Name"
 
-[segments.left]
-order = ["dir", "git_branch", "git_status"]    # left prompt segments, in order
-
-[segments.right]
-order = ["cmd_duration", "context_badge"]      # right prompt segments, in order
-
-# Per-segment config — all fields optional
-[segment.dir]
-max_depth = 3
-
-[segment.git_branch]
-icon = " "
-color = { fg = "yellow" }
-
-# Named color palette — reference these in segment configs
+# ── Palette ─────────────────────────────────────────────────────────────────
+# Single source of truth for all colors. Segment configs reference these by
+# name via $variable syntax. Hex, named colors, and xterm-256 indices all work.
 [colors]
 accent  = "#7aa2f7"
+success = "#9ece6a"
+warning = "#e0af68"
+error   = "#f7768e"
 muted   = "#565f89"
+fg      = "#c0caf5"
+bg      = "#1a1b26"
+
+# ── Prompt layout ────────────────────────────────────────────────────────────
+[segments.left]
+order = ["dir", "git_branch", "git_status", "prompt_char"]  # left prompt
+
+[segments.right]
+order = ["cmd_duration", "context_badge"]                   # right prompt
+
+# ── Per-segment config ────────────────────────────────────────────────────────
+# All fields optional. Colors reference palette vars ($name) or literal values.
+# Every segment also accepts: show_in = ["interactive"] / hide_in = ["agent"]
+[segment.dir]
+max_depth = 3
+color     = { fg = "$accent", bold = true }
+
+[segment.git_branch]
+icon  = " "
+color = { fg = "$warning" }
+
+[segment.prompt_char]
+symbol       = "❯"
+error_symbol = "❯"
+color        = { fg = "$success" }
+error_color  = { fg = "$error" }
+
+# ── File listing colors ───────────────────────────────────────────────────────
+# Emitted as LS_COLORS and EZA_COLORS on theme switch / shell init.
+# Uses semantic keys — palette vars supported. (H-054: in progress)
+[ls_colors]
+dir        = { fg = "$accent", bold = true }
+symlink    = { fg = "#89ddff" }
+executable = { fg = "$success", bold = true }
+archive    = { fg = "$warning" }
+image      = { fg = "#ff007c" }
+audio      = { fg = "#ff007c" }
+broken     = { fg = "$error" }
 ```
 
 Switch to your theme with:
@@ -58,6 +111,47 @@ Switch to your theme with:
 lx theme switch my-theme
 lx theme list        # shows all available themes
 ```
+
+---
+
+## Palette System
+
+The `[colors]` table is the single source of truth for all colors in a theme.
+Segment color configs reference palette keys by name using `$variable` syntax:
+
+```toml
+[colors]
+accent  = "#7aa2f7"
+error   = "#f7768e"
+success = "#9ece6a"
+
+[segment.dir]
+color = { fg = "$accent" }          # resolves to "#7aa2f7"
+
+[segment.prompt_char]
+color       = { fg = "$success" }
+error_color = { fg = "$error" }
+```
+
+**Rules (D-015):**
+- Segment configs MUST reference palette vars rather than hardcoding hex values.
+- The `[colors]` table is the only place raw color values should appear.
+- This makes the entire theme recolorable by changing `[colors]` only.
+
+Standard semantic palette keys (used by built-in segments and `[ls_colors]`):
+
+| Key | Purpose |
+|---|---|
+| `accent` | Primary highlight (dirs, branches) |
+| `success` | Success state (clean git, prompt char) |
+| `warning` | Warning state (git dirty, slow cmd) |
+| `error` | Error state (prompt char on failure, broken symlinks) |
+| `muted` | Subdued text (timestamps, durations) |
+| `fg` | Default foreground |
+| `bg` | Default background (used for Powerline fill) |
+
+All keys are optional — segments fall back to terminal defaults if a palette
+key is absent.
 
 ---
 
@@ -75,6 +169,30 @@ order = ["dir", "git_branch", "git_status"]
 - A segment that returns nothing (e.g. `git_branch` outside a git repo) is
   silently omitted — no gap in the prompt
 - The same segment cannot appear in both `left` and `right` (use it once)
+
+---
+
+## Universal Visibility
+
+Every segment accepts `show_in` and `hide_in` fields in its `[segment.*]` config.
+These are evaluated by the renderer before the segment is called — a hidden
+segment costs zero evaluation time (D-017).
+
+```toml
+[segment.username]
+show_in = ["interactive"]       # only show in interactive context
+
+[segment.profile_badge]
+hide_in = ["agent", "minimal"]  # hide in agent and minimal
+
+[segment.context_badge]
+show_in = ["agent", "minimal"]  # always shown (overrides hide_in)
+```
+
+Valid context values: `interactive`, `agent`, `minimal`.
+
+> **Future:** `show_when` / `hide_when` for condition-based visibility
+> (SSH session, root user, etc.) — tracked in H-053.
 
 ---
 
@@ -246,6 +364,44 @@ color   = { fg = "magenta", bold = true }
 ```
 
 **Example output:** `AI` (when in agent context)
+
+---
+
+## File Listing Colors
+
+> **Status:** Planned — tracked in H-054. The schema below is the target design.
+> Once implemented, `lx theme switch` will emit `LS_COLORS` and `EZA_COLORS`
+> automatically.
+
+The `[ls_colors]` table lets a theme own `ls`, `eza`, and `lsd` output — the same
+palette variables available to segments apply here.
+
+```toml
+[ls_colors]
+dir        = { fg = "$accent", bold = true }
+symlink    = { fg = "#89ddff" }
+executable = { fg = "$success", bold = true }
+archive    = { fg = "$warning" }
+image      = { fg = "#ff007c" }
+audio      = { fg = "#ff007c" }
+broken     = { fg = "$error" }        # broken symlink
+other_writable = { fg = "$warning" }  # world-writable dir
+```
+
+Semantic keys and their `LS_COLORS` mappings:
+
+| Key | LS_COLORS code | Notes |
+|---|---|---|
+| `dir` | `di` | Directories |
+| `symlink` | `ln` | Symbolic links |
+| `executable` | `ex` | Executable files |
+| `archive` | — | `.tar`, `.gz`, `.zip`, etc. (extension list) |
+| `image` | — | `.png`, `.jpg`, `.gif`, etc. |
+| `audio` | — | `.mp3`, `.flac`, `.wav`, etc. |
+| `broken` | `or` | Broken symlinks |
+| `other_writable` | `ow` | Dirs writable by others |
+
+If `[ls_colors]` is absent, Lynx emits no `LS_COLORS` (OS default applies).
 
 ---
 
