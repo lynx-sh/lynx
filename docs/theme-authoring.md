@@ -38,12 +38,13 @@ and file listings are all derived from the same palette.
 4. [Segment Layout](#segment-layout)
 5. [Universal Visibility](#universal-visibility)
 6. [Segment Format Strings](#segment-format-strings)
-7. [Segment Reference](#segment-reference)
-8. [File Listing Colors](#file-listing-colors)
-9. [Color Formats](#color-formats)
-10. [Worked Example: Powerline-Style Theme](#worked-example-powerline-style-theme)
-11. [Testing Your Theme](#testing-your-theme)
-12. [Adding a Custom Segment in Rust](#adding-a-custom-segment-in-rust)
+7. [Custom Template Segments](#custom-template-segments)
+8. [Segment Reference](#segment-reference)
+9. [File Listing Colors](#file-listing-colors)
+10. [Color Formats](#color-formats)
+11. [Worked Example: Powerline-Style Theme](#worked-example-powerline-style-theme)
+12. [Testing Your Theme](#testing-your-theme)
+13. [Adding a Custom Segment in Rust](#adding-a-custom-segment-in-rust)
 
 ---
 
@@ -192,9 +193,6 @@ show_in = ["agent", "minimal"]  # always shown (overrides hide_in)
 
 Valid context values: `interactive`, `agent`, `minimal`.
 
-> **Future:** `show_when` / `hide_when` for condition-based visibility
-> (SSH session, root user, etc.) — tracked in H-053.
-
 ---
 
 ## Segment Format Strings
@@ -246,6 +244,74 @@ format = "took $duration"
 [segment.git_ahead_behind]
 format = "$ahead|$behind"
 ```
+
+---
+
+## Custom Template Segments
+
+Custom template segments let you compose one-off prompt segments entirely in
+TOML — no Rust required. Any name starting with `custom_` in a segment order
+array is treated as a custom segment.
+
+```toml
+[segments.left]
+order = ["custom_greeting", "dir", "git_branch"]
+
+[segment.custom_greeting]
+template = "hello ${env.USER}"
+color    = { fg = "blue" }
+show_in  = ["interactive"]
+```
+
+### Template syntax
+
+| Form | Expands to |
+|---|---|
+| `$cwd` | Current working directory |
+| `$context` | Shell context: `interactive`, `agent`, or `minimal` |
+| `$last_cmd_ms` | Last command duration in ms, or empty string |
+| `${env.VAR}` | Environment variable from the context snapshot |
+| `${cache.PLUGIN.FIELD}` | Field from a plugin's JSON state cache |
+| `$$` | A literal `$` |
+
+Unknown variables and missing cache fields expand to an empty string — they
+never produce an error. If the entire rendered output is empty, the segment is
+hidden (same as returning `None` from a Rust segment).
+
+### Available cache fields
+
+Cache fields use the same JSON structure each plugin writes to its
+`LYNX_CACHE_<PLUGIN>_STATE` variable. Common examples:
+
+| Template var | What it shows |
+|---|---|
+| `${cache.git.branch}` | Current git branch |
+| `${cache.git.dirty}` | `1` when repo has uncommitted changes |
+| `${cache.git.ahead}` | Commits ahead of upstream |
+| `${cache.git.behind}` | Commits behind upstream |
+| `${cache.kubectl.context}` | Active kubectl context |
+| `${cache.kubectl.namespace}` | Active kubectl namespace |
+| `${cache.node.version}` | Node.js version from `.node-version`/`.nvmrc` |
+
+### Universal visibility
+
+Custom segments support `show_in` and `hide_in` exactly like any built-in
+segment — the evaluator applies visibility rules before rendering:
+
+```toml
+[segment.custom_ssh_user]
+template = "${env.USER}@${env.HOSTNAME}"
+show_in  = ["interactive"]    # only show in interactive sessions
+```
+
+### When to use custom segments vs Rust segments
+
+| Situation | Approach |
+|---|---|
+| Compose existing RenderContext data in a new way | Custom template segment |
+| Display a static label with context-based visibility | Custom template segment |
+| Need to call an external tool or read a file | Rust segment (no I/O in render) |
+| Need complex logic, formatting, or color per-field | Rust segment |
 
 ---
 
@@ -676,15 +742,20 @@ lx doctor    # warns about segments in your theme not known to Lynx
 
 ## Adding a Custom Segment in Rust
 
-Segments are Rust types that implement the `Segment` trait in `lynx-prompt`.
-This section is for contributors who want to add a segment to the core.
+> **Before writing Rust:** If you only need to compose existing RenderContext
+> data (env vars, cache fields, cwd, context), use a
+> [custom template segment](#custom-template-segments) — no code required.
+
+Rust segments are for cases that need I/O-free logic beyond what templates
+support: complex conditional formatting, per-field colors, or new data sources
+that require a matching plugin. This section is for contributors adding a
+segment to the core.
 
 ### 1. Create the segment file
 
 In `crates/lynx-prompt/src/segments/my_segment.rs`:
 
 ```rust
-use lynx_theme::schema::SegmentConfig;
 use crate::segment::{RenderContext, RenderedSegment, Segment};
 
 pub struct MySegment;
@@ -698,7 +769,7 @@ impl Segment for MySegment {
         None    // or Some("my_state") if you read from the cache
     }
 
-    fn render(&self, config: &SegmentConfig, ctx: &RenderContext) -> Option<RenderedSegment> {
+    fn render(&self, config: &toml::Value, ctx: &RenderContext) -> Option<RenderedSegment> {
         // Return None to hide the segment entirely.
         // Return Some(RenderedSegment::new("text")) to show it.
         Some(RenderedSegment::new("hello"))
