@@ -77,15 +77,28 @@ pub async fn evaluate(
     join_all(futures).await.into_iter().flatten().collect()
 }
 
-/// Evaluate both left and right orders from a theme, return (left_segments, right_segments).
+/// Evaluate all layout orders from a theme.
+/// Returns `(left, right, top, continuation)`.
 pub async fn evaluate_theme(
     segments: &[Box<dyn Segment>],
     theme: &Theme,
     ctx: &RenderContext,
-) -> (Vec<RenderedSegment>, Vec<RenderedSegment>) {
+) -> (
+    Vec<RenderedSegment>,
+    Vec<RenderedSegment>,
+    Vec<RenderedSegment>,
+    Vec<RenderedSegment>,
+) {
     let left = evaluate(segments, &theme.segments.left.order, &theme.segment, ctx);
     let right = evaluate(segments, &theme.segments.right.order, &theme.segment, ctx);
-    tokio::join!(left, right)
+    let top = evaluate(segments, &theme.segments.top.order, &theme.segment, ctx);
+    let continuation = evaluate(
+        segments,
+        &theme.segments.continuation.order,
+        &theme.segment,
+        ctx,
+    );
+    tokio::join!(left, right, top, continuation)
 }
 
 #[cfg(test)]

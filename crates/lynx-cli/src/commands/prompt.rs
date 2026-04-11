@@ -5,7 +5,7 @@ use lynx_core::{brand, env_vars, types::Context};
 use lynx_prompt::{
     cache_keys,
     evaluator::evaluate_theme,
-    renderer::render_prompt,
+    renderer::{render_prompt, render_transient_prompt},
     segment::RenderContext,
     BackgroundJobsSegment, CmdDurationSegment, CondaEnvSegment, ContextBadgeSegment, DirSegment,
     ExitCodeSegment, GitActionSegment, GitAheadBehindSegment, GitBranchSegment, GitStashSegment,
@@ -25,16 +25,20 @@ pub struct PromptArgs {
 #[derive(Subcommand)]
 pub enum PromptCommand {
     /// Render PROMPT and RPROMPT shell assignments for eval by precmd hook
-    Render,
+    Render {
+        /// Emit a minimal transient PROMPT (collapses full prompt after a command runs).
+        #[arg(long)]
+        transient: bool,
+    },
 }
 
 pub async fn run(args: PromptArgs) -> Result<()> {
     match args.command {
-        PromptCommand::Render => cmd_render().await,
+        PromptCommand::Render { transient } => cmd_render(transient).await,
     }
 }
 
-async fn cmd_render() -> Result<()> {
+async fn cmd_render(transient: bool) -> Result<()> {
     let ctx = build_render_context_from_env();
 
     // Run in-process plugin lifecycle and emit shell:precmd so plugin handlers
@@ -83,8 +87,14 @@ async fn cmd_render() -> Result<()> {
     ];
 
     // --- Evaluate and render ---
-    let (left, right) = evaluate_theme(&segments, &theme, &ctx).await;
-    let output = render_prompt(&left, &right, &theme);
+    let theme_ref = &theme;
+    if transient {
+        print!("{}", render_transient_prompt(theme_ref));
+        return Ok(());
+    }
+
+    let (left, right, top, continuation) = evaluate_theme(&segments, theme_ref, &ctx).await;
+    let output = render_prompt(&left, &right, &top, &continuation, theme_ref);
     print!("{}", output);
     Ok(())
 }

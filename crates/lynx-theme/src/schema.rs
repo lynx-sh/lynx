@@ -1,11 +1,41 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+/// Configuration for a single separator glyph + color.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+pub struct SeparatorGlyph {
+    /// The character(s) to render between segments (e.g. " " or "").
+    pub char: Option<String>,
+    /// Foreground color of the separator (named or hex).
+    pub color: Option<String>,
+}
+
+/// Powerline / connector separator config — optional [separators] table in theme.
+/// When absent, the renderer falls back to a single space between segments.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+pub struct Separators {
+    /// Between left segments (left-to-right flow).
+    #[serde(default)]
+    pub left: SeparatorGlyph,
+    /// Between right segments.
+    #[serde(default)]
+    pub right: SeparatorGlyph,
+    /// Leading edge before the first left segment.
+    #[serde(default)]
+    pub left_edge: SeparatorGlyph,
+    /// Trailing edge after the last left segment.
+    #[serde(default)]
+    pub right_edge: SeparatorGlyph,
+}
+
 /// Top-level theme file structure.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Theme {
     pub meta: ThemeMeta,
     pub segments: SegmentLayout,
+    /// Separator / connector config. Optional — defaults to space separator.
+    #[serde(default)]
+    pub separators: Separators,
     /// Per-segment config tables — raw TOML values.
     /// Each segment impl deserializes its own typed config from these.
     /// Universal fields (`show_in`, `hide_in`, `color`, `cache_ttl_ms`) are
@@ -31,6 +61,13 @@ pub struct SegmentLayout {
     pub left: SegmentOrder,
     #[serde(default)]
     pub right: SegmentOrder,
+    /// Segments rendered on the line above the input line (multi-line prompts).
+    /// When non-empty, the renderer emits a top line + newline + left segments.
+    #[serde(default)]
+    pub top: SegmentOrder,
+    /// Segments rendered as PROMPT2 (continuation prompt for multi-line input).
+    #[serde(default)]
+    pub continuation: SegmentOrder,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
@@ -70,8 +107,23 @@ pub const KNOWN_SEGMENTS: &[&str] = &[
     "dir",
     "git_branch",
     "git_status",
+    "git_action",
+    "git_ahead_behind",
+    "git_stash",
     "cmd_duration",
     "context_badge",
     "kubectl_context",
     "profile_badge",
+    "username",
+    "hostname",
+    "ssh_indicator",
+    "venv",
+    "conda_env",
+    "task_status",
+    "exit_code",
+    "background_jobs",
+    "vi_mode",
+    "time",
+    "newline",
+    "prompt_char",
 ];
