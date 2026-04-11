@@ -193,6 +193,46 @@ show_in = ["agent", "minimal"]  # always shown (overrides hide_in)
 
 Valid context values: `interactive`, `agent`, `minimal`.
 
+### Condition-based visibility (`show_when` / `hide_when`)
+
+For finer control beyond shell context, use `show_when` or `hide_when`. These
+accept a single inline table with one condition — evaluated against the current
+environment and prompt state, with no I/O.
+
+```toml
+[segment.username]
+show_when = { env_set = "SSH_CONNECTION" }   # only over SSH
+
+[segment.git_branch]
+show_when = { in_git_repo = true }           # only inside git repos
+
+[segment.venv]
+show_when = { env_matches = { VIRTUAL_ENV = "*myproject*" } }
+
+[segment.dir]
+show_when = { cwd_matches = "~/work/**" }    # ~ expanded from HOME env var
+
+[segment.exit_code]
+show_when = { exit_code_nonzero = true }     # only on non-zero exit
+
+[segment.ci_badge]
+hide_when = { env_set = "CI" }              # hidden in CI environments
+```
+
+**Condition types:**
+
+| Condition | Type | Matches when… |
+|---|---|---|
+| `env_set` | `string` | named env var is set and non-empty |
+| `env_matches` | `{ VAR = "glob" }` | all listed env vars match their glob patterns |
+| `in_git_repo` | `true` / `false` | git cache present (`true`) or absent (`false`) |
+| `cwd_matches` | `string` (glob) | current directory matches pattern (`~` expanded) |
+| `exit_code_nonzero` | `true` / `false` | last exit code non-zero (`true`) or zero (`false`) |
+
+**Priority:** `show_in` / `hide_in` (context gate) is evaluated first. If the
+segment passes the context gate, `show_when` is checked next (takes priority
+over `hide_when`). Conditions are pure — no I/O, no subprocess calls.
+
 ---
 
 ## Segment Format Strings
