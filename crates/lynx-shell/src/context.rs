@@ -26,51 +26,21 @@ pub struct DetectionOutcome {
 /// Detect the current [`Context`] from the process environment.
 ///
 /// Priority order:
-/// 1. `LYNX_CONTEXT` env override (respects explicit choice)
-/// 2. Any canonical `AGENT_ENV_VARS` set → `Agent`
-/// 3. Any canonical `MINIMAL_ENV_VARS` set → `Minimal`
+/// 1. Any `AGENT_ENV_VARS` set → `Agent`  (ground truth — beats inherited LYNX_CONTEXT)
+/// 2. `LYNX_CONTEXT` explicit override
+/// 3. Any `MINIMAL_ENV_VARS` set → `Minimal`
 /// 4. Default → `Interactive`
+///
+/// Agent env vars rank first because `LYNX_CONTEXT=interactive` may be inherited from
+/// a parent interactive shell. A host tool's env var (e.g. `CLAUDECODE=1`) is the only
+/// reliable signal that the current session is an agent session.
 pub fn detect_context() -> Context {
     detect_context_outcome().context
 }
 
-/// Detect context for use by `lx init` — ignores any inherited `LYNX_CONTEXT` env var.
-///
-/// `lx init` is the process that *writes* `LYNX_CONTEXT`, so reading it back as an
-/// override would cause parent-shell context to bleed into child shells (e.g. an
-/// interactive terminal exporting `LYNX_CONTEXT=interactive` then Claude Code opening
-/// a new terminal that inherits it, suppressing agent detection).
-///
-/// User-facing `--context` flag on `lx init` is handled by the caller after this.
-pub fn detect_context_for_init() -> Context {
-    // Check agent env vars first — these are injected by the host tool (Claude Code, Cursor, etc.)
-    if let Some(_var) = AGENT_ENV_VARS
-        .iter()
-        .copied()
-        .find(|var| std::env::var_os(var).is_some())
-    {
-        return Context::Agent;
-    }
-
-    if let Some(_var) = MINIMAL_ENV_VARS
-        .iter()
-        .copied()
-        .find(|var| std::env::var_os(var).is_some())
-    {
-        return Context::Minimal;
-    }
-
-    Context::Interactive
-}
-
 pub fn detect_context_outcome() -> DetectionOutcome {
-    if let Some(context) = override_context() {
-        return DetectionOutcome {
-            context,
-            method: DetectionMethod::Override,
-        };
-    }
-
+    // Agent env vars are ground truth — checked before LYNX_CONTEXT so an inherited
+    // interactive value from a parent shell cannot suppress agent detection.
     if let Some(var) = AGENT_ENV_VARS
         .iter()
         .copied()
@@ -79,6 +49,13 @@ pub fn detect_context_outcome() -> DetectionOutcome {
         return DetectionOutcome {
             context: Context::Agent,
             method: DetectionMethod::AgentEnv(var),
+        };
+    }
+
+    if let Some(context) = override_context() {
+        return DetectionOutcome {
+            context,
+            method: DetectionMethod::Override,
         };
     }
 
@@ -152,20 +129,11 @@ mod tests {
     }
 
     #[test]
-    fn detect_for_init_ignores_inherited_lynx_context() {
-        // Simulate a child shell inheriting LYNX_CONTEXT=interactive from a parent
-        // while Claude Code env var is also present.
-        let _g1 = EnvGuard::set(&[("LYNX_CONTEXT", "interactive"), ("CLAUDECODE", "1")]);
-        // detect_context() would return Interactive (override wins)
-        assert_eq!(detect_context(), Context::Interactive);
-        // detect_context_for_init() must return Agent (ignores inherited LYNX_CONTEXT)
-        assert_eq!(detect_context_for_init(), Context::Agent);
-    }
-
-    #[test]
-    fn detect_for_init_falls_back_to_interactive_when_no_agent_env() {
-        let _g = EnvGuard::unset(&["LYNX_CONTEXT", "CLAUDECODE", "CURSOR_CLI", "CI"]);
-        assert_eq!(detect_context_for_init(), Context::Interactive);
+    fn agent_env_beats_inherited_lynx_context_interactive() {
+        // CLAUDECODE=1 must win even when LYNX_CONTEXT=interactive is inherited from
+        // a parent interactive shell — agent env is ground truth.
+        let _g = EnvGuard::set(&[("LYNX_CONTEXT", "interactive"), ("CLAUDECODE", "1")]);
+        assert_eq!(detect_context(), Context::Agent);
     }
 
     #[test]
@@ -177,19 +145,22 @@ mod tests {
 
     #[test]
     fn lynx_context_override_agent() {
-        let _g = EnvGuard::set(&[("LYNX_CONTEXT", "agent")]);
+        let _g1 = EnvGuard::unset(&["CLAUDECODE", "CURSOR_CLI"]);
+        let _g2 = EnvGuard::set(&[("LYNX_CONTEXT", "agent")]);
         assert_eq!(detect_context(), Context::Agent);
     }
 
     #[test]
     fn lynx_context_override_minimal() {
-        let _g = EnvGuard::set(&[("LYNX_CONTEXT", "minimal")]);
+        let _g1 = EnvGuard::unset(&["CLAUDECODE", "CURSOR_CLI"]);
+        let _g2 = EnvGuard::set(&[("LYNX_CONTEXT", "minimal")]);
         assert_eq!(detect_context(), Context::Minimal);
     }
 
     #[test]
     fn lynx_context_override_interactive() {
-        let _g = EnvGuard::set(&[("LYNX_CONTEXT", "interactive")]);
+        let _g1 = EnvGuard::unset(&["CLAUDECODE", "CURSOR_CLI"]);
+        let _g2 = EnvGuard::set(&[("LYNX_CONTEXT", "interactive")]);
         assert_eq!(detect_context(), Context::Interactive);
     }
 

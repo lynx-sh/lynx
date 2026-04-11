@@ -4,7 +4,7 @@ use lynx_config::load as load_config;
 use lynx_core::types::Context;
 use lynx_manifest::schema::PluginManifest;
 use lynx_shell::{
-    context::detect_context_for_init,
+    context::detect_context,
     init::{generate_init_script, InitParams},
     safemode::generate_safemode_script,
 };
@@ -27,7 +27,7 @@ pub async fn run(args: InitArgs) -> Result<()> {
         }
     };
 
-    let detected = detect_context_for_init();
+    let detected = detect_context();
     let context = match args.context.as_deref() {
         Some("agent") => Context::Agent,
         Some("minimal") => Context::Minimal,
