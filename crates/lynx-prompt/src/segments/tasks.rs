@@ -100,13 +100,11 @@ fn read_last_log_entry(path: &PathBuf) -> Option<serde_json::Value> {
 }
 
 fn tasks_toml_path() -> PathBuf {
-    let home = std::env::var("HOME").unwrap_or_default();
-    PathBuf::from(home).join(".config/lynx/tasks.toml")
+    lynx_core::paths::tasks_file()
 }
 
 fn task_log_dir() -> PathBuf {
-    let home = std::env::var("HOME").unwrap_or_default();
-    PathBuf::from(home).join(".config/lynx/logs/tasks")
+    lynx_core::paths::task_logs_dir()
 }
 
 #[cfg(test)]
@@ -161,28 +159,24 @@ mod tests {
 
     #[test]
     fn compute_summary_returns_none_when_no_tasks_toml() {
-        // Override HOME to a temp dir with no tasks.toml.
         let tmp = TempDir::new().unwrap();
-        std::env::set_var("HOME", tmp.path());
+        std::env::set_var("LYNX_DIR", tmp.path());
         let result = compute_task_summary();
-        // Restore HOME — best effort in test.
-        std::env::remove_var("HOME");
+        std::env::remove_var("LYNX_DIR");
         assert!(result.is_none());
     }
 
     #[test]
     fn compute_summary_contains_task_count() {
         let tmp = TempDir::new().unwrap();
-        let config_dir = tmp.path().join(".config/lynx");
-        std::fs::create_dir_all(&config_dir).unwrap();
         std::fs::write(
-            config_dir.join("tasks.toml"),
+            tmp.path().join("tasks.toml"),
             "[[task]]\nname=\"a\"\nrun=\"echo a\"\ncron=\"* * * * *\"\n\n[[task]]\nname=\"b\"\nrun=\"echo b\"\ncron=\"* * * * *\"\n",
         ).unwrap();
 
-        std::env::set_var("HOME", tmp.path());
+        std::env::set_var("LYNX_DIR", tmp.path());
         let result = compute_task_summary();
-        std::env::remove_var("HOME");
+        std::env::remove_var("LYNX_DIR");
 
         let summary = result.unwrap();
         assert!(summary.contains("2"), "expected count 2, got: {summary}");
