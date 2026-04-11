@@ -13,6 +13,9 @@ pub struct RenderContext {
     pub last_cmd_ms: Option<u64>,
     /// Shared segment cache (keyed by cache key).
     pub cache: HashMap<String, serde_json::Value>,
+    /// Snapshot of relevant environment variables captured before render.
+    /// Segments must read env via this field — never call std::env::var() directly.
+    pub env: HashMap<String, String>,
 }
 
 /// A rendered segment ready for display.

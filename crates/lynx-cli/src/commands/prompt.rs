@@ -107,11 +107,30 @@ fn build_render_context_from_env() -> RenderContext {
         }
     }
 
+    // Capture env snapshot — segments must read from ctx.env, not std::env::var().
+    let env_keys = [
+        "USER",
+        "HOSTNAME",
+        "HOME",
+        "SSH_CONNECTION",
+        "SSH_TTY",
+        "VIRTUAL_ENV",
+        "CONDA_DEFAULT_ENV",
+        env_vars::LYNX_LAST_EXIT_CODE,
+        env_vars::LYNX_BG_JOBS,
+        env_vars::LYNX_VI_MODE,
+    ];
+    let env: HashMap<String, String> = env_keys
+        .iter()
+        .filter_map(|k| std::env::var(k).ok().map(|v| (k.to_string(), v)))
+        .collect();
+
     RenderContext {
         cwd,
         shell_context,
         last_cmd_ms,
         cache,
+        env,
     }
 }
 
@@ -255,5 +274,38 @@ active_profile = "work"
 
         let ctx = build_render_context_from_env();
         assert_eq!(ctx.cache[lynx_prompt::cache_keys::PROFILE_STATE]["name"], "work");
+    }
+
+    #[test]
+    fn env_snapshot_captures_lynx_exit_code() {
+        let _lock = env_lock().lock().expect("lock");
+        let _guard = EnvGuard::new(&[lynx_core::env_vars::LYNX_LAST_EXIT_CODE, "PWD"]);
+        std::env::set_var(lynx_core::env_vars::LYNX_LAST_EXIT_CODE, "1");
+        std::env::set_var("PWD", "/");
+        let ctx = build_render_context_from_env();
+        assert_eq!(ctx.env.get("LYNX_LAST_EXIT_CODE").map(|s| s.as_str()), Some("1"));
+    }
+
+    #[test]
+    fn env_snapshot_captures_virtual_env() {
+        let _lock = env_lock().lock().expect("lock");
+        let _guard = EnvGuard::new(&["VIRTUAL_ENV", "PWD"]);
+        std::env::set_var("VIRTUAL_ENV", "/home/user/.venv/myproject");
+        std::env::set_var("PWD", "/");
+        let ctx = build_render_context_from_env();
+        assert_eq!(
+            ctx.env.get("VIRTUAL_ENV").map(|s| s.as_str()),
+            Some("/home/user/.venv/myproject")
+        );
+    }
+
+    #[test]
+    fn env_snapshot_omits_unset_vars() {
+        let _lock = env_lock().lock().expect("lock");
+        let _guard = EnvGuard::new(&["SSH_CONNECTION", "PWD"]);
+        std::env::remove_var("SSH_CONNECTION");
+        std::env::set_var("PWD", "/");
+        let ctx = build_render_context_from_env();
+        assert!(!ctx.env.contains_key("SSH_CONNECTION"));
     }
 }

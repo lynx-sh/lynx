@@ -48,6 +48,7 @@ mod tests {
             shell_context: lynx_core::types::Context::Interactive,
             last_cmd_ms: ms,
             cache: HashMap::new(),
+            env: HashMap::new(),
         }
     }
 

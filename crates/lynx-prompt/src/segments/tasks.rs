@@ -118,6 +118,7 @@ mod tests {
             shell_context: Context::Interactive,
             last_cmd_ms: None,
             cache,
+            env: HashMap::new(),
         }
     }
 

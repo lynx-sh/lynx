@@ -12,6 +12,8 @@ _lynx_hook_preexec() {
 }
 
 _lynx_hook_precmd() {
+  export LYNX_LAST_EXIT_CODE=$?
+  export LYNX_BG_JOBS=${#jobstates}
   eval "$(lx refresh-state 2>/dev/null)"
   eval "$(lx prompt render 2>/dev/null)"
   lx event emit "shell:precmd" 2>/dev/null

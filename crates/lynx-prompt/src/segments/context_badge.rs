@@ -59,6 +59,7 @@ mod tests {
             shell_context,
             last_cmd_ms: None,
             cache: std::collections::HashMap::new(),
+            env: std::collections::HashMap::new(),
         }
     }
 
