@@ -44,4 +44,6 @@ pub enum Command {
     Update(crate::commands::update::UpdateArgs),
     /// Remove Lynx from this system
     Uninstall(crate::commands::uninstall::UninstallArgs),
+    /// Show real-world usage examples and quickstart guide
+    Examples(crate::commands::examples::ExamplesArgs),
 }

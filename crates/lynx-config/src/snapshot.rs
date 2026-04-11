@@ -25,7 +25,7 @@ pub fn list() -> Result<Vec<(String, PathBuf)>> {
 }
 
 fn create_in(snaps_dir: &Path, config_dir: &Path, label: &str) -> Result<PathBuf> {
-    std::fs::create_dir_all(snaps_dir).map_err(LynxError::Io)?;
+    std::fs::create_dir_all(snaps_dir).map_err(LynxError::IoRaw)?;
 
     let ts = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -38,7 +38,7 @@ fn create_in(snaps_dir: &Path, config_dir: &Path, label: &str) -> Result<PathBuf
         .collect();
 
     let snap_dir = snaps_dir.join(format!("{ts}_{safe_label}"));
-    std::fs::create_dir_all(&snap_dir).map_err(LynxError::Io)?;
+    std::fs::create_dir_all(&snap_dir).map_err(LynxError::IoRaw)?;
 
     // Copy config files (non-recursive: direct children only).
     copy_config_files(config_dir, &snap_dir)?;
@@ -55,7 +55,7 @@ fn list_in(snaps_dir: &Path) -> Result<Vec<(String, PathBuf)>> {
     }
 
     let mut entries: Vec<(String, PathBuf)> = std::fs::read_dir(snaps_dir)
-        .map_err(LynxError::Io)?
+        .map_err(LynxError::IoRaw)?
         .flatten()
         .filter(|e| e.path().is_dir())
         .map(|e| {
@@ -76,21 +76,21 @@ pub fn restore(snap_dir: &Path, config_dir: &Path) -> Result<()> {
             "snapshot not found: {snap_dir:?}"
         )));
     }
-    for entry in std::fs::read_dir(snap_dir).map_err(LynxError::Io)?.flatten() {
+    for entry in std::fs::read_dir(snap_dir).map_err(LynxError::IoRaw)?.flatten() {
         let src = entry.path();
         let dest = config_dir.join(entry.file_name());
-        std::fs::copy(&src, &dest).map_err(LynxError::Io)?;
+        std::fs::copy(&src, &dest).map_err(LynxError::IoRaw)?;
     }
     Ok(())
 }
 
 fn copy_config_files(src: &Path, dest: &Path) -> Result<()> {
-    for entry in std::fs::read_dir(src).map_err(LynxError::Io)?.flatten() {
+    for entry in std::fs::read_dir(src).map_err(LynxError::IoRaw)?.flatten() {
         let path = entry.path();
         // Only copy files (not subdirs — snapshots/ itself lives here).
         if path.is_file() {
             let dest_file = dest.join(entry.file_name());
-            std::fs::copy(&path, &dest_file).map_err(LynxError::Io)?;
+            std::fs::copy(&path, &dest_file).map_err(LynxError::IoRaw)?;
         }
     }
     Ok(())
@@ -98,7 +98,7 @@ fn copy_config_files(src: &Path, dest: &Path) -> Result<()> {
 
 fn trim_snapshots(dir: &Path) -> Result<()> {
     let mut entries: Vec<PathBuf> = std::fs::read_dir(dir)
-        .map_err(LynxError::Io)?
+        .map_err(LynxError::IoRaw)?
         .flatten()
         .filter(|e| e.path().is_dir())
         .map(|e| e.path())
@@ -112,7 +112,7 @@ fn trim_snapshots(dir: &Path) -> Result<()> {
     entries.sort();
     let to_remove = entries.len() - MAX_SNAPSHOTS;
     for path in entries.iter().take(to_remove) {
-        std::fs::remove_dir_all(path).map_err(LynxError::Io)?;
+        std::fs::remove_dir_all(path).map_err(LynxError::IoRaw)?;
     }
     Ok(())
 }

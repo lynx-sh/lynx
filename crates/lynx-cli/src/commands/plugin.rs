@@ -1,7 +1,8 @@
 use anyhow::{bail, Result};
 use clap::{Args, Subcommand};
 use lynx_config::{load as load_config, save as save_config};
-use lynx_plugin::{exec::generate_exec_script, namespace::scaffold_convention_comment};
+use lynx_plugin::exec::generate_exec_script;
+use lynx_plugin::namespace::scaffold_convention_comment;
 use std::path::PathBuf;
 
 #[derive(Args)]
@@ -43,6 +44,8 @@ pub enum PluginCommand {
         /// Plugin name to exec
         name: String,
     },
+    /// Show real-world usage examples
+    Examples,
 }
 
 pub async fn run(args: PluginArgs) -> Result<()> {
@@ -53,6 +56,11 @@ pub async fn run(args: PluginArgs) -> Result<()> {
         PluginCommand::New { name } => cmd_new(&name).await,
         PluginCommand::Reinstall { name } => cmd_reinstall(&name).await,
         PluginCommand::Exec { name } => cmd_exec(&name).await,
+        PluginCommand::Examples => {
+            crate::commands::examples::run(
+                crate::commands::examples::ExamplesArgs { command: Some("plugin".into()) }
+            ).await
+        }
     }
 }
 
@@ -127,45 +135,95 @@ async fn cmd_new(name: &str) -> Result<()> {
 
     std::fs::create_dir_all(dir.join("shell"))?;
 
-    // plugin.toml scaffold
+    // plugin.toml — every field has an inline comment explaining it
     let toml = format!(
         r#"[plugin]
-name        = "{name}"
-version     = "0.1.0"
-description = ""
-authors     = []
+name        = "{name}"   # unique identifier — must match the directory name
+version     = "0.1.0"   # semver; bump when you make breaking changes
+description = ""         # shown in `lx plugin list`
+authors     = []         # e.g. ["Your Name <you@example.com>"]
 
 [load]
-lazy  = false
-hooks = []
+lazy  = false  # true = load only on first use of an exported function
+hooks = []     # zsh hooks that trigger load, e.g. ["chpwd", "precmd"]
 
 [deps]
-binaries = []
-plugins  = []
+binaries = []  # required binaries, e.g. ["git", "fzf"] — checked at load
+plugins  = []  # other lynx plugins this one depends on
 
 [exports]
-functions = []
-aliases   = []
+# List every function and alias exported to the shell.
+# Unlisted names are private — Lynx will refuse to source them.
+functions = ["{name}"]   # example: replace with your real function names
+aliases   = []           # example: ["g", "gs"] — only loaded in interactive context
 
 [contexts]
+# Aliases are never loaded in agent or minimal contexts (D-010).
+# Add "interactive" here to also skip functions in non-interactive shells.
 disabled_in = ["agent", "minimal"]
 "#,
         name = name
     );
     std::fs::write(dir.join("plugin.toml"), toml)?;
 
-    // init.zsh scaffold
+    // shell/init.zsh — thin entry point, sources the other files, under 10 lines
     let init_zsh = format!(
-        "# {name} plugin — init.zsh\n\
-         {convention}\n\n\
-         # Add your plugin functions below.\n",
+        "# {name} — init.zsh  (keep this file under 10 lines)\n\
+         # Sources functions and aliases; actual logic lives in functions.zsh.\n\
+         source \"${{LYNX_PLUGIN_DIR}}/{name}/shell/functions.zsh\"\n\
+         source \"${{LYNX_PLUGIN_DIR}}/{name}/shell/aliases.zsh\"\n",
         name = name,
-        convention = scaffold_convention_comment(),
     );
     std::fs::write(dir.join("shell/init.zsh"), init_zsh)?;
 
-    println!("Scaffolded plugin '{}' at ./{}/", name, name);
-    println!("  Edit {}/plugin.toml to declare exports and deps.", name);
+    // shell/functions.zsh — example function with _ prefix for internals
+    let functions_zsh = format!(
+        "# {name} -- functions.zsh\n\
+         # Public functions must match the exports.functions list in plugin.toml.\n\
+         # Internal helpers use the _ prefix so Lynx won't export them.\n\
+         \n\
+         {convention}\n\
+         \n\
+         # Example public function -- rename and replace with your logic.\n\
+         {name}() {{\n\
+         {indent}__{name}_run \"$@\"\n\
+         }}\n\
+         \n\
+         # Internal helper -- not exported.\n\
+         __{name}_run() {{\n\
+         {indent}echo \"{name}: $*\"\n\
+         }}\n",
+        name = name,
+        convention = scaffold_convention_comment(),
+        indent = "  ",
+    );
+    std::fs::write(dir.join("shell/functions.zsh"), functions_zsh)?;
+
+    // shell/aliases.zsh — context-gated example
+    let aliases_zsh = format!(
+        "# {name} — aliases.zsh\n\
+         # Aliases are only sourced in interactive context (disabled_in agent+minimal).\n\
+         # All aliases must be listed in exports.aliases in plugin.toml.\n\
+         \n\
+         # Example alias — remove or replace:\n\
+         # alias {short}='{name}'\n",
+        name = name,
+        short = name.chars().next().unwrap_or('x'),
+    );
+    std::fs::write(dir.join("shell/aliases.zsh"), aliases_zsh)?;
+
+    println!("Created plugin '{}' at ./{}/", name, name);
+    println!();
+    println!("  Structure:");
+    println!("    {name}/plugin.toml          — manifest (edit exports + deps)");
+    println!("    {name}/shell/init.zsh        — entry point (keep under 10 lines)");
+    println!("    {name}/shell/functions.zsh   — your functions go here");
+    println!("    {name}/shell/aliases.zsh     — aliases (context-gated automatically)");
+    println!();
+    println!("  Next:");
+    println!("    lx plugin add ./{name}       — install and activate");
+    println!("    lx plugin list               — verify it's loaded");
+    println!("    lx doctor                    — check for issues");
     Ok(())
 }
 

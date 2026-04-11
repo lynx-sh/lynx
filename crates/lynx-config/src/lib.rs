@@ -2,6 +2,7 @@ pub mod defaults;
 pub mod migrate;
 pub mod schema;
 pub mod snapshot;
+pub mod validate;
 
 use lynx_core::error::{LynxError, Result};
 use schema::LynxConfig;
@@ -30,7 +31,7 @@ pub fn load_from(path: &Path) -> Result<LynxConfig> {
             Ok(cfg)
         }
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(LynxConfig::default()),
-        Err(e) => Err(LynxError::Io(e)),
+        Err(e) => Err(LynxError::IoRaw(e)),
     }
 }
 
@@ -40,20 +41,13 @@ pub fn save(config: &LynxConfig) -> Result<()> {
 }
 
 pub fn save_to(config: &LynxConfig, path: &Path) -> Result<()> {
-    validate(config)?;
+    validate::validate_before_apply(config)?;
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(LynxError::Io)?;
+        std::fs::create_dir_all(parent).map_err(LynxError::IoRaw)?;
     }
     let content = toml::to_string_pretty(config)
         .map_err(|e| LynxError::Config(e.to_string()))?;
-    std::fs::write(path, content).map_err(LynxError::Io)
-}
-
-fn validate(config: &LynxConfig) -> Result<()> {
-    if config.active_theme.is_empty() {
-        return Err(LynxError::Config("active_theme must not be empty".into()));
-    }
-    Ok(())
+    std::fs::write(path, content).map_err(LynxError::IoRaw)
 }
 
 #[cfg(test)]

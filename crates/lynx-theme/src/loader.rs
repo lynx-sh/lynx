@@ -50,7 +50,7 @@ pub fn load_from_path(path: &Path) -> Result<Theme> {
         .file_stem()
         .and_then(|s| s.to_str())
         .unwrap_or("unknown");
-    let content = std::fs::read_to_string(path).map_err(LynxError::Io)?;
+    let content = std::fs::read_to_string(path).map_err(LynxError::IoRaw)?;
     parse_and_validate(&content, name)
 }
 

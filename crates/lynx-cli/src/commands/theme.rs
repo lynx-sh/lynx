@@ -23,6 +23,8 @@ pub enum ThemeCommand {
     List,
     /// Open the active theme in $EDITOR; validates and rolls back on error
     Edit,
+    /// Show real-world usage examples
+    Examples,
 }
 
 pub async fn run(args: ThemeArgs) -> Result<()> {
@@ -31,6 +33,11 @@ pub async fn run(args: ThemeArgs) -> Result<()> {
         ThemeCommand::Random => cmd_random(),
         ThemeCommand::List => cmd_list(),
         ThemeCommand::Edit => cmd_edit(),
+        ThemeCommand::Examples => {
+            crate::commands::examples::run(
+                crate::commands::examples::ExamplesArgs { command: Some("theme".into()) }
+            ).await
+        }
     }
 }
 

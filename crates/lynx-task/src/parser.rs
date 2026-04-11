@@ -6,7 +6,7 @@ use std::time::Duration;
 
 /// Parse and validate all tasks from a tasks.toml file path.
 pub fn load_tasks(path: &Path) -> Result<Vec<ValidatedTask>> {
-    let content = std::fs::read_to_string(path).map_err(LynxError::Io)?;
+    let content = std::fs::read_to_string(path).map_err(LynxError::IoRaw)?;
     parse_tasks_str(&content)
 }
 

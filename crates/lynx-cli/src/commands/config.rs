@@ -25,6 +25,8 @@ pub enum ConfigCommand {
     Get { key: String },
     /// Set a config value (snapshot → validate → apply)
     Set { key: String, value: String },
+    /// Show real-world usage examples
+    Examples,
 }
 
 pub async fn run(args: ConfigArgs) -> Result<()> {
@@ -34,6 +36,11 @@ pub async fn run(args: ConfigArgs) -> Result<()> {
         ConfigCommand::Validate => cmd_validate(),
         ConfigCommand::Get { key } => cmd_get(&key),
         ConfigCommand::Set { key, value } => cmd_set(&key, &value),
+        ConfigCommand::Examples => {
+            return crate::commands::examples::run(
+                crate::commands::examples::ExamplesArgs { command: Some("config".into()) }
+            ).await;
+        }
     }
 }
 

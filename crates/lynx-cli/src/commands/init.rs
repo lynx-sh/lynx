@@ -1,7 +1,11 @@
 use anyhow::Result;
 use clap::Args;
 use lynx_config::load as load_config;
-use lynx_shell::{context::detect_context, init::{generate_init_script, InitParams}};
+use lynx_shell::{
+    context::detect_context,
+    init::{generate_init_script, InitParams},
+    safemode::generate_safemode_script,
+};
 use lynx_core::types::Context;
 
 #[derive(Args)]
@@ -12,7 +16,15 @@ pub struct InitArgs {
 }
 
 pub async fn run(args: InitArgs) -> Result<()> {
-    let config = load_config()?;
+    // If config fails to load, emit safe mode instead of crashing the shell.
+    let config = match load_config() {
+        Ok(cfg) => cfg,
+        Err(e) => {
+            let script = generate_safemode_script(&e.to_string());
+            print!("{}", script);
+            return Ok(());
+        }
+    };
 
     let detected = detect_context();
     let context = match args.context.as_deref() {

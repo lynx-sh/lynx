@@ -4,6 +4,7 @@ pub mod context;
 pub mod daemon;
 pub mod doctor;
 pub mod event;
+pub mod examples;
 pub mod init;
 pub mod migrate;
 pub mod plugin;
@@ -34,5 +35,6 @@ pub async fn dispatch(cli: Cli) -> Result<()> {
         Command::Migrate(args)   => migrate::run(args).await,
         Command::Update(args)    => update::run(args).await,
         Command::Uninstall(args) => uninstall::run(args).await,
+        Command::Examples(args)  => examples::run(args).await,
     }
 }

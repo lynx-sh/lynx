@@ -12,7 +12,7 @@ use std::path::PathBuf;
 /// This is the single source of truth for all runtime paths — never hardcode /tmp elsewhere.
 pub fn runtime_dir() -> Result<PathBuf> {
     let dir = resolve_runtime_dir();
-    std::fs::create_dir_all(&dir).map_err(LynxError::Io)?;
+    std::fs::create_dir_all(&dir).map_err(LynxError::IoRaw)?;
     set_permissions_700(&dir)?;
     Ok(dir)
 }
@@ -46,7 +46,7 @@ pub fn lock_file() -> Result<PathBuf> {
 fn set_permissions_700(dir: &std::path::Path) -> Result<()> {
     use std::os::unix::fs::PermissionsExt;
     let perms = std::fs::Permissions::from_mode(0o700);
-    std::fs::set_permissions(dir, perms).map_err(LynxError::Io)
+    std::fs::set_permissions(dir, perms).map_err(LynxError::IoRaw)
 }
 
 fn get_uid() -> u32 {

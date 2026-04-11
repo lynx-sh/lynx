@@ -70,6 +70,8 @@ pub enum TaskCommand {
         /// Task name
         name: String,
     },
+    /// Show real-world usage examples
+    Examples,
 }
 
 pub async fn run(args: TaskArgs) -> Result<()> {
@@ -83,6 +85,11 @@ pub async fn run(args: TaskArgs) -> Result<()> {
         TaskCommand::Resume { name } => cmd_set_enabled(name, true).await,
         TaskCommand::Run { name } => cmd_run(name).await,
         TaskCommand::Remove { name } => cmd_remove(name).await,
+        TaskCommand::Examples => {
+            crate::commands::examples::run(
+                crate::commands::examples::ExamplesArgs { command: Some("task".into()) }
+            ).await
+        }
     }
 }
 
