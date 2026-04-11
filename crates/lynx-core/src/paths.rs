@@ -102,6 +102,23 @@ pub fn bin_dir() -> PathBuf {
     home().join(".local").join("bin")
 }
 
+/// Search `$PATH` for a binary named `name`. Returns the first match, or `None`.
+///
+/// This is the single canonical binary-lookup used across all crates.
+/// Never write inline PATH-walking logic — call this instead.
+pub fn find_binary(name: &str) -> Option<PathBuf> {
+    std::env::var_os(crate::env_vars::PATH).and_then(|path| {
+        std::env::split_paths(&path).find_map(|dir| {
+            let candidate = dir.join(name);
+            if candidate.is_file() {
+                Some(candidate)
+            } else {
+                None
+            }
+        })
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

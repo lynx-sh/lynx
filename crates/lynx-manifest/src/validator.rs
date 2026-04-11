@@ -51,18 +51,8 @@ fn check_binary_deps(manifest: &PluginManifest) -> Result<()> {
     Ok(())
 }
 
-/// Minimal PATH lookup — avoids pulling in the `which` crate.
 fn which(bin: &str) -> Option<std::path::PathBuf> {
-    std::env::var_os("PATH").and_then(|path| {
-        std::env::split_paths(&path).find_map(|dir| {
-            let candidate = dir.join(bin);
-            if candidate.is_file() {
-                Some(candidate)
-            } else {
-                None
-            }
-        })
-    })
+    lynx_core::paths::find_binary(bin)
 }
 
 #[cfg(test)]
