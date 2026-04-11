@@ -181,6 +181,6 @@ Tested in interactive:      full plugin loads — yes
 ## Session End
 ```bash
 cargo nextest run --all          # verify nothing broken
-scripts/verify-guardrails.sh     # 38 invariant checks — must pass
+scripts/verify-guardrails.sh     # invariant checks — must pass
 pt done S-XXX success "what was done" "what next agent does first"
 ```

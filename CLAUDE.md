@@ -14,7 +14,7 @@ A thin ~200-line zsh layer evals output from `lx`. All logic is in Rust crates.
 ## Project Layout
 
 ```
-crates/         Rust workspace (13 crates — see maps/crate-deps.md for dep rules)
+crates/         Rust workspace (see maps/crate-deps.md for dep rules)
 shell/          Thin zsh integration layer (logic-free — see patterns/shell-protocol.md)
 plugins/        First-party plugins (see patterns/plugin-protocol.md)
 themes/         TOML theme files

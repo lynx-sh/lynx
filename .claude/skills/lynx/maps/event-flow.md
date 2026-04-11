@@ -17,17 +17,14 @@ _lynx_hook_chpwd()
 ## Well-Known Event Names (defined in lynx-events/src/types.rs)
 
 ```rust
+// Source of truth: crates/lynx-events/src/types.rs
 pub const SHELL_CHPWD:        &str = "shell:chpwd";        // cwd changed
 pub const SHELL_PREEXEC:      &str = "shell:preexec";      // before command runs
 pub const SHELL_PRECMD:       &str = "shell:precmd";       // before prompt renders
-pub const SHELL_CONTEXT_CHANGED: &str = "shell:context-changed";
 pub const CONFIG_CHANGED:     &str = "config:changed";
 pub const PLUGIN_LOADED:      &str = "plugin:loaded";
-pub const PLUGIN_FAILED:      &str = "plugin:failed";
-pub const THEME_CHANGED:      &str = "theme:changed";
-pub const GIT_STATE_UPDATED:  &str = "git:state-updated";  // git plugin fires this
-pub const TASK_COMPLETED:     &str = "task:completed";
-pub const TASK_FAILED:        &str = "task:failed";
+pub const PLUGIN_UNLOADED:    &str = "plugin:unloaded";
+pub const GIT_BRANCH_CHANGED: &str = "git:branch-changed";
 ```
 
 ## Plugin Registration

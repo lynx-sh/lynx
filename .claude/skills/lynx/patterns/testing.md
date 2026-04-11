@@ -43,12 +43,12 @@ scripts/verify-guardrails.sh
 
 ## Guardrail Tests
 
-`scripts/verify-guardrails.sh` is the unified offline verifier. It runs 38 checks across 5 drift classes:
+`scripts/verify-guardrails.sh` is the unified offline verifier. It runs checks across 5 drift classes:
 
 | Class | What it checks |
 |---|---|
 | Shell protocol | Line limits (60 for core, 10 for plugin init.zsh), no branching in static files |
-| Context mismatch | `CLAUDE_CODE`, `CURSOR_SESSION`, `CI` constants still in `lynx-shell/src/context.rs` |
+| Context mismatch | `CLAUDECODE`, `CURSOR_CLI`, `CI` constants still in `lynx-shell/src/context.rs` |
 | Dep map drift | Forbidden crate dep pairs from `maps/crate-deps.md` (lynx-core↛lynx-*, etc.) |
 | Checksum enforcement | `validate_index` fn exists and is called in `fetch_plugin` |
 | Docs-command mismatch | Critical `lx` commands documented in README; subcommands declared in `cli.rs` |
