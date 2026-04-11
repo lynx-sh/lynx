@@ -40,6 +40,8 @@ pub(crate) struct GitState {
     stash_count: u32,
     ahead: u32,
     behind: u32,
+    /// Active repo action (merge, rebase, cherry-pick, bisect) or None when idle.
+    action: Option<String>,
 }
 
 /// Run a git subcommand, capture stdout. Returns `None` on non-zero exit or spawn failure.
@@ -69,6 +71,7 @@ pub(crate) fn gather_git_state() -> GitState {
             stash_count: 0,
             ahead: 0,
             behind: 0,
+            action: None,
         };
     }
 
@@ -83,6 +86,7 @@ pub(crate) fn gather_git_state() -> GitState {
         .unwrap_or(0);
 
     let (ahead, behind) = upstream_counts();
+    let action = detect_action(root.as_deref().unwrap_or(""));
 
     GitState {
         root,
@@ -94,7 +98,28 @@ pub(crate) fn gather_git_state() -> GitState {
         stash_count,
         ahead,
         behind,
+        action,
     }
+}
+
+/// Detect the active git operation via filesystem checks on the repo root.
+/// No git subprocess — reads only well-known marker files/directories.
+pub(crate) fn detect_action(root: &str) -> Option<String> {
+    use std::path::Path;
+    let git_dir = Path::new(root).join(".git");
+    if git_dir.join("MERGE_HEAD").exists() {
+        return Some("merge".to_string());
+    }
+    if git_dir.join("rebase-merge").is_dir() || git_dir.join("rebase-apply").is_dir() {
+        return Some("rebase".to_string());
+    }
+    if git_dir.join("CHERRY_PICK_HEAD").exists() {
+        return Some("cherry-pick".to_string());
+    }
+    if git_dir.join("BISECT_LOG").exists() {
+        return Some("bisect".to_string());
+    }
+    None
 }
 
 /// Parse `git status --porcelain` output into (dirty, staged, modified, untracked).
@@ -177,8 +202,15 @@ pub(crate) fn render_zsh(state: &GitState) -> String {
     // branch is JSON-escaped to handle unusual names safely.
     let branch_raw = state.branch.as_deref().unwrap_or("");
     let branch_json = branch_raw.replace('\\', "\\\\").replace('"', "\\\"");
+
+    let action_zsh = state.action.as_deref().unwrap_or("");
+    let action_json = match &state.action {
+        Some(a) => format!(r#""{}""#, a.replace('"', "\\\"")),
+        None => "null".to_string(),
+    };
+
     let json = format!(
-        r#"{{"branch":"{branch_json}","dirty":{dirty_b},"staged":{staged_b},"modified":{modified_b},"untracked":{untracked_b},"stash":{stash},"ahead":{ahead},"behind":{behind}}}"#,
+        r#"{{"branch":"{branch_json}","dirty":{dirty_b},"staged":{staged_b},"modified":{modified_b},"untracked":{untracked_b},"stash":{stash},"ahead":{ahead},"behind":{behind},"action":{action_json}}}"#,
         dirty_b = state.dirty,
         staged_b = state.staged,
         modified_b = state.modified,
@@ -189,7 +221,7 @@ pub(crate) fn render_zsh(state: &GitState) -> String {
     );
 
     format!(
-        "_lynx_git_state=(root '{root}' branch '{branch}' dirty '{dirty}' staged '{staged}' modified '{modified}' untracked '{untracked}' stash '{stash}' ahead '{ahead}' behind '{behind}')\nexport LYNX_CACHE_GIT_STATE='{json}'\n",
+        "_lynx_git_state=(root '{root}' branch '{branch}' dirty '{dirty}' staged '{staged}' modified '{modified}' untracked '{untracked}' stash '{stash}' ahead '{ahead}' behind '{behind}' action '{action_zsh}')\nexport LYNX_CACHE_GIT_STATE='{json}'\n",
         stash = state.stash_count,
         ahead = state.ahead,
         behind = state.behind,
@@ -212,6 +244,7 @@ mod tests {
             stash_count: 0,
             ahead: 0,
             behind: 0,
+            action: None,
         };
         let out = render_zsh(&state);
         assert!(out.contains("_lynx_git_state=()"));
@@ -230,6 +263,7 @@ mod tests {
             stash_count: 2,
             ahead: 1,
             behind: 3,
+            action: None,
         };
         let out = render_zsh(&state);
         assert!(out.contains("root '/home/user/repo'"));
@@ -255,6 +289,7 @@ mod tests {
             stash_count: 0,
             ahead: 0,
             behind: 0,
+            action: None,
         };
         let out = render_zsh(&state);
         assert!(out.contains("export LYNX_CACHE_GIT_STATE='"));
@@ -276,6 +311,7 @@ mod tests {
             stash_count: 0,
             ahead: 0,
             behind: 0,
+            action: None,
         };
         let out = render_zsh(&state);
         assert!(out.contains("dirty '0'"));
@@ -321,5 +357,86 @@ mod tests {
     #[test]
     fn zsh_escape_plain_string_unchanged() {
         assert_eq!(zsh_escape("main"), "main");
+    }
+
+    #[test]
+    fn render_zsh_includes_action_null() {
+        let state = GitState {
+            root: Some("/repo".into()),
+            branch: Some("main".into()),
+            dirty: false,
+            staged: false,
+            modified: false,
+            untracked: false,
+            stash_count: 0,
+            ahead: 0,
+            behind: 0,
+            action: None,
+        };
+        let out = render_zsh(&state);
+        assert!(out.contains(r#""action":null"#), "action field missing: {out}");
+        assert!(out.contains("action ''"), "action zsh field missing: {out}");
+    }
+
+    #[test]
+    fn render_zsh_includes_action_merge() {
+        let state = GitState {
+            root: Some("/repo".into()),
+            branch: Some("main".into()),
+            dirty: false,
+            staged: false,
+            modified: false,
+            untracked: false,
+            stash_count: 0,
+            ahead: 0,
+            behind: 0,
+            action: Some("merge".into()),
+        };
+        let out = render_zsh(&state);
+        assert!(out.contains(r#""action":"merge""#), "action json missing: {out}");
+        assert!(out.contains("action 'merge'"), "action zsh missing: {out}");
+    }
+
+    #[test]
+    fn detect_action_returns_none_without_markers() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join(".git")).unwrap();
+        let result = detect_action(dir.path().to_str().unwrap());
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn detect_action_merge_head() {
+        let dir = tempfile::tempdir().unwrap();
+        let git_dir = dir.path().join(".git");
+        std::fs::create_dir_all(&git_dir).unwrap();
+        std::fs::write(git_dir.join("MERGE_HEAD"), "abc123").unwrap();
+        assert_eq!(detect_action(dir.path().to_str().unwrap()), Some("merge".into()));
+    }
+
+    #[test]
+    fn detect_action_rebase_merge_dir() {
+        let dir = tempfile::tempdir().unwrap();
+        let git_dir = dir.path().join(".git");
+        std::fs::create_dir_all(git_dir.join("rebase-merge")).unwrap();
+        assert_eq!(detect_action(dir.path().to_str().unwrap()), Some("rebase".into()));
+    }
+
+    #[test]
+    fn detect_action_cherry_pick() {
+        let dir = tempfile::tempdir().unwrap();
+        let git_dir = dir.path().join(".git");
+        std::fs::create_dir_all(&git_dir).unwrap();
+        std::fs::write(git_dir.join("CHERRY_PICK_HEAD"), "abc123").unwrap();
+        assert_eq!(detect_action(dir.path().to_str().unwrap()), Some("cherry-pick".into()));
+    }
+
+    #[test]
+    fn detect_action_bisect() {
+        let dir = tempfile::tempdir().unwrap();
+        let git_dir = dir.path().join(".git");
+        std::fs::create_dir_all(&git_dir).unwrap();
+        std::fs::write(git_dir.join("BISECT_LOG"), "").unwrap();
+        assert_eq!(detect_action(dir.path().to_str().unwrap()), Some("bisect".into()));
     }
 }
