@@ -96,19 +96,22 @@ ACTIVATE:  For each hook in [load].hooks:
 
 ## Event System
 
-Events flow from zsh hooks through IPC to the daemon's event bus. Plugin
-handlers are registered at load time and dispatched asynchronously.
+Events are dispatched in-process inside each `lx` command invocation.
+`lx` instantiates an `EventBus`, runs the full plugin lifecycle
+(declare → resolve → activate) to register handlers, emits the event,
+and exits. No daemon required for event dispatch.
 
 ```
-zsh hook triggered (chpwd / preexec / precmd)
-  └── _lynx_hook_*() in shell/core/hooks.zsh
-        └── lx event emit "shell:<hook>" [--data "$arg"]
-              └── Unix socket → runtime_dir()/events.sock
-                    └── lynx-daemon parses IPC (emit/subscribe)
-                          └── EventBus::dispatch(event)
-                                └── registered handlers execute asynchronously
-                                      └── observable via `lx event log`
+lx prompt render (or lx event emit, lx plugin exec)
+  └── bus::build_active_bus()
+        └── lifecycle::declare() + resolve() + activate()
+              └── plugin handlers registered on in-process EventBus
+                    └── bus.emit("shell:precmd", ...)
+                          └── handlers execute, results observable via lx event log
 ```
+
+The daemon owns only the task scheduler. `lx event emit` can also be
+used from the shell directly to fire events for debugging.
 
 The precmd hook also runs prompt rendering synchronously before the event:
 
@@ -134,7 +137,7 @@ lx prompt render
   ├── reads LYNX_CACHE_GIT_STATE env var     → cache["git_state"]
   ├── reads LYNX_CACHE_KUBECTL_STATE env var → cache["kubectl_state"]
   ├── reads LynxConfig.active_profile        → cache["profile_state"]
-  ├── loads active theme (LYNX_THEME or "default")
+  ├── loads active theme (LYNX_THEME env var → config.active_theme → brand::DEFAULT_THEME fallback)
   ├── evaluates all segments concurrently (tokio)
   └── prints: PROMPT="..." \n RPROMPT="..."   ← eval'd by precmd
 ```
