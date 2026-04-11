@@ -21,7 +21,12 @@ pub fn generate_init_script(params: &InitParams<'_>) -> String {
 
     let mut out = String::new();
 
-    // Guard: skip if already initialized (idempotency)
+    // Clear any inherited LYNX_INITIALIZED from parent shells so this shell always
+    // initializes fresh. The idempotency guard below then prevents double-init if
+    // this script is eval'd twice in the same session (e.g. double source of .zshrc).
+    out.push_str("unset LYNX_INITIALIZED\n");
+
+    // Guard: skip if already initialized (idempotency within same session)
     out.push_str("if [[ -z \"${LYNX_INITIALIZED}\" ]]; then\n");
 
     // Core env vars
