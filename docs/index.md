@@ -8,7 +8,8 @@ Fast, Rust-powered zsh shell framework. Context-aware, plugin-isolated, theme-dr
 |---|---|---|
 | [Architecture](architecture.md) | Contributors, advanced users | Crate map, shell integration flow, plugin lifecycle, event system |
 | [Plugin Authoring](plugin-authoring.md) | Plugin developers | Building, testing, and publishing plugins |
-| [Theme Authoring](theme-authoring.md) | Theme developers | Theme TOML, all segments, custom segments in Rust |
+| [Theme Vision](theme-vision.md) | Contributors, agents | Full theme system design, roadmap, decisions summary — read this first |
+| [Theme Authoring](theme-authoring.md) | Theme developers | Theme TOML, all segments, CLI customization, custom segments in Rust |
 | [Registry Index Spec](registry-index-spec.md) | Registry maintainers | Static index format for the plugin registry |
 
 ## Decisions

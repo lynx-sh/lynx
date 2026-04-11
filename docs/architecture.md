@@ -1,7 +1,7 @@
 # Lynx Architecture
 
 This document covers the structural decisions that shape Lynx's codebase. For
-*why* each decision was made, see the [ADRs](decisions/).
+*why* each decision was made, run `pt decisions` — that is the single source of truth.
 
 ---
 
