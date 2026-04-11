@@ -63,6 +63,7 @@ mod tests {
             shell_context: shell_ctx,
             last_cmd_ms: None,
             cache,
+            env: HashMap::new(),
         }
     }
 
@@ -72,6 +73,7 @@ mod tests {
             shell_context: lynx_core::types::Context::Interactive,
             last_cmd_ms: None,
             cache: HashMap::new(),
+            env: HashMap::new(),
         }
     }
 

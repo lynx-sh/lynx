@@ -45,6 +45,15 @@ pub const LYNX_SAFE_MODE: &str = "LYNX_SAFE_MODE";
 /// Set to `"1"` by `lx benchmark` to gate benchmark-only codepaths.
 pub const LYNX_BENCHMARK_MODE: &str = "LYNX_BENCHMARK_MODE";
 
+/// Exit code of the last shell command. Exported by the precmd hook before `lx prompt render`.
+pub const LYNX_LAST_EXIT_CODE: &str = "LYNX_LAST_EXIT_CODE";
+
+/// Number of background jobs in the current shell. Exported by the precmd hook.
+pub const LYNX_BG_JOBS: &str = "LYNX_BG_JOBS";
+
+/// Current vi-mode indicator (e.g. `"insert"`, `"normal"`). Set by the vi-mode plugin.
+pub const LYNX_VI_MODE: &str = "LYNX_VI_MODE";
+
 // ── Agent detection env vars ─────────────────────────────────────────────────
 
 /// Set to `"1"` by Claude Code in every shell it spawns.
