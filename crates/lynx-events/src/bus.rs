@@ -33,7 +33,7 @@ impl EventBus {
         let boxed: AsyncHandler = Box::new(move |ev| Box::pin(handler(ev)));
         self.handlers
             .lock()
-            .unwrap()
+            .expect("event bus mutex poisoned")
             .entry(event_name.to_string())
             .or_default()
             .push(boxed);
@@ -45,7 +45,7 @@ impl EventBus {
     /// Returns the number of handlers invoked.
     pub async fn emit(&self, event: Event) -> usize {
         let handlers: Vec<*const AsyncHandler> = {
-            let lock = self.handlers.lock().unwrap();
+            let lock = self.handlers.lock().expect("event bus mutex poisoned");
             match lock.get(&event.name) {
                 None => return 0,
                 Some(hs) => hs.iter().map(|h| h as *const AsyncHandler).collect(),
@@ -57,7 +57,7 @@ impl EventBus {
         let count = handlers.len();
         for ptr in handlers {
             let fut = {
-                let lock = self.handlers.lock().unwrap();
+                let lock = self.handlers.lock().expect("event bus mutex poisoned");
                 if let Some(hs) = lock.get(&event.name) {
                     // Find the handler by pointer identity
                     hs.iter()

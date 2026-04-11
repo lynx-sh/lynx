@@ -76,7 +76,7 @@ async fn cmd_render() -> Result<()> {
 
     // --- Load theme ---
     let theme_name = std::env::var("LYNX_THEME").unwrap_or_else(|_| "default".into());
-    let theme = load_theme(&theme_name).unwrap_or_else(|_| load_theme("default").unwrap());
+    let theme = load_theme(&theme_name).or_else(|_| load_theme("default"))?;
 
     // --- Build segment registry ---
     let segments: Vec<Box<dyn lynx_prompt::segment::Segment>> = vec![
