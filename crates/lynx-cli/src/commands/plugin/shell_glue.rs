@@ -152,7 +152,8 @@ mod tests {
         let script = build_unload_script("git", Some(&manifest));
         assert!(script.contains("unfunction git_branch 2>/dev/null"));
         assert!(script.contains("unalias gst 2>/dev/null"));
-        assert!(script.contains("add-zsh-hook -d chpwd _git_plugin_chpwd 2>/dev/null"));
+        // git plugin no longer self-registers hooks — lx refresh-state handles precmd
+        assert!(!script.contains("add-zsh-hook"));
         assert!(script.contains("unset LYNX_PLUGIN_GIT_LOADED"));
     }
 
@@ -194,7 +195,8 @@ mod tests {
         std::env::set_var(lynx_core::env_vars::LYNX_DIR, lynx_dir);
 
         let script = generate_exec_script_for_plugin("git").expect("exec script");
-        assert!(script.contains("add-zsh-hook chpwd _git_plugin_chpwd"));
+        // git plugin no longer self-registers hooks — lx refresh-state handles precmd
+        assert!(!script.contains("add-zsh-hook"));
         assert!(script.contains("LYNX_PLUGIN_GIT_LOADED"));
     }
 

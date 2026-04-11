@@ -30,7 +30,7 @@ pub async fn run(_args: GitStateArgs) -> Result<()> {
     Ok(())
 }
 
-struct GitState {
+pub(crate) struct GitState {
     root: Option<String>,
     branch: Option<String>,
     dirty: bool,
@@ -56,7 +56,7 @@ fn git(args: &[&str]) -> Option<String> {
     }
 }
 
-fn gather_git_state() -> GitState {
+pub(crate) fn gather_git_state() -> GitState {
     let root = git(&["rev-parse", "--show-toplevel"]);
     if root.is_none() {
         return GitState {
@@ -161,7 +161,7 @@ fn zsh_escape(s: &str) -> String {
     s.replace('\'', "'\\''")
 }
 
-fn render_zsh(state: &GitState) -> String {
+pub(crate) fn render_zsh(state: &GitState) -> String {
     if state.root.is_none() {
         return "_lynx_git_state=()\nexport LYNX_CACHE_GIT_STATE=''\n".to_string();
     }

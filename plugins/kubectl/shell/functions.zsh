@@ -1,27 +1,12 @@
 # kubectl plugin — functions.zsh
-# State is cached into _lynx_kubectl_state[] on chpwd hook.
-# The kubectl_context prompt segment reads from this cache.
+# State is cached into _lynx_kubectl_state[] by lx refresh-state (precmd hook).
+# The kubectl_context prompt segment reads from the cache — no kubectl calls in render path.
 
 typeset -gA _lynx_kubectl_state
 
-# Refresh kubectl state cache — called on chpwd hook
-kubectl_refresh_state() {
-  if ! command -v kubectl &>/dev/null; then
-    _lynx_kubectl_state=()
-    return 0
-  fi
-  if [[ -z "$KUBECONFIG" && ! -f "$HOME/.kube/config" ]]; then
-    _lynx_kubectl_state=()
-    return 0
-  fi
-
-  local ctx ns
-  ctx=$(kubectl config current-context 2>/dev/null)
-  ns=$(kubectl config view --minify --output 'jsonpath={..namespace}' 2>/dev/null)
-  ns="${ns:-default}"
-
-  _lynx_kubectl_state=(context "$ctx" namespace "$ns")
-}
+# Manual refresh — useful after kubectl config use-context or similar.
+# Under normal use lx refresh-state handles this automatically each precmd.
+kubectl_refresh_state() { eval "$(lx kubectl-state 2>/dev/null)" }
 
 # Read helpers — fast, no subprocess
 kubectl_current_context()   { echo "${_lynx_kubectl_state[context]}" }
@@ -53,5 +38,3 @@ kns() {
     kubectl_refresh_state
   fi
 }
-
-_kubectl_plugin_chpwd() { kubectl_refresh_state }

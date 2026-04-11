@@ -6,7 +6,7 @@ authors     = ["proxikal"]
 
 [load]
 lazy  = false
-hooks = ["chpwd"]
+hooks = []
 
 [deps]
 binaries = ["kubectl"]

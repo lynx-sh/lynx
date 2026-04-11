@@ -52,7 +52,13 @@ pub enum Command {
     Profile(crate::commands::profile::ProfileArgs),
     /// Render PROMPT/RPROMPT for eval by shell precmd hook
     Prompt(crate::commands::prompt::PromptArgs),
-    /// Emit zsh that populates _lynx_git_state (called by git plugin)
+    /// Emit zsh that populates _lynx_git_state (standalone / debugging)
     #[command(name = "git-state")]
     GitState(crate::commands::git::GitStateArgs),
+    /// Emit zsh that populates _lynx_kubectl_state (standalone / debugging)
+    #[command(name = "kubectl-state")]
+    KubectlState(crate::commands::kubectl_state::KubectlStateArgs),
+    /// Refresh all enabled plugin state caches in one eval (called by precmd hook)
+    #[command(name = "refresh-state")]
+    RefreshState(crate::commands::refresh_state::RefreshStateArgs),
 }

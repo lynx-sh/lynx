@@ -4,6 +4,8 @@ pub mod context;
 pub mod daemon;
 pub mod doctor;
 pub mod git;
+pub mod kubectl_state;
+pub mod refresh_state;
 pub mod event;
 pub mod examples;
 pub mod init;
@@ -44,5 +46,7 @@ pub async fn dispatch(cli: Cli) -> Result<()> {
         Command::Profile(args) => profile::run(args).await,
         Command::Prompt(args) => prompt::run(args).await,
         Command::GitState(args) => git::run(args).await,
+        Command::KubectlState(args) => kubectl_state::run(args).await,
+        Command::RefreshState(args) => refresh_state::run(args).await,
     }
 }
