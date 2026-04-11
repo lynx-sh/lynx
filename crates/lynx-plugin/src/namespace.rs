@@ -104,6 +104,7 @@ mod tests {
                 aliases: aliases.iter().map(|s| s.to_string()).collect(),
             },
             contexts: ContextsConfig::default(),
+            state: StateConfig::default(),
         }
     }
 

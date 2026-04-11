@@ -59,6 +59,7 @@ mod tests {
             contexts: ContextsConfig {
                 disabled_in: vec!["agent".into(), "minimal".into()],
             },
+            state: StateConfig::default(),
         }
     }
 
