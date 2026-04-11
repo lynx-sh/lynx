@@ -4,6 +4,7 @@ use anyhow::{Context, Result};
 use clap::Args;
 use lynx_core::brand;
 use lynx_core::brand::ZSHRC_INIT_LINE;
+use lynx_theme::loader::write_builtin_checksums;
 
 #[derive(Args)]
 pub struct InstallArgs {
@@ -66,8 +67,11 @@ pub async fn run(args: InstallArgs) -> Result<()> {
     }
 
     if themes_src.exists() {
-        copy_dir_all(&themes_src, &lynx_dir.join("themes"))
+        let themes_dst = lynx_dir.join("themes");
+        copy_dir_all(&themes_src, &themes_dst)
             .with_context(|| format!("failed to copy themes/ from {}", themes_src.display()))?;
+        // Seed the checksum lockfile so future `lx update` can detect stock files.
+        write_builtin_checksums(&themes_dst);
         println!("  ✓ themes/  → {}/themes/", lynx_dir.display());
     } else {
         println!("  ⚠ themes/ not found — skipping");
