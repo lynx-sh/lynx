@@ -37,12 +37,13 @@ and file listings are all derived from the same palette.
 3. [Palette System](#palette-system)
 4. [Segment Layout](#segment-layout)
 5. [Universal Visibility](#universal-visibility)
-6. [Segment Reference](#segment-reference)
-7. [File Listing Colors](#file-listing-colors)
-8. [Color Formats](#color-formats)
-9. [Worked Example: Powerline-Style Theme](#worked-example-powerline-style-theme)
-10. [Testing Your Theme](#testing-your-theme)
-11. [Adding a Custom Segment in Rust](#adding-a-custom-segment-in-rust)
+6. [Segment Format Strings](#segment-format-strings)
+7. [Segment Reference](#segment-reference)
+8. [File Listing Colors](#file-listing-colors)
+9. [Color Formats](#color-formats)
+10. [Worked Example: Powerline-Style Theme](#worked-example-powerline-style-theme)
+11. [Testing Your Theme](#testing-your-theme)
+12. [Adding a Custom Segment in Rust](#adding-a-custom-segment-in-rust)
 
 ---
 
@@ -196,6 +197,58 @@ Valid context values: `interactive`, `agent`, `minimal`.
 
 ---
 
+## Segment Format Strings
+
+Every segment that produces text supports an optional `format` field. Format
+strings use `$variable` substitution — the same syntax as Starship modules.
+
+```toml
+[segment.git_branch]
+format = "[$branch]($style) "   # wrap branch in brackets, icon omitted
+```
+
+**Rules:**
+- `$variable` expands to the segment's value for that variable
+- Unknown variable names expand to an empty string (no error, no panic)
+- `$$` produces a literal `$`
+- If `format` is absent, the segment uses its built-in default layout
+
+**Available variables per segment:**
+
+| Segment | Variables |
+|---|---|
+| `git_branch` | `$icon`, `$branch` |
+| `git_status` | `$staged`, `$modified`, `$untracked` |
+| `dir` | `$path` |
+| `cmd_duration` | `$duration` |
+| `git_ahead_behind` | `$ahead`, `$behind` |
+
+`$staged`, `$modified`, `$untracked`, `$ahead`, and `$behind` expand to the
+icon/count when the condition is true, or to an empty string when false.
+
+**Examples:**
+
+```toml
+# git_branch: icon after branch, in angle brackets
+[segment.git_branch]
+icon   = "⎇ "
+format = "[$branch] $icon"
+
+# git_status: wrap all icons in square brackets
+[segment.git_status]
+format = "[$staged$modified$untracked]"
+
+# cmd_duration: add a prefix label
+[segment.cmd_duration]
+format = "took $duration"
+
+# git_ahead_behind: custom arrangement with a pipe separator
+[segment.git_ahead_behind]
+format = "$ahead|$behind"
+```
+
+---
+
 ## Segment Reference
 
 ### `dir` — Current Directory
@@ -206,6 +259,7 @@ Shows the current working directory, optionally shortened.
 |---|---|---|---|
 | `max_depth` | integer | `3` | Max path components to show. `0` = show full path |
 | `truncate_to_repo` | bool | `true` | When in a git repo, show path relative to repo root |
+| `format` | string | `"$path"` | Format template — see [Segment Format Strings](#segment-format-strings) |
 | `color` | color | none | Text color |
 
 ```toml
@@ -228,6 +282,7 @@ Requires: `git_state` cache populated by the git plugin (`add lx plugin add git`
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `icon` | string | `" "` | Prefix icon before branch name |
+| `format` | string | `"$icon$branch"` | Format template — vars: `$icon`, `$branch` |
 | `color` | color | none | Text color |
 
 ```toml
@@ -255,6 +310,7 @@ Requires: `git_state` cache (git plugin).
 | `modified.color` | color string | none | Color for modified icon |
 | `untracked.icon` | string | `"?"` | Icon for untracked files |
 | `untracked.color` | color string | none | Color for untracked icon |
+| `format` | string | `"$staged$modified$untracked"` | Format template — vars: `$staged`, `$modified`, `$untracked` |
 
 ```toml
 [segment.git_status]
@@ -274,6 +330,7 @@ Shows how long the previous command took. Hidden when below the threshold.
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `min_ms` | integer | `500` | Minimum duration (ms) before showing |
+| `format` | string | `"$duration"` | Format template — vars: `$duration` |
 | `color` | color | none | Text color |
 
 ```toml
@@ -283,6 +340,30 @@ color  = { fg = "grey" }
 ```
 
 **Example output:** `2.3s` / `1m45s` / `450ms` (when over threshold)
+
+---
+
+### `git_ahead_behind` — Ahead/Behind Remote
+
+Shows how many commits the current branch is ahead or behind its remote tracking
+branch. Hidden when both counts are zero or when no remote is configured.
+
+Requires: `git_state` cache (git plugin).
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `ahead_symbol` | string | `"↑"` | Symbol for ahead count |
+| `behind_symbol` | string | `"↓"` | Symbol for behind count |
+| `format` | string | `"$ahead $behind"` | Format template — vars: `$ahead`, `$behind` (each empty when zero) |
+| `color` | color | none | Text color |
+
+```toml
+[segment.git_ahead_behind]
+ahead_symbol  = "⇡"
+behind_symbol = "⇣"
+```
+
+**Example output:** `↑2` / `↓3` / `↑1 ↓2`
 
 ---
 

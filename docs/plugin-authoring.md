@@ -100,6 +100,26 @@ disabled_in = ["agent", "minimal"]
 # The command can be any executable: shell script, Go binary, Python, Rust binary, etc.
 # First-party plugins (git, kubectl) use native Rust gatherers — no gather needed.
 gather = ""    # e.g. "$PLUGIN_DIR/bin/my-plugin-state" or "zsh $PLUGIN_DIR/gather.zsh"
+
+[shell]
+# Optional. All fields default to empty — omit the entire section if unused.
+#
+# fpath: directories relative to the plugin root prepended to $fpath BEFORE
+# init.zsh is sourced. Use this to register zsh completions. Convention:
+# put completion files in completions/ using the _command naming format.
+fpath = ["completions"]
+#
+# widgets: ZLE widget names to register with `zle -N`. The widget function
+# must be defined in shell/functions.zsh and listed in exports.functions.
+# Registered after init.zsh is sourced.
+widgets = ["my_plugin_widget"]
+#
+# keybindings: key → widget pairs registered with `bindkey` after all `zle -N`
+# calls. key is a zsh key sequence (e.g. "^R", "\\eOA", "^[[A").
+# widget must be declared in shell.widgets.
+[[shell.keybindings]]
+key    = "^F"
+widget = "my_plugin_widget"
 ```
 
 ### Field details
@@ -130,6 +150,20 @@ plugin name prefix) — they are not exported and will not be checked.
 
 **`[exports].aliases`** — Every alias. These are only sourced when the context
 is not in `[contexts].disabled_in`.
+
+**`[shell].fpath`** — Relative paths within the plugin directory that Lynx
+prepends to `$fpath` before sourcing `init.zsh`. The convention is a
+`completions/` directory containing `_command`-named completion files. Do **not**
+call `compinit` inside a plugin — Lynx calls it once during `lx init`.
+
+**`[shell].widgets`** — ZLE widget names that Lynx registers with `zle -N`
+after sourcing `init.zsh`. The widget function must be defined in
+`shell/functions.zsh` and listed in `exports.functions`. Registering here
+(not in init.zsh) keeps the shell layer logic-free (D-001).
+
+**`[shell].keybindings`** — An array of `{key, widget}` tables. Lynx emits
+`bindkey '<key>' <widget>` for each entry, in order, after all `zle -N`
+registrations. The `key` field is any zsh key sequence string.
 
 ---
 
