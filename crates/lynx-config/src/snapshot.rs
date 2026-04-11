@@ -166,6 +166,45 @@ fn trim_snapshots(dir: &Path) -> Result<()> {
 mod tests {
     use super::*;
     use std::fs;
+    use std::sync::Mutex;
+
+    /// Global lock: tests that mutate env vars (HOME, LYNX_DIR) must hold this.
+    fn env_lock() -> &'static Mutex<()> {
+        static LOCK: std::sync::OnceLock<Mutex<()>> = std::sync::OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
+
+    /// RAII guard: saves and restores HOME + LYNX_DIR around a test body so
+    /// transaction tests operate on an isolated temp dir, not the real user config.
+    struct EnvIsolation {
+        _lock: std::sync::MutexGuard<'static, ()>,
+        saved_home: Option<std::ffi::OsString>,
+        saved_lynx_dir: Option<String>,
+    }
+
+    impl EnvIsolation {
+        fn new(tmp: &tempfile::TempDir) -> Self {
+            let lock = env_lock().lock().expect("env lock");
+            let saved_home = std::env::var_os("HOME");
+            let saved_lynx_dir = std::env::var("LYNX_DIR").ok();
+            std::env::set_var("HOME", tmp.path());
+            std::env::remove_var("LYNX_DIR"); // force lynx_dir() to derive from HOME
+            Self { _lock: lock, saved_home, saved_lynx_dir }
+        }
+    }
+
+    impl Drop for EnvIsolation {
+        fn drop(&mut self) {
+            match &self.saved_home {
+                Some(v) => std::env::set_var("HOME", v),
+                None => std::env::remove_var("HOME"),
+            }
+            match &self.saved_lynx_dir {
+                Some(v) => std::env::set_var("LYNX_DIR", v),
+                None => std::env::remove_var("LYNX_DIR"),
+            }
+        }
+    }
 
     /// Returns (config_dir, snaps_dir) — both isolated temp dirs.
     fn setup() -> (tempfile::TempDir, tempfile::TempDir) {
@@ -232,7 +271,7 @@ mod tests {
     #[test]
     fn transaction_rolls_back_on_validation_failure() {
         let tmp_home = tempfile::tempdir().unwrap();
-        std::env::set_var("HOME", tmp_home.path());
+        let _iso = EnvIsolation::new(&tmp_home);
 
         let cfg_dir = tmp_home.path().join(lynx_core::brand::CONFIG_DIR);
         std::fs::create_dir_all(&cfg_dir).unwrap();
@@ -254,14 +293,12 @@ enabled_plugins = []
 
         let content = std::fs::read_to_string(cfg_dir.join("config.toml")).unwrap();
         assert!(content.contains("active_theme = \"default\""));
-
-        std::env::remove_var("HOME");
     }
 
     #[test]
     fn transaction_rolls_back_on_apply_write_failure() {
         let tmp_home = tempfile::tempdir().unwrap();
-        std::env::set_var("HOME", tmp_home.path());
+        let _iso = EnvIsolation::new(&tmp_home);
 
         let cfg_dir = tmp_home.path().join(lynx_core::brand::CONFIG_DIR);
         std::fs::create_dir_all(&cfg_dir).unwrap();
@@ -291,7 +328,5 @@ enabled_plugins = []
             before, after,
             "config state must be restored on apply failure"
         );
-
-        std::env::remove_var("HOME");
     }
 }

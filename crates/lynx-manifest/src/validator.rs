@@ -74,6 +74,7 @@ mod tests {
             exports: ExportsConfig::default(),
             contexts: ContextsConfig::default(),
             state: StateConfig::default(),
+            shell: ShellConfig::default(),
         }
     }
 
