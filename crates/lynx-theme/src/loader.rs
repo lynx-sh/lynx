@@ -87,6 +87,40 @@ fn resolve_palette(theme: &mut Theme) {
     for config in theme.segment.values_mut() {
         resolve_value(&mut *config, &palette);
     }
+    resolve_ls_colors_palette(&mut theme.ls_colors, &palette);
+}
+
+/// Resolve `$varname` palette references inside the typed `LsColors` struct.
+fn resolve_ls_colors_palette(
+    lsc: &mut crate::schema::LsColors,
+    palette: &HashMap<String, String>,
+) {
+    for entry in [
+        &mut lsc.dir,
+        &mut lsc.symlink,
+        &mut lsc.executable,
+        &mut lsc.archive,
+        &mut lsc.image,
+        &mut lsc.audio,
+        &mut lsc.broken,
+        &mut lsc.other_writable,
+    ]
+    .into_iter()
+    .flatten()
+    {
+        resolve_color_ref(&mut entry.fg, palette);
+        resolve_color_ref(&mut entry.bg, palette);
+    }
+}
+
+fn resolve_color_ref(field: &mut Option<String>, palette: &HashMap<String, String>) {
+    if let Some(s) = field {
+        if let Some(key) = s.strip_prefix('$') {
+            if let Some(resolved) = palette.get(key) {
+                *s = resolved.clone();
+            }
+        }
+    }
 }
 
 /// Recursively resolve `$varname` strings in a `toml::Value`.
@@ -169,6 +203,7 @@ mod tests {
         assert!(!theme.segments.left.order.is_empty());
         assert!(!theme.segments.right.order.is_empty());
     }
+
 
     #[test]
     fn unknown_segment_warns_not_errors() {

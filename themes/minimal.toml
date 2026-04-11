@@ -16,3 +16,9 @@ truncate_to_repo = false
 [segment.context_badge]
 show_in = ["agent", "minimal"]
 label = { agent = "AI", minimal = "MIN" }
+
+[ls_colors]
+dir        = { fg = "grey", bold = true }
+symlink    = { fg = "grey"             }
+executable = { fg = "white"            }
+broken     = { fg = "grey"             }

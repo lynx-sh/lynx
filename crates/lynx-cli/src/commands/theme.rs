@@ -43,8 +43,8 @@ pub async fn run(args: ThemeArgs) -> Result<()> {
 }
 
 async fn cmd_set(name: &str) -> Result<()> {
-    // Validate theme exists.
-    load_theme(name).with_context(|| format!("theme '{name}' not found"))?;
+    // Validate theme exists and load for color export.
+    let theme = load_theme(name).with_context(|| format!("theme '{name}' not found"))?;
 
     mutate_config_transaction(&format!("theme-set-{name}"), |cfg| {
         cfg.active_theme = name.to_string();
@@ -55,7 +55,19 @@ async fn cmd_set(name: &str) -> Result<()> {
     // Emit theme:changed in-process so plugin handlers fire.
     emit_theme_changed(name).await;
 
-    println!("theme set to '{name}'");
+    // Status to stderr — keeps stdout clean for eval "$(lx theme set <name>)".
+    eprintln!("theme set to '{name}'");
+
+    // Emit LS_COLORS and EZA_COLORS as shell assignments on stdout.
+    // Callers can eval this output to update the current session:
+    //   eval "$(lx theme set <name>)"
+    if let Some(ls) = theme.ls_colors.to_ls_colors_string() {
+        println!("export LS_COLORS={ls:?}");
+    }
+    if let Some(eza) = theme.ls_colors.to_eza_colors_string() {
+        println!("export EZA_COLORS={eza:?}");
+    }
+
     Ok(())
 }
 

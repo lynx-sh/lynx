@@ -46,3 +46,13 @@ success = "#9ece6a"
 warning = "#e0af68"
 error   = "#f7768e"
 muted   = "#565f89"
+
+[ls_colors]
+dir           = { fg = "blue",    bold = true  }
+symlink       = { fg = "cyan"                  }
+executable    = { fg = "green",   bold = true  }
+archive       = { fg = "red"                   }
+image         = { fg = "magenta"               }
+audio         = { fg = "cyan"                  }
+broken        = { fg = "red",     bold = true  }
+other_writable = { fg = "blue",   bg = "dark-green" }
