@@ -59,7 +59,17 @@ async fn cmd_render(transient: bool) -> Result<()> {
         .map(|c| c.active_theme)
         .unwrap_or_else(|_| brand::DEFAULT_THEME.into());
     let theme_name = std::env::var(env_vars::LYNX_THEME).unwrap_or(config_theme);
-    let theme = load_theme(&theme_name).or_else(|_| load_theme(brand::DEFAULT_THEME))?;
+    let theme = match load_theme(&theme_name) {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!(
+                "lx: theme '{}' failed to load ({e}); falling back to '{}' — run `lx doctor` for details",
+                theme_name,
+                brand::DEFAULT_THEME
+            );
+            load_theme(brand::DEFAULT_THEME)?
+        }
+    };
 
     // --- Build segment registry ---
     let segments: Vec<Box<dyn lynx_prompt::segment::Segment>> = vec![
