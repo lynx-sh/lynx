@@ -40,8 +40,7 @@ pub fn redact(data: &str) -> String {
 
 /// Resolve the event log file path: `~/.config/lynx/logs/events.jsonl`.
 pub fn log_path() -> PathBuf {
-    let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
-    PathBuf::from(home).join(".config/lynx/logs/events.jsonl")
+    lynx_core::paths::events_log_file()
 }
 
 /// Write a single log entry to the event log file (append).
@@ -169,6 +168,7 @@ mod tests {
     fn write_and_tail_roundtrip() {
         let tmp = tempfile::tempdir().unwrap();
         std::env::set_var("HOME", tmp.path());
+        std::env::remove_var("LYNX_DIR");
 
         let event = Event::new("shell:chpwd", "/tmp/test");
         write_entry(&event, "shell").unwrap();

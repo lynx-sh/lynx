@@ -25,10 +25,7 @@ const BUILTIN_THEMES: &[(&str, &str)] = &[builtin!("default"), builtin!("minimal
 
 /// Resolve the user theme directory: `~/.config/lynx/themes/`.
 pub fn user_theme_dir() -> PathBuf {
-    let home = std::env::var_os("HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("."));
-    home.join(".config/lynx/themes")
+    lynx_core::paths::themes_dir()
 }
 
 /// Load a theme by name. Checks user theme dir first, then built-ins.

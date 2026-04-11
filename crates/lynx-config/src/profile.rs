@@ -4,7 +4,6 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 
 use lynx_core::{
-    brand,
     error::{LynxError, Result},
     redact::looks_like_secret_value,
 };
@@ -67,9 +66,7 @@ pub fn load(name: &str) -> Result<(Profile, Vec<ProfileWarning>)> {
 
 /// Load from an explicit path.
 pub fn load_from(path: &Path) -> Result<(Profile, Vec<ProfileWarning>)> {
-    let content = std::fs::read_to_string(path).map_err(|e| {
-        LynxError::io(e, path)
-    })?;
+    let content = std::fs::read_to_string(path).map_err(|e| LynxError::io(e, path))?;
     parse(&content)
 }
 
@@ -81,9 +78,7 @@ pub fn resolve(name: &str) -> Result<(Profile, Vec<ProfileWarning>)> {
 
 pub fn resolve_from(dir: &Path, name: &str) -> Result<(Profile, Vec<ProfileWarning>)> {
     let path = dir.join(format!("{name}.toml"));
-    let content = std::fs::read_to_string(&path).map_err(|e| {
-        LynxError::io(e, &path)
-    })?;
+    let content = std::fs::read_to_string(&path).map_err(|e| LynxError::io(e, &path))?;
     let (mut child, mut warnings) = parse(&content)?;
 
     if let Some(ref parent_name) = child.extends.clone() {
@@ -100,9 +95,7 @@ pub fn resolve_from(dir: &Path, name: &str) -> Result<(Profile, Vec<ProfileWarni
             )));
         }
         let (parent, parent_warnings) = parse(
-            &std::fs::read_to_string(&parent_path).map_err(|e| {
-                LynxError::io(e, &parent_path)
-            })?,
+            &std::fs::read_to_string(&parent_path).map_err(|e| LynxError::io(e, &parent_path))?,
         )?;
         warnings.extend(parent_warnings);
         child = merge(parent, child);
@@ -136,10 +129,7 @@ pub fn list_names_in(dir: &Path) -> Result<Vec<String>> {
 
 /// Profiles directory: `~/.config/lynx/profiles/`.
 pub fn profiles_dir() -> PathBuf {
-    let home = std::env::var_os("HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("."));
-    home.join(brand::CONFIG_DIR).join("profiles")
+    lynx_core::paths::profiles_dir()
 }
 
 /// Merge parent + child: child fields override parent, plugin lists are union-deduped.
@@ -212,9 +202,11 @@ theme = "default"
 
     #[test]
     fn secret_env_value_produces_warning() {
-        let toml = profile_toml(r#"[env]
+        let toml = profile_toml(
+            r#"[env]
 GITHUB_TOKEN = "ghp_abc123secret"
-"#);
+"#,
+        );
         let (_, warns) = parse(&toml).unwrap();
         assert!(!warns.is_empty());
         assert!(warns[0].key == "GITHUB_TOKEN");
@@ -222,9 +214,11 @@ GITHUB_TOKEN = "ghp_abc123secret"
 
     #[test]
     fn non_secret_env_no_warning() {
-        let toml = profile_toml(r#"[env]
+        let toml = profile_toml(
+            r#"[env]
 EDITOR = "nvim"
-"#);
+"#,
+        );
         let (_, warns) = parse(&toml).unwrap();
         assert!(warns.is_empty());
     }
@@ -234,40 +228,52 @@ EDITOR = "nvim"
         let dir = tempfile::tempdir().unwrap();
         let d = dir.path();
 
-        std::fs::write(d.join("base.toml"), r#"
+        std::fs::write(
+            d.join("base.toml"),
+            r#"
 name = "base"
 plugins = ["git"]
 theme = "default"
 [env]
 FOO = "bar"
-"#).unwrap();
+"#,
+        )
+        .unwrap();
 
-        std::fs::write(d.join("work.toml"), r#"
+        std::fs::write(
+            d.join("work.toml"),
+            r#"
 name = "work"
 extends = "base"
 plugins = ["kubectl"]
 theme = "nord"
 [env]
 BAR = "baz"
-"#).unwrap();
+"#,
+        )
+        .unwrap();
 
         let (resolved, warns) = resolve_from(d, "work").unwrap();
         assert!(warns.is_empty());
         assert!(resolved.plugins.contains(&"git".to_string()));
         assert!(resolved.plugins.contains(&"kubectl".to_string()));
-        assert_eq!(resolved.theme, Some("nord".into()));   // child wins
-        assert_eq!(resolved.env["FOO"], "bar");            // from parent
-        assert_eq!(resolved.env["BAR"], "baz");            // from child
+        assert_eq!(resolved.theme, Some("nord".into())); // child wins
+        assert_eq!(resolved.env["FOO"], "bar"); // from parent
+        assert_eq!(resolved.env["BAR"], "baz"); // from child
     }
 
     #[test]
     fn invalid_extends_errors() {
         let dir = tempfile::tempdir().unwrap();
-        std::fs::write(dir.path().join("child.toml"), r#"
+        std::fs::write(
+            dir.path().join("child.toml"),
+            r#"
 name = "child"
 extends = "nonexistent"
 plugins = []
-"#).unwrap();
+"#,
+        )
+        .unwrap();
         let result = resolve_from(dir.path(), "child");
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("nonexistent"));
@@ -276,11 +282,15 @@ plugins = []
     #[test]
     fn self_extends_errors() {
         let dir = tempfile::tempdir().unwrap();
-        std::fs::write(dir.path().join("loop.toml"), r#"
+        std::fs::write(
+            dir.path().join("loop.toml"),
+            r#"
 name = "loop"
 extends = "loop"
 plugins = []
-"#).unwrap();
+"#,
+        )
+        .unwrap();
         let result = resolve_from(dir.path(), "loop");
         assert!(result.is_err());
     }
@@ -289,7 +299,11 @@ plugins = []
     fn list_names_returns_sorted() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("work.toml"), "name=\"work\"\nplugins=[]").unwrap();
-        std::fs::write(dir.path().join("default.toml"), "name=\"default\"\nplugins=[]").unwrap();
+        std::fs::write(
+            dir.path().join("default.toml"),
+            "name=\"default\"\nplugins=[]",
+        )
+        .unwrap();
         let names = list_names_in(dir.path()).unwrap();
         assert_eq!(names, ["default", "work"]);
     }

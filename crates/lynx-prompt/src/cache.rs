@@ -27,12 +27,18 @@ impl SegmentCache {
 
     /// Insert or update a cache entry.
     pub fn set(&self, key: impl Into<String>, value: Value, ttl: Duration) {
-        let mut map = self.inner.write().expect("SegmentCache write lock poisoned");
-        map.insert(key.into(), CacheEntry {
-            updated_at: Instant::now(),
-            data: value,
-            ttl,
-        });
+        let mut map = self
+            .inner
+            .write()
+            .expect("SegmentCache write lock poisoned");
+        map.insert(
+            key.into(),
+            CacheEntry {
+                updated_at: Instant::now(),
+                data: value,
+                ttl,
+            },
+        );
     }
 
     /// Get a cache entry. Returns `None` if not present or stale.
@@ -72,7 +78,11 @@ mod tests {
     #[test]
     fn set_and_get() {
         let cache = SegmentCache::new();
-        cache.set("git_state", json!({"branch": "main"}), Duration::from_secs(5));
+        cache.set(
+            "git_state",
+            json!({"branch": "main"}),
+            Duration::from_secs(5),
+        );
         let v = cache.get("git_state").unwrap();
         assert_eq!(v["branch"], "main");
     }

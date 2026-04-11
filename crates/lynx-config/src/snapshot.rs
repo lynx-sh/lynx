@@ -1,16 +1,15 @@
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use crate::schema::LynxConfig;
+use crate::{config_path, load, save};
 use lynx_core::error::{LynxError, Result};
 
 const MAX_SNAPSHOTS: usize = 10;
 
 /// Directory where snapshots are stored: `~/.config/lynx/snapshots/`.
 pub fn snapshots_dir() -> PathBuf {
-    let home = std::env::var_os("HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("."));
-    home.join(".config/lynx/snapshots")
+    lynx_core::paths::snapshots_dir()
 }
 
 /// Create a snapshot of the config dir, returning the snapshot path.
@@ -24,6 +23,43 @@ pub fn list() -> Result<Vec<(String, PathBuf)>> {
     list_in(&snapshots_dir())
 }
 
+/// Execute a guarded config mutation transaction:
+/// snapshot -> mutate -> validate+apply -> rollback on failure.
+pub fn mutate_config_transaction<T, F>(label: &str, mutate: F) -> Result<T>
+where
+    F: FnOnce(&mut LynxConfig) -> Result<T>,
+{
+    mutate_config_transaction_with(label, mutate, save)
+}
+
+fn mutate_config_transaction_with<T, F, A>(label: &str, mutate: F, apply: A) -> Result<T>
+where
+    F: FnOnce(&mut LynxConfig) -> Result<T>,
+    A: Fn(&LynxConfig) -> Result<()>,
+{
+    let path = config_path();
+    let config_dir = path
+        .parent()
+        .ok_or_else(|| LynxError::Config("config path has no parent directory".to_string()))?;
+
+    let snapshot_dir = create(config_dir, label)?;
+    let mut cfg = load()?;
+    let result = mutate(&mut cfg)?;
+
+    if let Err(save_err) = apply(&cfg) {
+        if let Err(restore_err) = restore(&snapshot_dir, config_dir) {
+            return Err(LynxError::Config(format!(
+                "config apply failed ({save_err}); rollback failed ({restore_err})"
+            )));
+        }
+        return Err(LynxError::Config(format!(
+            "config apply failed and was rolled back: {save_err}"
+        )));
+    }
+
+    Ok(result)
+}
+
 fn create_in(snaps_dir: &Path, config_dir: &Path, label: &str) -> Result<PathBuf> {
     std::fs::create_dir_all(snaps_dir).map_err(LynxError::IoRaw)?;
 
@@ -34,7 +70,13 @@ fn create_in(snaps_dir: &Path, config_dir: &Path, label: &str) -> Result<PathBuf
 
     let safe_label: String = label
         .chars()
-        .map(|c| if c.is_ascii_alphanumeric() || c == '-' { c } else { '_' })
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect();
 
     let snap_dir = snaps_dir.join(format!("{ts}_{safe_label}"));
@@ -76,7 +118,10 @@ pub fn restore(snap_dir: &Path, config_dir: &Path) -> Result<()> {
             "snapshot not found: {snap_dir:?}"
         )));
     }
-    for entry in std::fs::read_dir(snap_dir).map_err(LynxError::IoRaw)?.flatten() {
+    for entry in std::fs::read_dir(snap_dir)
+        .map_err(LynxError::IoRaw)?
+        .flatten()
+    {
         let src = entry.path();
         let dest = config_dir.join(entry.file_name());
         std::fs::copy(&src, &dest).map_err(LynxError::IoRaw)?;
@@ -126,7 +171,11 @@ mod tests {
     fn setup() -> (tempfile::TempDir, tempfile::TempDir) {
         let config = tempfile::tempdir().unwrap();
         let snaps = tempfile::tempdir().unwrap();
-        fs::write(config.path().join("config.toml"), "active_theme = \"default\"").unwrap();
+        fs::write(
+            config.path().join("config.toml"),
+            "active_theme = \"default\"",
+        )
+        .unwrap();
         (config, snaps)
     }
 
@@ -173,6 +222,76 @@ mod tests {
             std::thread::sleep(std::time::Duration::from_millis(2));
         }
         let entries = list_in(snaps.path()).unwrap();
-        assert!(entries.len() <= MAX_SNAPSHOTS, "too many snapshots: {}", entries.len());
+        assert!(
+            entries.len() <= MAX_SNAPSHOTS,
+            "too many snapshots: {}",
+            entries.len()
+        );
+    }
+
+    #[test]
+    fn transaction_rolls_back_on_validation_failure() {
+        let tmp_home = tempfile::tempdir().unwrap();
+        std::env::set_var("HOME", tmp_home.path());
+
+        let cfg_dir = tmp_home.path().join(".config/lynx");
+        std::fs::create_dir_all(&cfg_dir).unwrap();
+        std::fs::write(
+            cfg_dir.join("config.toml"),
+            r#"schema_version = 1
+active_theme = "default"
+active_context = "interactive"
+enabled_plugins = []
+"#,
+        )
+        .unwrap();
+
+        let result = mutate_config_transaction("tx-invalid-theme", |cfg| {
+            cfg.active_theme = String::new(); // save() validation should fail
+            Ok(())
+        });
+        assert!(result.is_err());
+
+        let content = std::fs::read_to_string(cfg_dir.join("config.toml")).unwrap();
+        assert!(content.contains("active_theme = \"default\""));
+
+        std::env::remove_var("HOME");
+    }
+
+    #[test]
+    fn transaction_rolls_back_on_apply_write_failure() {
+        let tmp_home = tempfile::tempdir().unwrap();
+        std::env::set_var("HOME", tmp_home.path());
+
+        let cfg_dir = tmp_home.path().join(".config/lynx");
+        std::fs::create_dir_all(&cfg_dir).unwrap();
+        std::fs::write(
+            cfg_dir.join("config.toml"),
+            r#"schema_version = 1
+active_theme = "default"
+active_context = "interactive"
+enabled_plugins = []
+"#,
+        )
+        .unwrap();
+        let before = std::fs::read_to_string(cfg_dir.join("config.toml")).unwrap();
+
+        let result = mutate_config_transaction_with(
+            "tx-simulated-write-failure",
+            |cfg| {
+                cfg.active_theme = "minimal".to_string();
+                Ok(())
+            },
+            |_cfg| Err(LynxError::Config("simulated write failure".to_string())),
+        );
+        assert!(result.is_err());
+
+        let after = std::fs::read_to_string(cfg_dir.join("config.toml")).unwrap();
+        assert_eq!(
+            before, after,
+            "config state must be restored on apply failure"
+        );
+
+        std::env::remove_var("HOME");
     }
 }

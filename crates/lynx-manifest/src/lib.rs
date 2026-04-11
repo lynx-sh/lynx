@@ -1,8 +1,8 @@
 pub mod schema;
 pub mod validator;
 
-use schema::PluginManifest;
 use lynx_core::error::Result;
+use schema::PluginManifest;
 
 /// Parse a plugin.toml from a TOML string.
 pub fn parse(toml_str: &str) -> Result<PluginManifest> {

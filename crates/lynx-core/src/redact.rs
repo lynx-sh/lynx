@@ -27,7 +27,12 @@ pub fn looks_like_secret_value(key: &str, _value: &str) -> bool {
 fn is_secret_key(key: &str) -> bool {
     let upper = key.trim().to_uppercase();
     const SUFFIXES: &[&str] = &[
-        "_KEY", "_TOKEN", "_SECRET", "_PASSWORD", "_CREDENTIAL", "_PRIVATE",
+        "_KEY",
+        "_TOKEN",
+        "_SECRET",
+        "_PASSWORD",
+        "_CREDENTIAL",
+        "_PRIVATE",
     ];
     SUFFIXES.iter().any(|s| upper.ends_with(s))
 }
@@ -117,9 +122,7 @@ fn try_redact_json(s: &str) -> Option<String> {
 }
 
 fn is_valid_identifier(s: &str) -> bool {
-    !s.is_empty()
-        && s.chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '_')
+    !s.is_empty() && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
 
 #[cfg(test)]
@@ -128,7 +131,10 @@ mod tests {
 
     #[test]
     fn kv_secret_key_redacted() {
-        assert_eq!(redact("AWS_SECRET_ACCESS_KEY=abc123"), "AWS_SECRET_ACCESS_KEY=[REDACTED]");
+        assert_eq!(
+            redact("AWS_SECRET_ACCESS_KEY=abc123"),
+            "AWS_SECRET_ACCESS_KEY=[REDACTED]"
+        );
     }
 
     #[test]
@@ -193,10 +199,20 @@ mod tests {
 
     #[test]
     fn all_suffixes_covered() {
-        for suffix in ["_KEY", "_TOKEN", "_SECRET", "_PASSWORD", "_CREDENTIAL", "_PRIVATE"] {
+        for suffix in [
+            "_KEY",
+            "_TOKEN",
+            "_SECRET",
+            "_PASSWORD",
+            "_CREDENTIAL",
+            "_PRIVATE",
+        ] {
             let line = format!("MY{suffix}=value");
             let out = redact(&line);
-            assert!(out.contains("[REDACTED]"), "suffix {suffix} not redacted: {out}");
+            assert!(
+                out.contains("[REDACTED]"),
+                "suffix {suffix} not redacted: {out}"
+            );
         }
     }
 

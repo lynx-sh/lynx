@@ -122,7 +122,7 @@ async fn cmd_add(path: &str) -> Result<()> {
     }
 
     let plugin_path = std::path::PathBuf::from(path);
-    let manifest_path = plugin_path.join("plugin.toml");
+    let manifest_path = plugin_path.join(lynx_core::brand::PLUGIN_MANIFEST);
 
     if !manifest_path.exists() {
         bail!("no plugin.toml found at {}", manifest_path.display());

@@ -15,10 +15,7 @@ pub fn parse_tasks_str(content: &str) -> Result<Vec<ValidatedTask>> {
     let file: TasksFile = toml::from_str(content)
         .map_err(|e| LynxError::Config(format!("tasks.toml parse error: {e}")))?;
 
-    file.tasks
-        .into_iter()
-        .map(validate_task)
-        .collect()
+    file.tasks.into_iter().map(validate_task).collect()
 }
 
 /// Validate a single task, returning a `ValidatedTask` or an error.
@@ -27,14 +24,19 @@ pub fn validate_task(task: Task) -> Result<ValidatedTask> {
     validate_cron(&task.name, &task.cron)?;
     let timeout_duration = parse_timeout(&task.name, task.timeout.as_deref())?;
 
-    Ok(ValidatedTask { task, timeout_duration })
+    Ok(ValidatedTask {
+        task,
+        timeout_duration,
+    })
 }
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
 fn validate_required_fields(task: &Task) -> Result<()> {
     if task.name.trim().is_empty() {
-        return Err(LynxError::Config("task field 'name' is required and must not be empty".into()));
+        return Err(LynxError::Config(
+            "task field 'name' is required and must not be empty".into(),
+        ));
     }
     if task.run.trim().is_empty() {
         return Err(LynxError::Config(format!(
@@ -80,14 +82,12 @@ fn validate_cron(task_name: &str, expr: &str) -> Result<()> {
 fn parse_timeout(task_name: &str, timeout: Option<&str>) -> Result<Option<Duration>> {
     match timeout {
         None => Ok(None),
-        Some(s) => {
-            humantime::parse_duration(s)
-                .map(Some)
-                .map_err(|e| LynxError::Config(format!(
-                    "task '{task_name}': invalid timeout '{s}': {e} \
+        Some(s) => humantime::parse_duration(s).map(Some).map_err(|e| {
+            LynxError::Config(format!(
+                "task '{task_name}': invalid timeout '{s}': {e} \
                      (use formats like '60s', '5m', '1h')"
-                )))
-        }
+            ))
+        }),
     }
 }
 

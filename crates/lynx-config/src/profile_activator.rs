@@ -49,7 +49,9 @@ pub fn activate_profile(profile: &Profile, current: &ActiveState) -> String {
     // ── Theme ─────────────────────────────────────────────────────────────────
     if let Some(ref new_theme) = profile.theme {
         if current.theme.as_deref() != Some(new_theme.as_str()) {
-            out.push(format!("eval \"$(lx theme apply {new_theme} 2>/dev/null)\""));
+            out.push(format!(
+                "eval \"$(lx theme apply {new_theme} 2>/dev/null)\""
+            ));
         }
     }
 

@@ -1,13 +1,14 @@
+use lynx_core::env_vars;
 use lynx_core::types::Context;
 
-/// Canonical context override env var.
-pub const CONTEXT_OVERRIDE_ENV: &str = "LYNX_CONTEXT";
+/// Canonical context override env var — use `env_vars::LYNX_CONTEXT` directly.
+pub const CONTEXT_OVERRIDE_ENV: &str = env_vars::LYNX_CONTEXT;
 
 /// Canonical env vars that indicate agent context.
-pub const AGENT_ENV_VARS: &[&str] = &["CLAUDECODE", "CURSOR_CLI"];
+pub const AGENT_ENV_VARS: &[&str] = &[env_vars::CLAUDECODE, env_vars::CURSOR_CLI];
 
 /// Canonical env vars that indicate minimal context.
-pub const MINIMAL_ENV_VARS: &[&str] = &["CI"];
+pub const MINIMAL_ENV_VARS: &[&str] = &[env_vars::CI];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DetectionMethod {
@@ -78,12 +79,7 @@ pub fn detect_context_outcome() -> DetectionOutcome {
 
 fn override_context() -> Option<Context> {
     let val = std::env::var(CONTEXT_OVERRIDE_ENV).ok()?;
-    match val.to_lowercase().as_str() {
-        "agent" => Some(Context::Agent),
-        "minimal" => Some(Context::Minimal),
-        "interactive" => Some(Context::Interactive),
-        _ => None,
-    }
+    Context::from_str(val.to_lowercase().as_str())
 }
 
 #[cfg(test)]

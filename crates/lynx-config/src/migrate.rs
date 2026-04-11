@@ -9,9 +9,7 @@ type MigrationFn = fn(&mut LynxConfig) -> Result<()>;
 
 /// Migrations indexed by the version they migrate FROM.
 /// Entry [0] migrates v0 → v1, entry [1] migrates v1 → v2, etc.
-const VERSION_MIGRATIONS: &[MigrationFn] = &[
-    migrate_v0_to_v1,
-];
+const VERSION_MIGRATIONS: &[MigrationFn] = &[migrate_v0_to_v1];
 
 /// Migrate a config to the current schema version, applying all pending
 /// migrations in order. Each migration logs what it changed. Idempotent.
@@ -23,10 +21,7 @@ pub fn migrate(config: &mut LynxConfig) -> Result<()> {
         return Ok(());
     }
 
-    info!(
-        "migrating config schema from v{} to v{}",
-        start, target
-    );
+    info!("migrating config schema from v{} to v{}", start, target);
 
     for version in start..target {
         if let Some(migration) = VERSION_MIGRATIONS.get(version) {
@@ -74,7 +69,11 @@ mod tests {
     fn config_at(version: u32) -> LynxConfig {
         LynxConfig {
             schema_version: version,
-            active_theme: if version == 0 { String::new() } else { "default".into() },
+            active_theme: if version == 0 {
+                String::new()
+            } else {
+                "default".into()
+            },
             active_context: Context::Interactive,
             enabled_plugins: vec![],
             ..Default::default()

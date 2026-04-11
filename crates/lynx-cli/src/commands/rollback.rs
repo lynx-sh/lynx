@@ -40,8 +40,5 @@ pub async fn run(args: RollbackArgs) -> Result<()> {
 }
 
 fn config_dir() -> Result<std::path::PathBuf> {
-    let home = std::env::var_os("HOME")
-        .map(std::path::PathBuf::from)
-        .ok_or_else(|| anyhow::anyhow!("$HOME not set"))?;
-    Ok(home.join(".config/lynx"))
+    Ok(lynx_core::paths::lynx_dir())
 }

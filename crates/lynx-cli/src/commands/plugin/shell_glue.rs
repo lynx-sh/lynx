@@ -44,14 +44,11 @@ fn generate_unload_script_for_plugin(name: &str) -> Result<String> {
     Ok(build_unload_script(name, manifest.as_ref()))
 }
 
-/// Prefer LYNX_DIR env var; fall back to XDG default.
+/// Prefer LYNX_DIR env var; fall back to default install location.
 fn resolve_lynx_dir() -> String {
-    std::env::var("LYNX_DIR").unwrap_or_else(|_| {
-        format!(
-            "{}/.local/share/lynx",
-            std::env::var("HOME").unwrap_or_else(|_| ".".into())
-        )
-    })
+    lynx_core::paths::lynx_dir()
+        .to_string_lossy()
+        .into_owned()
 }
 
 /// Check LYNX_DIR/plugins/<name> first, then the in-repo plugins/ directory.
@@ -70,7 +67,7 @@ fn resolve_plugin_dir(name: &str, lynx_dir: &str) -> Option<PathBuf> {
 }
 
 pub(super) fn read_plugin_manifest(plugin_dir: &Path) -> Result<Option<PluginManifest>> {
-    let manifest_path = plugin_dir.join("plugin.toml");
+    let manifest_path = plugin_dir.join(lynx_core::brand::PLUGIN_MANIFEST);
     if !manifest_path.exists() {
         return Ok(None);
     }
@@ -80,10 +77,7 @@ pub(super) fn read_plugin_manifest(plugin_dir: &Path) -> Result<Option<PluginMan
 }
 
 fn build_unload_script(name: &str, manifest: Option<&PluginManifest>) -> String {
-    let guard_var = format!(
-        "LYNX_PLUGIN_{}_LOADED",
-        name.to_uppercase().replace('-', "_")
-    );
+    let guard_var = lynx_core::env_vars::plugin_guard_var(name);
     let mut out = String::new();
 
     if let Some(manifest) = manifest {

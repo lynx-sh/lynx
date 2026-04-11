@@ -1,10 +1,10 @@
 use anyhow::{bail, Result};
 use clap::{Args, Subcommand};
 use lynx_config::{
-    load as load_config, save as save_config,
+    load as load_config,
     profile::{self, Profile},
     profile_activator::{activate_profile, ActiveState},
-    snapshot,
+    snapshot::mutate_config_transaction,
 };
 use std::path::PathBuf;
 
@@ -48,11 +48,11 @@ pub enum ProfileCommand {
 pub async fn run(args: ProfileArgs) -> Result<()> {
     match args.command {
         ProfileCommand::Create { name, force } => cmd_create(&name, force),
-        ProfileCommand::Edit { name }          => cmd_edit(&name),
-        ProfileCommand::Switch { name }        => cmd_switch(&name).await,
-        ProfileCommand::List                   => cmd_list(),
-        ProfileCommand::Delete { name }        => cmd_delete(&name),
-        ProfileCommand::Show                   => cmd_show(),
+        ProfileCommand::Edit { name } => cmd_edit(&name),
+        ProfileCommand::Switch { name } => cmd_switch(&name).await,
+        ProfileCommand::List => cmd_list(),
+        ProfileCommand::Delete { name } => cmd_delete(&name),
+        ProfileCommand::Show => cmd_show(),
     }
 }
 
@@ -117,9 +117,7 @@ fn cmd_edit(name: &str) -> Result<()> {
         .or_else(|_| std::env::var("VISUAL"))
         .unwrap_or_else(|_| "vi".into());
 
-    let status = std::process::Command::new(&editor)
-        .arg(&path)
-        .status()?;
+    let status = std::process::Command::new(&editor).arg(&path).status()?;
 
     if !status.success() {
         bail!("editor exited with non-zero status");
@@ -152,18 +150,8 @@ async fn cmd_switch(name: &str) -> Result<()> {
     // Check plugin deps are satisfied.
     check_plugin_deps(&resolved)?;
 
-    // Snapshot before mutating config (D-007).
-    let config_dir = {
-        let home = std::env::var_os("HOME")
-            .map(PathBuf::from)
-            .unwrap_or_else(|| PathBuf::from("."));
-        home.join(".config/lynx")
-    };
-    snapshot::create(&config_dir, &format!("profile-switch-{name}"))
-        .unwrap_or_default(); // non-fatal — warn only
-
     // Build current active state from config.
-    let mut cfg = load_config()?;
+    let cfg = load_config()?;
     let current = active_state_from_config(&cfg);
 
     // Emit activation zsh.
@@ -173,12 +161,15 @@ async fn cmd_switch(name: &str) -> Result<()> {
     }
 
     // Persist active_profile in config.
-    cfg.active_profile = Some(name.to_string());
-    // Also sync theme/plugins from profile so config stays consistent.
-    if let Some(ref t) = resolved.theme {
-        cfg.active_theme = t.clone();
-    }
-    save_config(&cfg)?;
+    let profile_name = name.to_string();
+    let resolved_theme = resolved.theme.clone();
+    mutate_config_transaction(&format!("profile-switch-{name}"), |config| {
+        config.active_profile = Some(profile_name.clone());
+        if let Some(ref t) = resolved_theme {
+            config.active_theme = t.clone();
+        }
+        Ok(())
+    })?;
 
     eprintln!("switched to profile '{name}'");
     Ok(())
@@ -186,16 +177,11 @@ async fn cmd_switch(name: &str) -> Result<()> {
 
 fn check_plugin_deps(profile: &Profile) -> Result<()> {
     // Best-effort: warn about plugins that don't have a plugin.toml installed.
-    let plugin_base = {
-        let home = std::env::var_os("HOME")
-            .map(PathBuf::from)
-            .unwrap_or_else(|| PathBuf::from("."));
-        home.join(".local/share/lynx/plugins")
-    };
+    let plugin_base = lynx_core::paths::installed_plugins_dir();
 
     let mut missing = Vec::new();
     for p in &profile.plugins {
-        let manifest = plugin_base.join(p).join("plugin.toml");
+        let manifest = plugin_base.join(p).join(lynx_core::brand::PLUGIN_MANIFEST);
         if !manifest.exists() {
             missing.push(p.as_str());
         }
@@ -231,11 +217,15 @@ fn cmd_list() -> Result<()> {
     }
 
     for name in &names {
-        let marker = if Some(name.as_str()) == active { "*" } else { " " };
+        let marker = if Some(name.as_str()) == active {
+            "*"
+        } else {
+            " "
+        };
         // Load for summary (plugin count + theme) — best effort.
         let summary = profile::load(name)
             .map(|(p, _)| {
-                let theme = p.theme.as_deref().unwrap_or("default");
+                let theme = p.theme.as_deref().unwrap_or(lynx_core::brand::DEFAULT_THEME);
                 format!("{} plugins, theme: {theme}", p.plugins.len())
             })
             .unwrap_or_else(|_| "error loading".into());
@@ -275,7 +265,10 @@ fn cmd_show() -> Result<()> {
             if let Some(ref ext) = resolved.extends {
                 println!("  extends: {ext}");
             }
-            println!("  theme:   {}", resolved.theme.as_deref().unwrap_or("default"));
+            println!(
+                "  theme:   {}",
+                resolved.theme.as_deref().unwrap_or(lynx_core::brand::DEFAULT_THEME)
+            );
             println!("  plugins: {}", resolved.plugins.join(", "));
             if !resolved.env.is_empty() {
                 let keys: Vec<&str> = resolved.env.keys().map(|k| k.as_str()).collect();

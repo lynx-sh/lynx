@@ -88,18 +88,36 @@ mod tests {
     fn all_variants_display_without_rust_internals() {
         let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "x");
         let cases: Vec<(&str, String)> = vec![
-            ("Config",   LynxError::Config("bad theme".into()).to_string()),
-            ("Plugin",   LynxError::Plugin("missing dep".into()).to_string()),
-            ("Theme",    LynxError::Theme("unknown theme".into()).to_string()),
-            ("Shell",    LynxError::Shell("context error".into()).to_string()),
-            ("Task",     LynxError::Task("cron parse fail".into()).to_string()),
-            ("Manifest", LynxError::Manifest("missing field".into()).to_string()),
-            ("Io",       LynxError::io(io_err, "/tmp/config.toml").to_string()),
+            ("Config", LynxError::Config("bad theme".into()).to_string()),
+            (
+                "Plugin",
+                LynxError::Plugin("missing dep".into()).to_string(),
+            ),
+            (
+                "Theme",
+                LynxError::Theme("unknown theme".into()).to_string(),
+            ),
+            (
+                "Shell",
+                LynxError::Shell("context error".into()).to_string(),
+            ),
+            (
+                "Task",
+                LynxError::Task("cron parse fail".into()).to_string(),
+            ),
+            (
+                "Manifest",
+                LynxError::Manifest("missing field".into()).to_string(),
+            ),
+            ("Io", LynxError::io(io_err, "/tmp/config.toml").to_string()),
         ];
         for (name, msg) in &cases {
             assert!(!msg.is_empty(), "{name} display is empty");
             assert!(!msg.contains("unwrap"), "{name} leaks 'unwrap': {msg}");
-            assert!(!msg.contains("called `Result"), "{name} leaks Result internals: {msg}");
+            assert!(
+                !msg.contains("called `Result"),
+                "{name} leaks Result internals: {msg}"
+            );
             assert!(msg.contains("Fix:"), "{name} missing Fix hint: {msg}");
         }
     }
@@ -111,7 +129,10 @@ mod tests {
         let msg = err.to_string();
         assert!(msg.contains("config.toml"), "missing path: {msg}");
         assert!(msg.contains("Fix:"), "missing Fix hint: {msg}");
-        assert!(msg.contains("lx"), "fix should suggest an lx command: {msg}");
+        assert!(
+            msg.contains("lx"),
+            "fix should suggest an lx command: {msg}"
+        );
     }
 
     #[test]
@@ -119,7 +140,10 @@ mod tests {
         let e = std::io::Error::new(std::io::ErrorKind::PermissionDenied, "denied");
         let err = LynxError::io(e, "/etc/passwd");
         let msg = err.to_string();
-        assert!(msg.contains("Permission denied"), "missing permission message: {msg}");
+        assert!(
+            msg.contains("Permission denied"),
+            "missing permission message: {msg}"
+        );
         assert!(msg.contains("chmod"), "fix should suggest chmod: {msg}");
     }
 
@@ -127,6 +151,9 @@ mod tests {
     fn config_error_suggests_validate_command() {
         let err = LynxError::Config("active_theme must not be empty".into());
         let msg = err.to_string();
-        assert!(msg.contains("lx config validate") || msg.contains("lx doctor"), "{msg}");
+        assert!(
+            msg.contains("lx config validate") || msg.contains("lx doctor"),
+            "{msg}"
+        );
     }
 }

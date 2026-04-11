@@ -1,7 +1,8 @@
 use anyhow::{bail, Context, Result};
 use clap::{Args, Subcommand};
 use lynx_task::{
-    schema::{OnFail, Task, TasksFile}, validate_task,
+    schema::{OnFail, Task, TasksFile},
+    validate_task,
 };
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
@@ -77,7 +78,13 @@ pub enum TaskCommand {
 pub async fn run(args: TaskArgs) -> Result<()> {
     match args.command {
         TaskCommand::Add {
-            name, run, cron, description, on_fail, timeout, log,
+            name,
+            run,
+            cron,
+            description,
+            on_fail,
+            timeout,
+            log,
         } => cmd_add(name, run, cron, description, on_fail, timeout, log).await,
         TaskCommand::List => cmd_list().await,
         TaskCommand::Logs { name, tail, follow } => cmd_logs(name, tail, follow).await,
@@ -86,9 +93,10 @@ pub async fn run(args: TaskArgs) -> Result<()> {
         TaskCommand::Run { name } => cmd_run(name).await,
         TaskCommand::Remove { name } => cmd_remove(name).await,
         TaskCommand::Examples => {
-            crate::commands::examples::run(
-                crate::commands::examples::ExamplesArgs { command: Some("task".into()) }
-            ).await
+            crate::commands::examples::run(crate::commands::examples::ExamplesArgs {
+                command: Some("task".into()),
+            })
+            .await
         }
     }
 }
@@ -337,7 +345,10 @@ async fn cmd_set_enabled(name: String, enabled: bool) -> Result<()> {
     let content = read_tasks_file(&path)?;
     let mut file = parse_tasks_file(&content)?;
 
-    let task = file.tasks.iter_mut().find(|t| t.name == name)
+    let task = file
+        .tasks
+        .iter_mut()
+        .find(|t| t.name == name)
         .with_context(|| format!("task '{name}' not found"))?;
 
     task.enabled = enabled;
@@ -354,7 +365,10 @@ async fn cmd_run(name: String) -> Result<()> {
     let content = read_tasks_file(&path)?;
     let file = parse_tasks_file(&content)?;
 
-    let task = file.tasks.iter().find(|t| t.name == name)
+    let task = file
+        .tasks
+        .iter()
+        .find(|t| t.name == name)
         .with_context(|| format!("task '{name}' not found"))?;
 
     // Build a ValidatedTask and run it directly in this process.

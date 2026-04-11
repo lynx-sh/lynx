@@ -117,7 +117,7 @@ mod tests {
 
         let base = runtime_dir().unwrap();
         assert_eq!(socket_path().unwrap(), base.join("events.sock"));
-        assert_eq!(pid_file().unwrap(),    base.join("daemon.pid"));
-        assert_eq!(lock_file().unwrap(),   base.join("daemon.lock"));
+        assert_eq!(pid_file().unwrap(), base.join("daemon.pid"));
+        assert_eq!(lock_file().unwrap(), base.join("daemon.lock"));
     }
 }

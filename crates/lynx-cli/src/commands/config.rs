@@ -3,8 +3,8 @@ use std::process::Command;
 use anyhow::{bail, Result};
 use clap::{Args, Subcommand};
 
-use lynx_config::{config_path, load, save};
-use lynx_config::snapshot::create as snapshot;
+use lynx_config::snapshot::{create as snapshot, mutate_config_transaction};
+use lynx_config::{config_path, load};
 use lynx_core::redact;
 
 #[derive(Args)]
@@ -37,9 +37,10 @@ pub async fn run(args: ConfigArgs) -> Result<()> {
         ConfigCommand::Get { key } => cmd_get(&key),
         ConfigCommand::Set { key, value } => cmd_set(&key, &value),
         ConfigCommand::Examples => {
-            crate::commands::examples::run(
-                crate::commands::examples::ExamplesArgs { command: Some("config".into()) }
-            ).await
+            crate::commands::examples::run(crate::commands::examples::ExamplesArgs {
+                command: Some("config".into()),
+            })
+            .await
         }
     }
 }
@@ -119,34 +120,44 @@ fn cmd_get(key: &str) -> Result<()> {
 }
 
 fn cmd_set(key: &str, value: &str) -> Result<()> {
-    let path = config_path();
-    let config_dir = path.parent().unwrap_or(&path);
-    snapshot(config_dir, &format!("config-set-{key}"))?;
+    mutate_config_transaction(&format!("config-set-{key}"), |cfg| {
+        match key {
+            "active_theme" => {
+                // Validate theme exists before applying.
+                lynx_theme::loader::load(value).map_err(|e| {
+                    lynx_core::error::LynxError::Config(format!("theme not found: {e}"))
+                })?;
+                cfg.active_theme = value.to_string();
+            }
+            "active_context" => {
+                cfg.active_context = match value {
+                    "interactive" => lynx_core::types::Context::Interactive,
+                    "agent" => lynx_core::types::Context::Agent,
+                    "minimal" => lynx_core::types::Context::Minimal,
+                    other => {
+                        return Err(lynx_core::error::LynxError::Config(format!(
+                            "unknown context '{other}'"
+                        )))
+                    }
+                };
+            }
+            "sync.remote" => {
+                cfg.sync.remote = if value.is_empty() {
+                    None
+                } else {
+                    Some(value.to_string())
+                };
+            }
+            other => {
+                return Err(lynx_core::error::LynxError::Config(format!(
+                    "unknown config key '{}' — cannot set via CLI",
+                    other
+                )))
+            }
+        }
+        Ok(())
+    })?;
 
-    let mut cfg = load()?;
-    match key {
-        "active_theme" => {
-            // Validate theme exists before applying.
-            lynx_theme::loader::load(value)
-                .map_err(|e| anyhow::anyhow!("theme not found: {e}"))?;
-            cfg.active_theme = value.to_string();
-        }
-        "active_context" => {
-            cfg.active_context = match value {
-                "interactive" => lynx_core::types::Context::Interactive,
-                "agent" => lynx_core::types::Context::Agent,
-                "minimal" => lynx_core::types::Context::Minimal,
-                other => bail!("unknown context '{other}'"),
-            };
-        }
-        "sync.remote" => {
-            cfg.sync.remote = if value.is_empty() { None } else { Some(value.to_string()) };
-        }
-        other => bail!("unknown config key '{}' — cannot set via CLI", other),
-    }
-
-    save(&cfg)?;
     println!("{key} = {value}");
     Ok(())
 }
-

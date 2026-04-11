@@ -1,0 +1,311 @@
+version = 1
+block = "B13"
+phase = "B13-P01"
+generated_at = "2026-04-11T03:45:00-04:00"
+
+[captures.shell_init_path]
+status = "deviating"
+actual = [
+  "loader hardcodes binary path to ~/.local/bin/lx",
+  "loader performs shell-side context detection before lx init",
+  "lx init eval call is not silent (no 2>/dev/null)"
+]
+evidence = [
+  "shell/core/loader.zsh:4",
+  "shell/core/loader.zsh:12",
+  "shell/core/loader.zsh:19",
+  "docs/decisions/adr-001-rust-thin-zsh.md:24",
+  "docs/architecture.md:64"
+]
+owner_phase = "B13-P03"
+
+[captures.context_detection_env_vars]
+status = "deviating"
+actual = [
+  "shell loader checks CLAUDE_CODE and CURSOR_SESSION",
+  "lynx-shell detects CLAUDE_CODE, CURSOR_SESSION, CODEIUM_SESSION, COPILOT_AGENT, WINDSURF_AGENT + CI/TTY heuristics",
+  "lynx-cli context status checks CLAUDE_CODE_ENTRYPOINT and CURSOR_SESSION_ID",
+  "docs reference CURSOR_IDE and LYNX_MINIMAL in places, plus CI behavior mismatches"
+]
+evidence = [
+  "shell/core/loader.zsh:12",
+  "crates/lynx-shell/src/context.rs:5",
+  "crates/lynx-shell/src/context.rs:52",
+  "crates/lynx-cli/src/commands/context.rs:67",
+  "docs/decisions/adr-003-agent-context-detection.md:23",
+  "docs/architecture.md:167",
+  "README.md:116"
+]
+owner_phase = "B13-P02"
+
+[captures.runtime_socket_path]
+status = "deviating"
+actual = [
+  "runtime socket path is runtime_dir()/events.sock",
+  "architecture doc still references ~/.local/share/lynx/run/daemon.sock"
+]
+evidence = [
+  "crates/lynx-core/src/runtime.rs:32",
+  "docs/architecture.md:106"
+]
+owner_phase = "B13-P07"
+
+[captures.daemon_event_dataflow]
+status = "deviating"
+actual = [
+  "event bridge sends emit/subscribe IPC messages",
+  "daemon currently logs incoming IPC JSON but does not dispatch to EventBus"
+]
+evidence = [
+  "crates/lynx-events/src/bridge.rs:11",
+  "crates/lynx-daemon/src/main.rs:100",
+  "docs/architecture.md:107"
+]
+owner_phase = "B13-P04"
+
+[captures.config_mutation_protocol]
+status = "deviating"
+actual = [
+  "some mutation commands use snapshot+rollback, others write config directly",
+  "there is no single non-bypassable snapshot->validate->apply->rollback transaction helper"
+]
+evidence = [
+  "crates/lynx-cli/src/commands/config.rs:125",
+  "crates/lynx-cli/src/commands/plugin.rs:144",
+  "crates/lynx-cli/src/commands/context.rs:33",
+  "crates/lynx-cli/src/commands/sync.rs:84",
+  "crates/lynx-cli/src/commands/theme.rs:54"
+]
+owner_phase = "B13-P06"
+
+[[decisions]]
+id = "D-001"
+status = "deviating"
+summary = "Thin-shell and eval-bridge invariants are not consistently enforced."
+expected = "Shell files are thin forwarders with no logic; integration is eval \"$(lx ...)\" with silent failures per architecture constraints."
+owner_phase = "B13-P03"
+evidence = [
+  "docs/decisions/adr-001-rust-thin-zsh.md:20",
+  "docs/architecture.md:61",
+  "shell/core/loader.zsh:6",
+  "shell/core/hooks.zsh:17",
+  "shell/lib/eval-bridge.zsh:11"
+]
+
+[[decisions.mismatches]]
+id = "M-D001-01"
+severity = "high"
+anchor = "shell/core/loader.zsh:11"
+current = "Context detection and conditional behavior live in shell code."
+expected = "Shell should be a thin bridge; context logic centralized in Rust."
+fix_phase = "B13-P03"
+target_fix_paths = ["shell/core/loader.zsh", "crates/lynx-shell/src/context.rs"]
+
+[[decisions.mismatches]]
+id = "M-D001-02"
+severity = "high"
+anchor = "shell/core/loader.zsh:19"
+current = "lx init eval call is not silent (no 2>/dev/null)."
+expected = "All lx shell bridge calls should follow silent failure contract."
+fix_phase = "B13-P03"
+target_fix_paths = ["shell/core/loader.zsh", "docs/architecture.md"]
+
+[[decisions]]
+id = "D-002"
+status = "conforming"
+summary = "No OMZ compatibility layer is present."
+expected = "Lynx-format plugin manifests only; no OMZ emulation path."
+owner_phase = "none"
+evidence = [
+  "docs/decisions/adr-002-drop-omz-compat.md:17",
+  "crates/lynx-cli/src/commands/plugin.rs:127"
+]
+
+[[decisions]]
+id = "D-003"
+status = "conforming"
+summary = "Primary configuration surfaces are TOML-based and validated through Rust."
+expected = "No YAML/JSON/zsh as config source of truth."
+owner_phase = "none"
+evidence = [
+  "docs/decisions/adr-004-toml-everywhere.md:17",
+  "crates/lynx-config/src/lib.rs:1",
+  "themes/default.toml:1",
+  "profiles/default.toml:1"
+]
+
+[[decisions]]
+id = "D-004"
+status = "deviating"
+summary = "Context detection contract is inconsistent across shell, rust, cli, and docs."
+expected = "Automatic detection with one authoritative env-var contract and no contradictory interfaces."
+owner_phase = "B13-P02"
+evidence = [
+  "docs/decisions/adr-003-agent-context-detection.md:18",
+  "shell/core/loader.zsh:12",
+  "crates/lynx-shell/src/context.rs:5",
+  "crates/lynx-cli/src/commands/context.rs:67",
+  "README.md:116",
+  "docs/architecture.md:167"
+]
+
+[[decisions.mismatches]]
+id = "M-D004-01"
+severity = "high"
+anchor = "crates/lynx-cli/src/commands/context.rs:67"
+current = "CLI auto-detection uses CLAUDE_CODE_ENTRYPOINT/CURSOR_SESSION_ID; shell and rust use different names."
+expected = "Shared detector source and env list used by shell, cli, and docs."
+fix_phase = "B13-P02"
+target_fix_paths = ["crates/lynx-cli/src/commands/context.rs", "crates/lynx-shell/src/context.rs", "shell/core/loader.zsh"]
+
+[[decisions.mismatches]]
+id = "M-D004-02"
+severity = "high"
+anchor = "docs/architecture.md:167"
+current = "Docs claim CURSOR_IDE and LYNX_MINIMAL semantics that do not match implementation."
+expected = "Docs exactly match implemented detection behavior."
+fix_phase = "B13-P07"
+target_fix_paths = ["docs/architecture.md", "README.md", "docs/decisions/adr-003-agent-context-detection.md"]
+
+[[decisions]]
+id = "D-005"
+status = "conforming"
+summary = "Brand and CLI naming contract is present and consistently wired to lx/Lynx."
+expected = "Binary name lx and framework name Lynx as canonical identifiers."
+owner_phase = "none"
+evidence = [
+  "crates/lynx-core/src/brand.rs:4",
+  "crates/lynx-core/src/brand.rs:5",
+  "install.sh:13",
+  "README.md:1"
+]
+
+[[decisions]]
+id = "D-006"
+status = "conforming"
+summary = "Namespace isolation is convention+linter based, not hard sandboxing."
+expected = "Manifest exports plus linting for undeclared symbols."
+owner_phase = "none"
+evidence = [
+  "crates/lynx-plugin/src/namespace.rs:33",
+  "docs/plugin-authoring.md:17"
+]
+
+[[decisions]]
+id = "D-007"
+status = "deviating"
+summary = "Mutation paths are inconsistent; snapshot/validate/apply/rollback is not universally enforced."
+expected = "All config mutation commands route through one guarded transaction path."
+owner_phase = "B13-P06"
+evidence = [
+  "docs/architecture.md:145",
+  "crates/lynx-cli/src/commands/config.rs:125",
+  "crates/lynx-cli/src/commands/plugin.rs:144",
+  "crates/lynx-cli/src/commands/context.rs:33",
+  "crates/lynx-cli/src/commands/sync.rs:84",
+  "crates/lynx-cli/src/commands/theme.rs:60"
+]
+
+[[decisions.mismatches]]
+id = "M-D007-01"
+severity = "high"
+anchor = "crates/lynx-cli/src/commands/plugin.rs:144"
+current = "Plugin add/remove mutate config with direct save_config() and no snapshot transaction."
+expected = "Guarded mutation transaction with snapshot and rollback semantics."
+fix_phase = "B13-P06"
+target_fix_paths = ["crates/lynx-cli/src/commands/plugin.rs", "crates/lynx-config/src/snapshot.rs"]
+
+[[decisions.mismatches]]
+id = "M-D007-02"
+severity = "high"
+anchor = "crates/lynx-cli/src/commands/context.rs:33"
+current = "Context set mutates config directly and emits event without mutation guard path."
+expected = "Context mutation goes through shared D-007 helper."
+fix_phase = "B13-P06"
+target_fix_paths = ["crates/lynx-cli/src/commands/context.rs", "crates/lynx-config/src/snapshot.rs"]
+
+[[decisions.mismatches]]
+id = "M-D007-03"
+severity = "high"
+anchor = "crates/lynx-cli/src/commands/sync.rs:84"
+current = "Sync init writes sync.remote directly with save() and no snapshot/rollback guard."
+expected = "Sync config mutations use same guarded transaction helper."
+fix_phase = "B13-P06"
+target_fix_paths = ["crates/lynx-cli/src/commands/sync.rs", "crates/lynx-config/src/snapshot.rs"]
+
+[[decisions]]
+id = "D-008"
+status = "deviating"
+summary = "Event bus contract exists, but daemon runtime does not yet dispatch emitted IPC events."
+expected = "Daemon receives IPC and dispatches through EventBus to subscribers."
+owner_phase = "B13-P04"
+evidence = [
+  "docs/architecture.md:107",
+  "crates/lynx-events/src/bridge.rs:12",
+  "crates/lynx-daemon/src/main.rs:104"
+]
+
+[[decisions.mismatches]]
+id = "M-D008-01"
+severity = "high"
+anchor = "crates/lynx-daemon/src/main.rs:104"
+current = "Daemon logs msg_type but does not call EventBus dispatch for emit/subscribe IPC."
+expected = "Daemon decodes and wires emit/subscribe into live EventBus state."
+fix_phase = "B13-P04"
+target_fix_paths = ["crates/lynx-daemon/src/main.rs", "crates/lynx-events/src/bridge.rs"]
+
+[[decisions]]
+id = "D-009"
+status = "conforming"
+summary = "Sync mechanism is git-backed and uses standard git workflows."
+expected = "Config sync uses git init/push/pull/status primitives, no proprietary cloud protocol."
+owner_phase = "none"
+evidence = [
+  "docs/decisions/adr-005-git-backed-sync.md:14",
+  "crates/lynx-cli/src/commands/sync.rs:18",
+  "crates/lynx-cli/src/commands/sync.rs:107"
+]
+
+[[decisions]]
+id = "D-010"
+status = "deviating"
+summary = "Alias context-gating is present, but first-party alias density conflicts with 'no alias-heavy plugins' decision wording."
+expected = "Aliases remain minimal and strictly context-gated for agent/minimal contexts."
+owner_phase = "B13-P08"
+evidence = [
+  "plugins/git/plugin.toml:24",
+  "plugins/git/plugin.toml:27",
+  "docs/decisions/adr-003-agent-context-detection.md:46",
+  "pt decisions all"
+]
+
+[[decisions.mismatches]]
+id = "M-D010-01"
+severity = "medium"
+anchor = "plugins/git/plugin.toml:24"
+current = "git plugin exports a large alias set while D-010 states no alias-heavy plugins."
+expected = "Decision text and implementation should agree on acceptable alias footprint."
+fix_phase = "B13-P08"
+target_fix_paths = ["plugins/git/plugin.toml", "docs/decisions", "README.md"]
+
+[[crosscutting]]
+id = "X-DEP-001"
+status = "deviating"
+summary = "Dependency-map rule says daemon must not import lynx-task directly, but Cargo.toml has direct dependency."
+owner_phase = "B13-P05"
+evidence = [
+  ".claude/skills/lynx/maps/crate-deps.md:30",
+  "crates/lynx-daemon/Cargo.toml:17"
+]
+
+[[crosscutting]]
+id = "X-DOC-001"
+status = "deviating"
+summary = "Architecture doc socket path and context table do not match runtime implementation."
+owner_phase = "B13-P07"
+evidence = [
+  "docs/architecture.md:106",
+  "docs/architecture.md:167",
+  "crates/lynx-core/src/runtime.rs:32",
+  "crates/lynx-shell/src/context.rs:5"
+]

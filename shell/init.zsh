@@ -1,6 +1,6 @@
 # Lynx shell integration — sourced from .zshrc
 # This is the ONLY line needed in .zshrc:
-#   source "${HOME}/.config/lynx/init.zsh"
+#   source "${HOME}/.config/lynx/shell/init.zsh"
 #
 # Everything else is managed by `lx`.
 

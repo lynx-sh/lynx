@@ -36,7 +36,10 @@ impl RegistryEntry {
     pub fn resolve_version(&self, version: Option<&str>) -> Option<&PluginVersion> {
         match version {
             Some(v) => self.versions.iter().find(|pv| pv.version == v),
-            None => self.versions.iter().find(|pv| pv.version == self.latest_version),
+            None => self
+                .versions
+                .iter()
+                .find(|pv| pv.version == self.latest_version),
         }
     }
 
@@ -66,8 +69,7 @@ impl RegistryIndex {
         self.plugins
             .iter()
             .filter(|e| {
-                e.name.to_lowercase().contains(&q)
-                    || e.description.to_lowercase().contains(&q)
+                e.name.to_lowercase().contains(&q) || e.description.to_lowercase().contains(&q)
             })
             .collect()
     }
@@ -83,6 +85,10 @@ pub struct LockEntry {
     pub version: String,
     /// SHA-256 hex digest of the installed archive (verified at install time).
     pub checksum_sha256: String,
+    /// SHA-256 hex digest of the installed plugin directory contents.
+    /// Used by `lx plugin checksum <name>` for post-install tamper checks.
+    #[serde(default)]
+    pub installed_checksum_sha256: Option<String>,
     /// Source URL the archive was downloaded from.
     pub url: String,
     /// Install method: "registry" or "local".
@@ -263,6 +269,7 @@ url = "https://example.com/broken.tar.gz"
             name: "git".into(),
             version: "1.0.0".into(),
             checksum_sha256: "abc".into(),
+            installed_checksum_sha256: Some("abc".into()),
             url: "https://example.com/git.tar.gz".into(),
             source: "registry".into(),
         });
@@ -274,12 +281,20 @@ url = "https://example.com/broken.tar.gz"
     fn lockfile_upsert_replaces_existing() {
         let mut lock = LockFile::default();
         lock.upsert(LockEntry {
-            name: "git".into(), version: "1.0.0".into(),
-            checksum_sha256: "old".into(), url: "u".into(), source: "registry".into(),
+            name: "git".into(),
+            version: "1.0.0".into(),
+            checksum_sha256: "old".into(),
+            installed_checksum_sha256: Some("old".into()),
+            url: "u".into(),
+            source: "registry".into(),
         });
         lock.upsert(LockEntry {
-            name: "git".into(), version: "1.1.0".into(),
-            checksum_sha256: "new".into(), url: "u2".into(), source: "registry".into(),
+            name: "git".into(),
+            version: "1.1.0".into(),
+            checksum_sha256: "new".into(),
+            installed_checksum_sha256: Some("new".into()),
+            url: "u2".into(),
+            source: "registry".into(),
         });
         assert_eq!(lock.entries.len(), 1);
         assert_eq!(lock.find("git").unwrap().version, "1.1.0");
@@ -289,8 +304,12 @@ url = "https://example.com/broken.tar.gz"
     fn lockfile_remove() {
         let mut lock = LockFile::default();
         lock.upsert(LockEntry {
-            name: "git".into(), version: "1.0.0".into(),
-            checksum_sha256: "x".into(), url: "u".into(), source: "registry".into(),
+            name: "git".into(),
+            version: "1.0.0".into(),
+            checksum_sha256: "x".into(),
+            installed_checksum_sha256: Some("x".into()),
+            url: "u".into(),
+            source: "registry".into(),
         });
         assert!(lock.remove("git"));
         assert!(lock.find("git").is_none());
@@ -301,8 +320,11 @@ url = "https://example.com/broken.tar.gz"
     fn lockfile_roundtrips_toml() {
         let mut lock = LockFile::default();
         lock.upsert(LockEntry {
-            name: "git".into(), version: "1.0.0".into(),
-            checksum_sha256: "abc".into(), url: "https://x.com/git.tar.gz".into(),
+            name: "git".into(),
+            version: "1.0.0".into(),
+            checksum_sha256: "abc".into(),
+            installed_checksum_sha256: Some("abc".into()),
+            url: "https://x.com/git.tar.gz".into(),
             source: "registry".into(),
         });
         let serialized = toml::to_string_pretty(&lock).unwrap();

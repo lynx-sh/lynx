@@ -84,7 +84,10 @@ mod tests {
                 description: String::new(),
                 authors: vec![],
             },
-            load: LoadConfig { lazy: true, hooks: vec![] },
+            load: LoadConfig {
+                lazy: true,
+                hooks: vec![],
+            },
             deps: DepsConfig::default(),
             exports: ExportsConfig {
                 functions: fns.iter().map(|s| s.to_string()).collect(),

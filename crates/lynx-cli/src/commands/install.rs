@@ -3,9 +3,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use clap::Args;
 use lynx_core::brand;
-
-const LYNX_INIT_LINE: &str = r#"source "${HOME}/.config/lynx/shell/init.zsh""#;
-const LYNX_INIT_PATTERN: &str = r#"source "${HOME}/.config/lynx/shell/init.zsh""#;
+use lynx_core::brand::ZSHRC_INIT_LINE;
 
 #[derive(Args)]
 pub struct InstallArgs {
@@ -100,7 +98,7 @@ pub async fn run(args: InstallArgs) -> Result<()> {
         println!();
         println!("Add this to your ~/.zshrc to activate Lynx:");
         println!();
-        println!("    {LYNX_INIT_LINE}");
+        println!("    {ZSHRC_INIT_LINE}");
         println!();
         println!("Or run `lx install --zshrc` to do it automatically.");
     } else {
@@ -207,7 +205,7 @@ fn patch_zshrc(home: &Path) -> Result<()> {
         let content = std::fs::read_to_string(&zshrc)
             .with_context(|| format!("failed to read {}", zshrc.display()))?;
 
-        if content.lines().any(|l| l.contains(LYNX_INIT_PATTERN)) {
+        if content.lines().any(|l| l.contains(ZSHRC_INIT_LINE)) {
             println!("  ✓ ~/.zshrc already has Lynx init line — skipping");
             return Ok(());
         }
@@ -217,14 +215,14 @@ fn patch_zshrc(home: &Path) -> Result<()> {
         if !appended.ends_with('\n') {
             appended.push('\n');
         }
-        appended.push_str(&format!("\n# Lynx shell framework\n{LYNX_INIT_LINE}\n"));
+        appended.push_str(&format!("\n# Lynx shell framework\n{ZSHRC_INIT_LINE}\n"));
         std::fs::write(&zshrc, &appended)
             .with_context(|| format!("failed to write {}", zshrc.display()))?;
     } else {
         // Create minimal .zshrc
         std::fs::write(
             &zshrc,
-            format!("# Lynx shell framework\n{LYNX_INIT_LINE}\n"),
+            format!("# Lynx shell framework\n{ZSHRC_INIT_LINE}\n"),
         )
         .with_context(|| format!("failed to create {}", zshrc.display()))?;
     }
@@ -284,13 +282,13 @@ mod tests {
     fn patch_zshrc_idempotent() {
         let home = TempDir::new().unwrap();
         let zshrc = home.path().join(".zshrc");
-        fs::write(&zshrc, format!("{LYNX_INIT_LINE}\n")).unwrap();
+        fs::write(&zshrc, format!("{ZSHRC_INIT_LINE}\n")).unwrap();
 
         patch_zshrc(home.path()).unwrap();
 
         let content = fs::read_to_string(&zshrc).unwrap();
         assert_eq!(
-            content.lines().filter(|l| l.contains(LYNX_INIT_PATTERN)).count(),
+            content.lines().filter(|l| l.contains(ZSHRC_INIT_LINE)).count(),
             1,
             "should not duplicate init line"
         );
@@ -301,7 +299,7 @@ mod tests {
         let home = TempDir::new().unwrap();
         patch_zshrc(home.path()).unwrap();
         let content = fs::read_to_string(home.path().join(".zshrc")).unwrap();
-        assert!(content.contains(LYNX_INIT_LINE));
+        assert!(content.contains(ZSHRC_INIT_LINE));
     }
 
     #[test]
@@ -314,6 +312,6 @@ mod tests {
 
         let content = fs::read_to_string(&zshrc).unwrap();
         assert!(content.contains("export FOO=bar"));
-        assert!(content.contains(LYNX_INIT_LINE));
+        assert!(content.contains(ZSHRC_INIT_LINE));
     }
 }

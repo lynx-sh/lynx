@@ -20,7 +20,7 @@ pub fn declare(plugins_dir: &Path) -> PluginRegistry {
     };
 
     for entry in entries.flatten() {
-        let manifest_path = entry.path().join("plugin.toml");
+        let manifest_path = entry.path().join(lynx_core::brand::PLUGIN_MANIFEST);
         if !manifest_path.exists() {
             continue;
         }
@@ -58,12 +58,19 @@ pub fn apply_resolve(
     let (_, disabled) = filter_for_context(&all_manifests, context);
 
     for (name, reason) in &disabled {
-        registry.set_state(name, PluginState::Excluded { reason: reason.clone() });
+        registry.set_state(
+            name,
+            PluginState::Excluded {
+                reason: reason.clone(),
+            },
+        );
     }
     for (name, bin) in excluded {
         registry.set_state(
             name,
-            PluginState::Excluded { reason: format!("missing binary: {}", bin) },
+            PluginState::Excluded {
+                reason: format!("missing binary: {}", bin),
+            },
         );
     }
     for name in eager_order.iter().chain(lazy_order.iter()) {

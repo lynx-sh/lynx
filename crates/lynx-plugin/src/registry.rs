@@ -15,9 +15,15 @@ pub enum PluginState {
 }
 
 impl PluginState {
-    pub fn is_active(&self) -> bool { matches!(self, Self::Active) }
-    pub fn is_failed(&self) -> bool { matches!(self, Self::Failed { .. }) }
-    pub fn is_excluded(&self) -> bool { matches!(self, Self::Excluded { .. }) }
+    pub fn is_active(&self) -> bool {
+        matches!(self, Self::Active)
+    }
+    pub fn is_failed(&self) -> bool {
+        matches!(self, Self::Failed { .. })
+    }
+    pub fn is_excluded(&self) -> bool {
+        matches!(self, Self::Excluded { .. })
+    }
 }
 
 /// Per-plugin entry in the registry.
@@ -49,10 +55,13 @@ pub struct PluginRegistry {
 }
 
 impl PluginRegistry {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     pub fn insert(&mut self, entry: PluginEntry) {
-        self.entries.insert(entry.manifest.plugin.name.clone(), entry);
+        self.entries
+            .insert(entry.manifest.plugin.name.clone(), entry);
     }
 
     pub fn get(&self, name: &str) -> Option<&PluginEntry> {

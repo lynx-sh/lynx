@@ -71,7 +71,9 @@ fn repo_root() -> PathBuf {
                 }
             }
         }
-        dir = dir.parent().expect("reached filesystem root without finding workspace");
+        dir = dir
+            .parent()
+            .expect("reached filesystem root without finding workspace");
     }
 }
 

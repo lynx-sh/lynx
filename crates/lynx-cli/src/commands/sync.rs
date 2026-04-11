@@ -4,7 +4,7 @@ use std::process::Command;
 use anyhow::{bail, Context as _, Result};
 use clap::{Args, Subcommand};
 
-use lynx_config::{load, save};
+use lynx_config::snapshot::mutate_config_transaction;
 use lynx_core::brand;
 
 #[derive(Args)]
@@ -79,9 +79,10 @@ fn cmd_init(remote: &str) -> Result<()> {
     }
 
     // Save remote to config.
-    let mut cfg = load()?;
-    cfg.sync.remote = Some(remote.to_string());
-    save(&cfg)?;
+    mutate_config_transaction("sync-init", |cfg| {
+        cfg.sync.remote = Some(remote.to_string());
+        Ok(())
+    })?;
 
     println!("sync initialized with remote: {remote}");
     Ok(())
@@ -130,7 +131,11 @@ fn cmd_status() -> Result<()> {
     let behind = git_output(&dir, &["rev-list", "--count", "@{u}..HEAD"])
         .unwrap_or_else(|_| "?".to_string());
 
-    println!("sync status: {} ahead, {} behind", ahead.trim(), behind.trim());
+    println!(
+        "sync status: {} ahead, {} behind",
+        ahead.trim(),
+        behind.trim()
+    );
     Ok(())
 }
 

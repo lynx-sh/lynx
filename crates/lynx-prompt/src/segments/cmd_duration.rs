@@ -47,19 +47,27 @@ mod tests {
 
     #[test]
     fn hides_under_threshold() {
-        let cfg = SegmentConfig { min_ms: Some(500), ..Default::default() };
+        let cfg = SegmentConfig {
+            min_ms: Some(500),
+            ..Default::default()
+        };
         assert!(CmdDurationSegment.render(&cfg, &ctx(Some(200))).is_none());
     }
 
     #[test]
     fn shows_when_over_threshold() {
-        let cfg = SegmentConfig { min_ms: Some(500), ..Default::default() };
+        let cfg = SegmentConfig {
+            min_ms: Some(500),
+            ..Default::default()
+        };
         assert!(CmdDurationSegment.render(&cfg, &ctx(Some(1500))).is_some());
     }
 
     #[test]
     fn hides_when_no_duration() {
-        assert!(CmdDurationSegment.render(&Default::default(), &ctx(None)).is_none());
+        assert!(CmdDurationSegment
+            .render(&Default::default(), &ctx(None))
+            .is_none());
     }
 
     #[test]
