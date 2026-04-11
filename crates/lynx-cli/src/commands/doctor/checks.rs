@@ -311,7 +311,7 @@ mod tests {
             )
         };
         std::fs::write(
-            cfg_dir.join("config.toml"),
+            cfg_dir.join(lynx_core::brand::CONFIG_FILE),
             format!(
                 "schema_version = 1\nenabled_plugins = {plugins}\nactive_theme = \"default\"\nactive_context = \"interactive\"\n"
             ),

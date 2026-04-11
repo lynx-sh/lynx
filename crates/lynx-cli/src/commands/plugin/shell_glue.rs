@@ -128,7 +128,7 @@ mod tests {
     impl EnvGuard {
         fn new() -> Self {
             Self {
-                old_lynx_dir: std::env::var("LYNX_DIR").ok(),
+                old_lynx_dir: std::env::var(lynx_core::env_vars::LYNX_DIR).ok(),
             }
         }
     }
@@ -136,9 +136,9 @@ mod tests {
     impl Drop for EnvGuard {
         fn drop(&mut self) {
             if let Some(v) = &self.old_lynx_dir {
-                std::env::set_var("LYNX_DIR", v);
+                std::env::set_var(lynx_core::env_vars::LYNX_DIR, v);
             } else {
-                std::env::remove_var("LYNX_DIR");
+                std::env::remove_var(lynx_core::env_vars::LYNX_DIR);
             }
         }
     }
@@ -170,7 +170,7 @@ mod tests {
         let _guard = EnvGuard::new();
         let temp = temp_home();
         // installed_plugins_dir() = LYNX_DIR/plugins — set LYNX_DIR to temp root
-        std::env::set_var("LYNX_DIR", temp.path());
+        std::env::set_var(lynx_core::env_vars::LYNX_DIR, temp.path());
         let plugin_path = temp.path().join("plugins").join("demo");
         std::fs::create_dir_all(&plugin_path).expect("create plugin path");
         let resolved = resolve_plugin_dir("demo");
@@ -191,7 +191,7 @@ mod tests {
         let git_plugin = fixture_plugin("git");
         let plugins_dir = git_plugin.parent().expect("plugins dir parent");
         let lynx_dir = plugins_dir.parent().expect("lynx dir parent");
-        std::env::set_var("LYNX_DIR", lynx_dir);
+        std::env::set_var(lynx_core::env_vars::LYNX_DIR, lynx_dir);
 
         let script = generate_exec_script_for_plugin("git").expect("exec script");
         assert!(script.contains("add-zsh-hook chpwd _git_plugin_chpwd"));

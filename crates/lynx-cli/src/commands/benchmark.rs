@@ -5,6 +5,7 @@ use anyhow::Result;
 use clap::Args;
 
 use lynx_core::brand;
+use lynx_core::env_vars;
 
 #[derive(Args)]
 pub struct BenchmarkArgs {
@@ -61,7 +62,7 @@ fn measure_startup() -> Result<Vec<(String, Duration)>> {
         .arg("-i")
         .arg("-c")
         .arg("exit")
-        .env("LYNX_BENCHMARK_MODE", "1")
+        .env(env_vars::LYNX_BENCHMARK_MODE, "1")
         .output();
 
     let total = start.elapsed();

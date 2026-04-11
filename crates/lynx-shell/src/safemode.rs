@@ -1,3 +1,5 @@
+use lynx_core::env_vars;
+
 /// Safe mode boot output for `lx init` when the config is invalid.
 ///
 /// Instead of crashing the shell, Lynx emits a minimal init script that:
@@ -25,7 +27,7 @@ print -u2 "  Fix: run 'lx doctor' to diagnose, or 'lx config validate' to check 
 /// Returns true if the current shell session is in safe mode.
 /// Check `$LYNX_SAFE_MODE` env var (set to "1" in safe mode).
 pub fn is_safe_mode() -> bool {
-    std::env::var("LYNX_SAFE_MODE").as_deref() == Ok("1")
+    std::env::var(env_vars::LYNX_SAFE_MODE).as_deref() == Ok("1")
 }
 
 #[cfg(test)]

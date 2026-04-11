@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Result};
 use clap::{Args, Subcommand};
+use lynx_core::brand;
 use lynx_core::runtime::{pid_file, socket_path};
 use lynx_daemon::platform_backend;
 use std::path::PathBuf;
@@ -192,13 +193,13 @@ fn daemon_binary_path() -> Result<PathBuf> {
         }
     }
 
-    if let Ok(path) = which::which("lynx-daemon") {
+    if let Ok(path) = which::which(brand::DAEMON_NAME) {
         return Ok(path);
     }
 
     if let Ok(current) = std::env::current_exe() {
         if let Some(parent) = current.parent() {
-            let sibling = parent.join("lynx-daemon");
+            let sibling = parent.join(brand::DAEMON_NAME);
             if sibling.exists() {
                 return Ok(sibling);
             }

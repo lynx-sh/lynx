@@ -39,6 +39,12 @@ pub const LYNX_DAEMON_BIN: &str = "LYNX_DAEMON_BIN";
 /// Controls log verbosity for the daemon (e.g. `debug`, `info`, `warn`, `error`).
 pub const LYNX_LOG: &str = "LYNX_LOG";
 
+/// Set to `"1"` to suppress plugin loading failures and start in degraded mode.
+pub const LYNX_SAFE_MODE: &str = "LYNX_SAFE_MODE";
+
+/// Set to `"1"` by `lx benchmark` to gate benchmark-only codepaths.
+pub const LYNX_BENCHMARK_MODE: &str = "LYNX_BENCHMARK_MODE";
+
 // ── Agent detection env vars ─────────────────────────────────────────────────
 
 /// Set to `"1"` by Claude Code in every shell it spawns.

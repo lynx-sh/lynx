@@ -74,7 +74,7 @@ pub async fn run(args: InstallArgs) -> Result<()> {
     }
 
     // Write default config if none exists
-    let config_path = lynx_dir.join("config.toml");
+    let config_path = lynx_dir.join(brand::CONFIG_FILE);
     if !config_path.exists() {
         std::fs::write(
             &config_path,
