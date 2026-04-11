@@ -64,29 +64,39 @@ pub fn render_prompt(
 
 /// Compute the visible (display) length of a prompt string by stripping
 /// zsh zero-width markers `%{...%}` and ANSI escape sequences.
+///
+/// Uses a byte-level scan so we can look for the exact 2-byte sequence `%}`
+/// (the zsh closer) rather than tracking brace depth with chars, which breaks
+/// because encountering `%` inside an ANSI escape would wrongly inflate depth.
 fn visible_len(s: &str) -> usize {
-    let mut len = 0;
-    let mut chars = s.chars().peekable();
-    while let Some(ch) = chars.next() {
-        if ch == '%' && chars.peek() == Some(&'{') {
-            // Skip everything until closing %}.
-            chars.next(); // consume '{'
-            let mut depth = 1usize;
-            for c in chars.by_ref() {
-                if c == '%' { depth += 1; }
-                if c == '}' {
-                    depth -= 1;
-                    if depth == 0 { break; }
+    let b = s.as_bytes();
+    let mut i = 0;
+    let mut len = 0usize;
+    while i < b.len() {
+        if b[i] == b'%' && i + 1 < b.len() && b[i + 1] == b'{' {
+            // Skip zsh zero-width block %{...%}  — search for literal %}.
+            i += 2;
+            while i + 1 < b.len() {
+                if b[i] == b'%' && b[i + 1] == b'}' {
+                    i += 2;
+                    break;
                 }
+                i += 1;
             }
-        } else if ch == '\x1b' && chars.peek() == Some(&'[') {
-            // Skip ANSI CSI sequence: ESC [ ... <final byte 0x40-0x7E>
-            chars.next(); // consume '['
-            for c in chars.by_ref() {
-                if c >= '@' && c <= '~' { break; }
+        } else if b[i] == 0x1b && i + 1 < b.len() && b[i + 1] == b'[' {
+            // Skip ANSI CSI sequence: ESC [ <params> <final 0x40-0x7E>
+            i += 2;
+            while i < b.len() {
+                let byte = b[i];
+                i += 1;
+                if byte >= 0x40 && byte <= 0x7e { break; }
             }
         } else {
-            len += 1;
+            // Count only the leading byte of each UTF-8 code point.
+            if b[i] & 0b1100_0000 != 0b1000_0000 {
+                len += 1;
+            }
+            i += 1;
         }
     }
     len
@@ -323,6 +333,22 @@ mod tests {
         assert!(out.contains("RPROMPT=\"\""));
         // should not contain segment content
         assert!(!out.contains("~/code"));
+    }
+
+    #[test]
+    fn visible_len_strips_zsh_markers_and_ansi() {
+        // Plain text
+        assert_eq!(visible_len("hello"), 5);
+        // zsh %{...%} wrappers are zero-width
+        assert_eq!(visible_len("%{\x1b[32m%}hello%{\x1b[0m%}"), 5);
+        // ANSI CSI sequence is zero-width
+        assert_eq!(visible_len("\x1b[1;32mhello\x1b[0m"), 5);
+        // UTF-8 multi-byte counted as 1 char
+        assert_eq!(visible_len("~/dev"), 5);
+        // Combined: zsh-wrapped ANSI + text after it
+        assert_eq!(visible_len("%{\x1b[1m%}┌─[%{\x1b[0m%}foo"), 6); // ┌─[ = 3, foo = 3
+        // Trailing space counted
+        assert_eq!(visible_len("abc "), 4);
     }
 
     #[test]
