@@ -9,7 +9,7 @@ use crate::segment::RenderedSegment;
 /// Assemble PROMPT and RPROMPT shell assignments from rendered segments.
 ///
 /// When `top` is non-empty the output is a two-line prompt:
-///   PROMPT="<top line>\n<left line> "
+///   PROMPT="<top line>"$'\n'"<left line> "
 ///
 /// When `continuation` is non-empty, PROMPT2 is also emitted.
 pub fn render_prompt(
@@ -25,16 +25,15 @@ pub fn render_prompt(
     let left_str = assemble(left, theme, sep, true);
     let rprompt = assemble(right, theme, sep, false);
 
-    let prompt = if top.is_empty() {
-        left_str
+    let mut out = if top.is_empty() {
+        format!("PROMPT=\"{left_str}\"\nRPROMPT=\"{rprompt}\"\n")
     } else {
         let top_str = assemble(top, theme, sep, true);
-        // Embed a literal newline inside the zsh PROMPT string.
-        // The $'\n' syntax works inside double-quoted zsh assignments.
-        format!("{top_str}\\n{left_str}")
+        // Use ANSI-C quoting ($'\n') to embed a real newline between the two
+        // prompt lines. A literal \n inside PROMPT="..." is NOT a newline in
+        // zsh — it renders as the two characters '\' and 'n'.
+        format!("PROMPT=\"{top_str}\"$'\\n'\"{left_str}\"\nRPROMPT=\"{rprompt}\"\n")
     };
-
-    let mut out = format!("PROMPT=\"{prompt}\"\nRPROMPT=\"{rprompt}\"\n");
 
     if !continuation.is_empty() {
         let prompt2 = assemble(continuation, theme, sep, true);
@@ -230,7 +229,7 @@ mod tests {
         let top = vec![RenderedSegment::new("info").with_cache_key("dir")];
         let left = vec![RenderedSegment::new("~/code").with_cache_key("dir")];
         let out = render_prompt(&left, &[], &top, &[], &theme);
-        assert!(out.contains("\\n"), "expected embedded newline in two-line prompt");
+        assert!(out.contains("$'\\n'"), "expected ANSI-C newline ($'\\n') in two-line prompt");
     }
 
     #[test]
