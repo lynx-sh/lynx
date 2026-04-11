@@ -3,6 +3,8 @@ use clap::{Args, Subcommand};
 use lynx_config::{load as load_config, save as save_config};
 use lynx_plugin::exec::generate_exec_script;
 use lynx_plugin::namespace::scaffold_convention_comment;
+use lynx_registry::fetch::{check_for_update, fetch_plugin, update_plugin, FetchOptions};
+use lynx_registry::index::{get_index, load_lock};
 use std::path::PathBuf;
 
 #[derive(Args)]
@@ -46,6 +48,27 @@ pub enum PluginCommand {
     },
     /// Show real-world usage examples
     Examples,
+    /// Search the plugin registry
+    Search {
+        /// Search query (fuzzy match on name and description)
+        query: String,
+        /// Refresh the registry index before searching
+        #[arg(long)]
+        refresh: bool,
+    },
+    /// Show full details for a registry plugin
+    Info {
+        /// Plugin name
+        name: String,
+    },
+    /// Update installed plugin(s) to latest registry version
+    Update {
+        /// Plugin name (omit for --all)
+        name: Option<String>,
+        /// Update all registry-installed plugins
+        #[arg(long)]
+        all: bool,
+    },
 }
 
 pub async fn run(args: PluginArgs) -> Result<()> {
@@ -56,6 +79,9 @@ pub async fn run(args: PluginArgs) -> Result<()> {
         PluginCommand::New { name } => cmd_new(&name).await,
         PluginCommand::Reinstall { name } => cmd_reinstall(&name).await,
         PluginCommand::Exec { name } => cmd_exec(&name).await,
+        PluginCommand::Search { query, refresh } => cmd_search(&query, refresh).await,
+        PluginCommand::Info { name } => cmd_info(&name).await,
+        PluginCommand::Update { name, all } => cmd_update(name.as_deref(), all).await,
         PluginCommand::Examples => {
             crate::commands::examples::run(
                 crate::commands::examples::ExamplesArgs { command: Some("plugin".into()) }
@@ -65,6 +91,11 @@ pub async fn run(args: PluginArgs) -> Result<()> {
 }
 
 async fn cmd_add(path: &str) -> Result<()> {
+    // If path looks like a registry name (no path separators, no ./), fetch from registry.
+    if !path.contains('/') && !path.contains('\\') {
+        return cmd_add_from_registry(path, false).await;
+    }
+
     let plugin_path = PathBuf::from(path);
     let manifest_path = plugin_path.join("plugin.toml");
 
@@ -87,6 +118,22 @@ async fn cmd_add(path: &str) -> Result<()> {
     config.enabled_plugins.push(name.clone());
     save_config(&config)?;
     println!("Added plugin '{}'.", name);
+    Ok(())
+}
+
+async fn cmd_add_from_registry(name: &str, force: bool) -> Result<()> {
+    let install_dir = tokio::task::spawn_blocking({
+        let name = name.to_string();
+        move || fetch_plugin(&name, &FetchOptions { force, refresh_index: true, ..Default::default() })
+    })
+    .await??;
+
+    let mut config = load_config()?;
+    if !config.enabled_plugins.contains(&name.to_string()) {
+        config.enabled_plugins.push(name.to_string());
+        save_config(&config)?;
+    }
+    println!("installed '{}' to {}", name, install_dir.display());
     Ok(())
 }
 
@@ -228,15 +275,113 @@ disabled_in = ["agent", "minimal"]
 }
 
 async fn cmd_reinstall(name: &str) -> Result<()> {
-    // For now: remove from config then prompt to re-add with a path.
-    // Full registry fetch is a later block (lynx-registry).
-    let mut config = load_config()?;
-    config.enabled_plugins.retain(|p| p != name);
-    save_config(&config)?;
-    println!(
-        "Removed '{}' from config. Re-add with: lx plugin add <path>",
-        name
-    );
+    cmd_add_from_registry(name, true).await
+}
+
+async fn cmd_search(query: &str, refresh: bool) -> Result<()> {
+    let idx = tokio::task::spawn_blocking({
+        let refresh = refresh;
+        move || get_index(refresh, None)
+    })
+    .await??;
+
+    let results = idx.search(query);
+    if results.is_empty() {
+        println!("no results for '{query}'");
+        return Ok(());
+    }
+
+    let lock = load_lock().unwrap_or_default();
+    println!("{:<20} {:<10} {}", "NAME", "VERSION", "DESCRIPTION");
+    println!("{}", "-".repeat(60));
+    for entry in results {
+        let installed = if lock.find(&entry.name).is_some() { "*" } else { " " };
+        println!(
+            "{installed}{:<19} {:<10} {}",
+            entry.name, entry.latest_version, entry.description
+        );
+    }
+    println!("\n* = installed   install: lx plugin add <name>");
+    Ok(())
+}
+
+async fn cmd_info(name: &str) -> Result<()> {
+    let idx = tokio::task::spawn_blocking(|| get_index(false, None)).await??;
+    let entry = idx
+        .find(name)
+        .ok_or_else(|| anyhow::anyhow!("plugin '{name}' not found in registry"))?;
+
+    let lock = load_lock().unwrap_or_default();
+    let installed = lock.find(name);
+
+    println!("name:        {}", entry.name);
+    println!("description: {}", entry.description);
+    println!("author:      {}", entry.author);
+    println!("latest:      {}", entry.latest_version);
+    println!("versions:    {}", entry.versions.len());
+    for v in &entry.versions {
+        let min = v.min_lynx_version.as_deref().unwrap_or("any");
+        println!("  {} — min_lynx: {min}", v.version);
+    }
+    if let Some(locked) = installed {
+        println!("installed:   v{}", locked.version);
+        if locked.version != entry.latest_version {
+            println!("             (update available: {})", entry.latest_version);
+        }
+    } else {
+        println!("installed:   no   (lx plugin add {name})");
+    }
+    Ok(())
+}
+
+async fn cmd_update(name: Option<&str>, all: bool) -> Result<()> {
+    if all {
+        // Update all registry-installed plugins.
+        let lock = load_lock().unwrap_or_default();
+        let registry_names: Vec<String> = lock
+            .entries
+            .iter()
+            .filter(|e| e.source == "registry")
+            .map(|e| e.name.clone())
+            .collect();
+
+        if registry_names.is_empty() {
+            println!("no registry-installed plugins to update");
+            return Ok(());
+        }
+
+        for plugin_name in &registry_names {
+            match update_one(plugin_name).await {
+                Ok(_) => {}
+                Err(e) => eprintln!("warning: failed to update '{}': {e}", plugin_name),
+            }
+        }
+        return Ok(());
+    }
+
+    let name = name.ok_or_else(|| anyhow::anyhow!("provide a plugin name or use --all"))?;
+    update_one(name).await
+}
+
+async fn update_one(name: &str) -> Result<()> {
+    let update_available = tokio::task::spawn_blocking({
+        let name = name.to_string();
+        move || check_for_update(&name, true, None)
+    })
+    .await??;
+
+    match update_available {
+        None => println!("'{name}' is already up to date (or not registry-installed)"),
+        Some((current, latest)) => {
+            println!("updating '{name}': {current} → {latest}");
+            tokio::task::spawn_blocking({
+                let name = name.to_string();
+                move || update_plugin(&name, None)
+            })
+            .await??;
+            println!("updated '{name}' to {latest}");
+        }
+    }
     Ok(())
 }
 

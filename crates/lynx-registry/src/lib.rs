@@ -1,2 +1,3 @@
-// lynx-registry — registry
-// TODO: implement
+pub mod fetch;
+pub mod index;
+pub mod schema;

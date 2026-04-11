@@ -18,7 +18,8 @@ lynx-plugin   = { path = "../lynx-plugin" }
 lynx-theme   = { path = "../lynx-theme" }
 lynx-task    = { path = "../lynx-task" }
 lynx-daemon  = { path = "../lynx-daemon" }
-lynx-shell   = { path = "../lynx-shell" }
+lynx-shell    = { path = "../lynx-shell" }
+lynx-registry = { path = "../lynx-registry" }
 clap.workspace = true
 serde_json.workspace = true
 toml.workspace = true

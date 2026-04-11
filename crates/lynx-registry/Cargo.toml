@@ -6,7 +6,16 @@ authors.workspace = true
 
 [dependencies]
 lynx-core = { path = "../lynx-core" }
+lynx-manifest = { path = "../lynx-manifest" }
 serde.workspace = true
+serde_json.workspace = true
 toml.workspace = true
 anyhow.workspace = true
 thiserror.workspace = true
+sha2.workspace = true
+hex.workspace = true
+reqwest.workspace = true
+flate2.workspace = true
+tar.workspace = true
+tracing.workspace = true
+tempfile.workspace = true
