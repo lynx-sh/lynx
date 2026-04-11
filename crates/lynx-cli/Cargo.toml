@@ -19,7 +19,7 @@ lynx-theme   = { path = "../lynx-theme" }
 lynx-prompt  = { path = "../lynx-prompt" }
 lynx-task    = { path = "../lynx-task" }
 lynx-daemon  = { path = "../lynx-daemon" }
-lynx-loader   = { path = "../lynx-loader" }
+lynx-depgraph = { path = "../lynx-depgraph" }
 lynx-shell    = { path = "../lynx-shell" }
 lynx-registry = { path = "../lynx-registry" }
 clap.workspace = true

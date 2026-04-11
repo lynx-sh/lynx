@@ -9,7 +9,7 @@ lynx-core          ← NO internal deps. Foundation only.
 ├── lynx-events    ← lynx-core only
 ├── lynx-template  ← lynx-core, lynx-config
 ├── lynx-shell     ← lynx-core, lynx-manifest
-│   └── lynx-loader    ← lynx-core, lynx-manifest, lynx-events, lynx-shell
+│   └── lynx-depgraph    ← lynx-core, lynx-manifest, lynx-events, lynx-shell
 │       └── lynx-prompt    ← lynx-core, lynx-config, lynx-events, lynx-template, lynx-theme
 lynx-theme         ← lynx-core, lynx-config
 lynx-plugin        ← lynx-core, lynx-manifest, lynx-events, lynx-shell
@@ -23,7 +23,7 @@ lynx-cli           ← ALL crates (assembles — never implements business logic
 ## Forbidden Dependencies (P0 violations)
 
 - lynx-core depending on ANYTHING internal
-- lynx-prompt depending on lynx-loader (circular)
+- lynx-prompt depending on lynx-depgraph (circular)
 - lynx-events depending on lynx-plugin (circular)
 - lynx-shell depending on lynx-cli
 - Any crate depending on lynx-cli

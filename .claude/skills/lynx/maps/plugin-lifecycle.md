@@ -49,7 +49,7 @@ LOADED → ACTIVATE (register hooks) → ACTIVE | DEGRADED
 ## What Lives Where
 
 - DECLARE logic: lynx-manifest (parser) + lynx-plugin (discovery)
-- RESOLVE logic: lynx-loader (dep graph, topo sort, context filter)
+- RESOLVE logic: lynx-depgraph (dep graph, topo sort, context filter)
 - LOAD logic: lynx-plugin/lifecycle.rs + lx plugin exec command
 - ACTIVATE logic: lynx-plugin/lifecycle.rs + lynx-events (subscription)
 - State tracking: PluginRegistry in lynx-plugin

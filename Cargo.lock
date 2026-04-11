@@ -886,8 +886,8 @@ dependencies = [
  "lynx-config",
  "lynx-core",
  "lynx-daemon",
+ "lynx-depgraph",
  "lynx-events",
- "lynx-loader",
  "lynx-manifest",
  "lynx-plugin",
  "lynx-prompt",
@@ -947,6 +947,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "lynx-depgraph"
+version = "0.1.0"
+dependencies = [
+ "lynx-core",
+ "lynx-events",
+ "lynx-manifest",
+ "lynx-shell",
+ "serde",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "lynx-events"
 version = "0.1.0"
 dependencies = [
@@ -957,18 +969,6 @@ dependencies = [
  "tempfile",
  "thiserror 1.0.69",
  "tokio",
-]
-
-[[package]]
-name = "lynx-loader"
-version = "0.1.0"
-dependencies = [
- "lynx-core",
- "lynx-events",
- "lynx-manifest",
- "lynx-shell",
- "serde",
- "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -993,6 +993,7 @@ dependencies = [
  "serde",
  "tempfile",
  "thiserror 1.0.69",
+ "tracing",
 ]
 
 [[package]]

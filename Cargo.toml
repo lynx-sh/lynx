@@ -7,7 +7,7 @@ members = [
     "crates/lynx-events",
     "crates/lynx-template",
     "crates/lynx-shell",
-    "crates/lynx-loader",
+    "crates/lynx-depgraph",
     "crates/lynx-prompt",
     "crates/lynx-theme",
     "crates/lynx-plugin",
