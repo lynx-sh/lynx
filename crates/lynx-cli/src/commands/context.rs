@@ -1,26 +1,27 @@
 use anyhow::Result;
 use clap::{Args, Subcommand};
 
-use lynx_config::{load, save};
+use lynx_config::{load, snapshot::mutate_config_transaction};
 use lynx_core::types::Context;
 use lynx_events::{emit_event, types::Event};
+use lynx_shell::context::{detect_context_outcome, DetectionMethod};
 
 #[derive(Args)]
 pub struct ContextArgs {
     #[command(subcommand)]
-    pub command: ContextCommand,
+    pub command: Option<ContextCommand>,
 }
 
 #[derive(Subcommand)]
 pub enum ContextCommand {
     /// Switch to a context (interactive, agent, minimal)
     Set { name: String },
-    /// Show current context and detection method
+    /// Show current context and detection method (default when no subcommand given)
     Status,
 }
 
 pub async fn run(args: ContextArgs) -> Result<()> {
-    match args.command {
+    match args.command.unwrap_or(ContextCommand::Status) {
         ContextCommand::Set { name } => cmd_set(&name),
         ContextCommand::Status => cmd_status(),
     }
@@ -28,9 +29,10 @@ pub async fn run(args: ContextArgs) -> Result<()> {
 
 fn cmd_set(name: &str) -> Result<()> {
     let ctx = parse_context(name)?;
-    let mut cfg = load()?;
-    cfg.active_context = ctx.clone();
-    save(&cfg)?;
+    mutate_config_transaction("context-set", |cfg| {
+        cfg.active_context = ctx.clone();
+        Ok(())
+    })?;
 
     // Emit shell:context-changed so the loader reloads plugins in-place.
     let data = serde_json::json!({ "context": name }).to_string();
@@ -45,14 +47,13 @@ fn cmd_set(name: &str) -> Result<()> {
 
 fn cmd_status() -> Result<()> {
     let cfg = load()?;
-
-    // Determine detection method.
-    let env_override = std::env::var("LYNX_CONTEXT").ok();
-    let (detected, method) = if let Some(ref v) = env_override {
-        (v.as_str().to_string(), "manual (LYNX_CONTEXT env var)")
-    } else {
-        let auto = detect_context_auto();
-        (format!("{auto:?}").to_lowercase(), "auto-detected")
+    let outcome = detect_context_outcome();
+    let detected = context_str(&outcome.context).to_string();
+    let method = match outcome.method {
+        DetectionMethod::Override => "manual override (LYNX_CONTEXT)".to_string(),
+        DetectionMethod::AgentEnv(var) => format!("auto-detected agent ({var})"),
+        DetectionMethod::MinimalEnv(var) => format!("auto-detected minimal ({var})"),
+        DetectionMethod::DefaultInteractive => "auto-detected interactive (default)".to_string(),
     };
 
     println!("Context:   {}", context_str(&cfg.active_context));
@@ -60,19 +61,6 @@ fn cmd_status() -> Result<()> {
     println!("Stored:    {}", context_str(&cfg.active_context));
 
     Ok(())
-}
-
-fn detect_context_auto() -> Context {
-    // Mirror the detection logic from lynx-shell.
-    if std::env::var("CLAUDE_CODE_ENTRYPOINT").is_ok()
-        || std::env::var("CURSOR_SESSION_ID").is_ok()
-    {
-        Context::Agent
-    } else if std::env::var("CI").is_ok() {
-        Context::Minimal
-    } else {
-        Context::Interactive
-    }
 }
 
 fn context_str(ctx: &Context) -> &'static str {
@@ -88,6 +76,9 @@ fn parse_context(s: &str) -> anyhow::Result<Context> {
         "interactive" => Ok(Context::Interactive),
         "agent" => Ok(Context::Agent),
         "minimal" => Ok(Context::Minimal),
-        other => anyhow::bail!("unknown context '{}' — valid: interactive, agent, minimal", other),
+        other => anyhow::bail!(
+            "unknown context '{}' — valid: interactive, agent, minimal",
+            other
+        ),
     }
 }
