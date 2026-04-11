@@ -1,10 +1,6 @@
 use anyhow::Result;
 use clap::{Args, Subcommand};
-use lynx_events::{
-    bridge::{emit_event, register_subscriber},
-    logger,
-    types::Event,
-};
+use lynx_events::{logger, types::Event};
 
 #[derive(Args)]
 pub struct EventArgs {
@@ -14,20 +10,13 @@ pub struct EventArgs {
 
 #[derive(Subcommand)]
 pub enum EventCommand {
-    /// Emit a named event to the daemon (fire-and-forget)
+    /// Emit a named event in-process (runs registered plugin handlers, then exits)
     Emit {
         /// Event name, e.g. shell:chpwd
         name: String,
         /// Optional data payload
         #[arg(long, default_value = "")]
         data: String,
-    },
-    /// Register a zsh function as a subscriber for an event
-    On {
-        /// Event name to subscribe to
-        event_name: String,
-        /// Zsh function name to call when the event fires
-        zsh_fn: String,
     },
     /// Inspect the event log
     Log {
@@ -45,10 +34,10 @@ pub enum EventCommand {
 pub async fn run(args: EventArgs) -> Result<()> {
     match args.command {
         EventCommand::Emit { name, data } => {
-            emit_event(&Event::new(name, data))?;
-        }
-        EventCommand::On { event_name, zsh_fn } => {
-            register_subscriber(&event_name, &zsh_fn)?;
+            let config = lynx_config::load()?;
+            let plugins_dir = lynx_core::paths::installed_plugins_dir();
+            let bus = crate::bus::build_active_bus(&config.active_context, &plugins_dir);
+            bus.emit(Event::new(name, data)).await;
         }
         EventCommand::Log { tail, filter } => {
             let entries = logger::tail_log(tail, filter.as_deref())?;
