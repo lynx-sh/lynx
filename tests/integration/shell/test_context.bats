@@ -1,6 +1,8 @@
 #!/usr/bin/env bats
 # Integration tests for context detection and context-gating behavior
 
+load helpers
+
 setup() {
   export HOME="$(mktemp -d)"
   export LYNX_TEST=1
@@ -11,32 +13,32 @@ teardown() {
 }
 
 @test "default context is interactive" {
-  unset CLAUDE_CODE CURSOR_SESSION CI LYNX_CONTEXT
+  unset "$LYNX_VAR_CLAUDECODE" "$LYNX_VAR_CURSOR_CLI" "$LYNX_VAR_CI" "$LYNX_VAR_CONTEXT"
   run lx init
   [ "$status" -eq 0 ]
   [[ "$output" == *"LYNX_CONTEXT=interactive"* ]]
 }
 
-@test "CLAUDE_CODE=1 triggers agent context" {
-  CLAUDE_CODE=1 run lx init
+@test "CLAUDECODE=1 triggers agent context" {
+  eval "$LYNX_VAR_CLAUDECODE=1" run lx init
   [ "$status" -eq 0 ]
   [[ "$output" == *"LYNX_CONTEXT=agent"* ]]
 }
 
-@test "CURSOR_SESSION set triggers agent context" {
-  CURSOR_SESSION=abc run lx init
+@test "CURSOR_CLI set triggers agent context" {
+  eval "$LYNX_VAR_CURSOR_CLI=abc" run lx init
   [ "$status" -eq 0 ]
   [[ "$output" == *"LYNX_CONTEXT=agent"* ]]
 }
 
 @test "CI=true triggers minimal context" {
-  CI=true run lx init
+  run env -u "$LYNX_VAR_CLAUDECODE" -u "$LYNX_VAR_CURSOR_CLI" -u "$LYNX_VAR_CONTEXT" CI=true lx init
   [ "$status" -eq 0 ]
   [[ "$output" == *"LYNX_CONTEXT=minimal"* ]]
 }
 
 @test "LYNX_CONTEXT=minimal triggers minimal context" {
-  LYNX_CONTEXT=minimal run lx init
+  run env -u "$LYNX_VAR_CLAUDECODE" -u "$LYNX_VAR_CURSOR_CLI" LYNX_CONTEXT=minimal lx init
   [ "$status" -eq 0 ]
   [[ "$output" == *"LYNX_CONTEXT=minimal"* ]]
 }
@@ -47,14 +49,14 @@ teardown() {
   [[ "$output" == *"LYNX_CONTEXT=agent"* ]]
 }
 
-@test "context status uses canonical detector (CLAUDE_CODE)" {
-  run env CLAUDE_CODE=1 lx context status
+@test "context status uses canonical detector (CLAUDECODE)" {
+  run env "$LYNX_VAR_CLAUDECODE=1" lx context status
   [ "$status" -eq 0 ]
-  [[ "$output" == *"Detected:  agent (auto-detected agent (CLAUDE_CODE))"* ]]
+  [[ "$output" == *"Detected:  agent (auto-detected agent (CLAUDECODE))"* ]]
 }
 
 @test "context status uses canonical detector (CI)" {
-  run env CI=true lx context status
+  run env -u "$LYNX_VAR_CLAUDECODE" -u "$LYNX_VAR_CURSOR_CLI" -u "$LYNX_VAR_CONTEXT" CI=true lx context status
   [ "$status" -eq 0 ]
   [[ "$output" == *"Detected:  minimal (auto-detected minimal (CI))"* ]]
 }
@@ -66,7 +68,7 @@ teardown() {
 }
 
 @test "explicit --context interactive forces interactive" {
-  CLAUDE_CODE=1 run lx init --context interactive
+  eval "$LYNX_VAR_CLAUDECODE=1" run lx init --context interactive
   [ "$status" -eq 0 ]
   [[ "$output" == *"LYNX_CONTEXT=interactive"* ]]
 }
@@ -87,7 +89,7 @@ teardown() {
 
 @test "guardrail: context detector source references canonical env vars" {
   local src="$BATS_TEST_DIRNAME/../../../crates/lynx-shell/src/context.rs"
-  run rg "CLAUDE_CODE|CURSOR_SESSION" "$src"
+  run rg "$LYNX_VAR_CLAUDECODE|$LYNX_VAR_CURSOR_CLI" "$src"
   [ "$status" -eq 0 ]
 }
 

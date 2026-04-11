@@ -1,6 +1,8 @@
 #!/usr/bin/env bats
 # Integration tests for lx doctor
 
+load helpers
+
 setup() {
   export HOME="$(mktemp -d)"
   export LYNX_TEST=1
@@ -47,8 +49,8 @@ teardown() {
 
 @test "guardrail: lynx-core has no internal lynx-* dependencies" {
   local cargo="$BATS_TEST_DIRNAME/../../../crates/lynx-core/Cargo.toml"
-  # lynx-core must not depend on any other lynx-* crate
-  run rg "lynx-" "$cargo"
+  # lynx-core must not depend on any other lynx-* crate (match dep lines, not the package name)
+  run rg 'lynx-\w+ = ' "$cargo"
   [ "$status" -eq 1 ]
 }
 
