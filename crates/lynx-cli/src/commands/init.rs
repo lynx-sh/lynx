@@ -1,7 +1,8 @@
 use anyhow::Result;
 use clap::Args;
 use lynx_config::load as load_config;
-use lynx_core::types::Context;
+use lynx_core::{brand, env_vars, types::Context};
+use lynx_theme::loader::load as load_theme;
 use lynx_manifest::schema::PluginManifest;
 use lynx_shell::{
     context::detect_context,
@@ -68,6 +69,19 @@ pub async fn run(args: InitArgs) -> Result<()> {
         plugin_dir: &plugin_dir,
         enabled_plugins: &enabled_plugins,
     });
+
+    // Emit LS_COLORS / EZA_COLORS from the active theme so file listings are
+    // colored from first shell startup without any manual eval.
+    let theme_name = std::env::var(env_vars::LYNX_THEME)
+        .unwrap_or_else(|_| config.active_theme.clone());
+    if let Ok(theme) = load_theme(&theme_name).or_else(|_| load_theme(brand::DEFAULT_THEME)) {
+        if let Some(ls) = theme.ls_colors.to_ls_colors_string() {
+            print!("export LS_COLORS={ls:?}\n");
+        }
+        if let Some(eza) = theme.ls_colors.to_eza_colors_string() {
+            print!("export EZA_COLORS={eza:?}\n");
+        }
+    }
 
     print!("{}", script);
     Ok(())
