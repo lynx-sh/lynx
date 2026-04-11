@@ -49,6 +49,8 @@ pub enum ThemeCommand {
     /// Add, remove, or move segments in the prompt order
     #[command(subcommand)]
     Segment(SegmentCommand),
+    /// Open the WYSIWYG theme studio in your browser (local web UI, no npm)
+    Studio,
 }
 
 #[derive(Subcommand)]
@@ -103,6 +105,7 @@ pub async fn run(args: ThemeArgs) -> Result<()> {
             cmd_patch("segment.prompt_char.color.fg", &color).await
         }
         ThemeCommand::Segment(seg) => cmd_segment(seg).await,
+        ThemeCommand::Studio => lynx_studio::run().await,
     }
 }
 

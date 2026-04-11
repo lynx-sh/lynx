@@ -15,6 +15,7 @@ members = [
     "crates/lynx-registry",
     "crates/lynx-daemon",
     "crates/lynx-cli",
+    "crates/lynx-studio",
     "crates/lynx-test-utils",
 ]
 
@@ -56,6 +57,10 @@ regex = "1"
 # Crypto / checksums
 sha2 = "0.10"
 hex = "0.4"
+
+# HTTP server (theme studio)
+axum = "0.7"
+tower-http = { version = "0.5", features = ["cors"] }
 
 # HTTP client (registry fetch)
 reqwest = { version = "0.12", features = ["blocking", "rustls-tls"], default-features = false }

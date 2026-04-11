@@ -16,6 +16,7 @@ lynx-events   = { path = "../lynx-events" }
 lynx-manifest = { path = "../lynx-manifest" }
 lynx-plugin   = { path = "../lynx-plugin" }
 lynx-theme   = { path = "../lynx-theme" }
+lynx-studio  = { path = "../lynx-studio" }
 lynx-prompt  = { path = "../lynx-prompt" }
 lynx-task    = { path = "../lynx-task" }
 lynx-daemon  = { path = "../lynx-daemon" }
