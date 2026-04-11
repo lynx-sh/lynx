@@ -60,7 +60,8 @@ pub fn generate_init_script(params: &InitParams<'_>) -> String {
         out.push_str(&format!("  lynx_eval_plugin {}\n", shell_quote(plugin)));
     }
 
-    out.push_str("  export LYNX_INITIALIZED=1\n");
+    // Not exported — must not leak into child shells or lx init would skip there too
+    out.push_str("  typeset -g LYNX_INITIALIZED=1\n");
     out.push_str("fi\n");
 
     out
