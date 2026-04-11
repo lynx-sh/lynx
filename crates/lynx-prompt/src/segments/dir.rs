@@ -8,6 +8,8 @@ use crate::segment::{apply_format, RenderContext, RenderedSegment, Segment};
 struct DirConfig {
     max_depth: Option<u32>,
     truncate_to_repo: Option<bool>,
+    /// Replace the home directory prefix with `~`. Default: `true`.
+    tilde_home: Option<bool>,
     /// Format template. Available vars: `$path`.
     /// Default: `"$path"`.
     format: Option<String>,
@@ -24,11 +26,25 @@ impl Segment for DirSegment {
         let cfg: DirConfig = config.clone().try_into().unwrap_or_default();
         let max_depth = cfg.max_depth.unwrap_or(3);
         let truncate_to_repo = cfg.truncate_to_repo.unwrap_or(true);
+        let tilde_home = cfg.tilde_home.unwrap_or(true);
+
+        let home = ctx.env.get("HOME").map(|s| s.as_str()).unwrap_or("");
+        let effective_cwd = if tilde_home && !home.is_empty() {
+            if ctx.cwd == home {
+                "~".to_string()
+            } else if let Some(rest) = ctx.cwd.strip_prefix(home) {
+                format!("~{rest}")
+            } else {
+                ctx.cwd.clone()
+            }
+        } else {
+            ctx.cwd.clone()
+        };
 
         let display = if max_depth == 0 {
-            ctx.cwd.clone()
+            effective_cwd
         } else {
-            shorten(&ctx.cwd, max_depth, truncate_to_repo, &ctx.cache)
+            shorten(&effective_cwd, max_depth, truncate_to_repo, &ctx.cache)
         };
 
         let text = match cfg.format.as_deref() {
@@ -85,12 +101,20 @@ mod tests {
     use crate::segment::empty_config;
 
     fn ctx(cwd: &str) -> RenderContext {
+        ctx_with_home(cwd, "")
+    }
+
+    fn ctx_with_home(cwd: &str, home: &str) -> RenderContext {
+        let mut env = HashMap::new();
+        if !home.is_empty() {
+            env.insert("HOME".to_string(), home.to_string());
+        }
         RenderContext {
             cwd: cwd.to_string(),
             shell_context: lynx_core::types::Context::Interactive,
             last_cmd_ms: None,
             cache: HashMap::new(),
-            env: HashMap::new(),
+            env,
         }
     }
 
@@ -126,5 +150,45 @@ mod tests {
     fn default_config_renders() {
         let r = DirSegment.render(&empty_config(), &ctx("/a/b/c")).unwrap();
         assert!(!r.text.is_empty());
+    }
+
+    #[test]
+    fn tilde_substitution_home_dir() {
+        let r = DirSegment
+            .render(&cfg("max_depth = 0\ntruncate_to_repo = false"), &ctx_with_home("/Users/proxikal", "/Users/proxikal"))
+            .unwrap();
+        assert_eq!(r.text, "~");
+    }
+
+    #[test]
+    fn tilde_substitution_subdir() {
+        let r = DirSegment
+            .render(&cfg("max_depth = 0\ntruncate_to_repo = false"), &ctx_with_home("/Users/proxikal/dev/projects", "/Users/proxikal"))
+            .unwrap();
+        assert_eq!(r.text, "~/dev/projects");
+    }
+
+    #[test]
+    fn tilde_substitution_with_truncation() {
+        let r = DirSegment
+            .render(&cfg("max_depth = 2\ntruncate_to_repo = false"), &ctx_with_home("/Users/proxikal/a/b/c/d", "/Users/proxikal"))
+            .unwrap();
+        assert_eq!(r.text, "…/c/d");
+    }
+
+    #[test]
+    fn tilde_substitution_disabled() {
+        let r = DirSegment
+            .render(&cfg("max_depth = 0\ntruncate_to_repo = false\ntilde_home = false"), &ctx_with_home("/Users/proxikal", "/Users/proxikal"))
+            .unwrap();
+        assert_eq!(r.text, "/Users/proxikal");
+    }
+
+    #[test]
+    fn no_tilde_when_not_under_home() {
+        let r = DirSegment
+            .render(&cfg("max_depth = 0\ntruncate_to_repo = false"), &ctx_with_home("/tmp/work", "/Users/proxikal"))
+            .unwrap();
+        assert_eq!(r.text, "/tmp/work");
     }
 }
