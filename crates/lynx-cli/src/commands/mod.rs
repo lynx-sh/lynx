@@ -3,6 +3,7 @@ pub mod config;
 pub mod context;
 pub mod daemon;
 pub mod doctor;
+pub mod git;
 pub mod event;
 pub mod examples;
 pub mod init;
@@ -42,5 +43,6 @@ pub async fn dispatch(cli: Cli) -> Result<()> {
         Command::Examples(args) => examples::run(args).await,
         Command::Profile(args) => profile::run(args).await,
         Command::Prompt(args) => prompt::run(args).await,
+        Command::GitState(args) => git::run(args).await,
     }
 }
