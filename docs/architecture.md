@@ -1,65 +1,184 @@
 # Lynx Architecture
 
+This document covers the structural decisions that shape Lynx's codebase. For
+*why* each decision was made, see the [ADRs](decisions/).
+
+---
+
 ## Crate Dependency Graph
 
+Dependencies flow strictly downward. Sideways imports between crates at the
+same level are forbidden (P0 violation). `lynx-cli` is the only assembler —
+it depends on everything but implements nothing.
+
 ```
-lynx-core          (no internal deps — foundation types only)
-├── lynx-config    (user config TOML)
-├── lynx-manifest  (plugin.toml parser)
-├── lynx-events    (event bus)
-├── lynx-template  (token substitution)
-└── lynx-shell     (zsh glue generator)
-    └── lynx-loader    (dep graph, plugin lifecycle)
-        └── lynx-prompt    (segment evaluation, rendering)
-            └── lynx-theme     (theme TOML loader)
-lynx-task          (task scheduler, cron)
-lynx-daemon        (background process, IPC socket)
-lynx-registry      (plugin index, fetch, version)
-lynx-cli           (lx binary — assembles all crates, never implements)
+lynx-core          (foundation: types, error, runtime paths — no internal deps)
+├── lynx-config    (user config TOML — reads/writes ~/.config/lynx/config.toml)
+├── lynx-manifest  (plugin.toml parser and validator)
+├── lynx-events    (async event bus, IPC socket protocol)
+├── lynx-template  (token substitution engine — used by shell glue generators)
+└── lynx-shell     (zsh glue generator — thin shell script builders)
+    └── lynx-loader    (plugin dep-graph resolver, lifecycle orchestrator)
+        └── lynx-prompt    (segment evaluation, concurrent rendering)
+            └── lynx-theme     (theme TOML loader, color engine, terminal capability)
+
+lynx-plugin        (exec script gen, lazy wrappers, namespace lint, context filter)
+lynx-task          (task scheduler: cron-style, persistent JSONL log)
+lynx-daemon        (background process, Unix socket IPC, event dispatch)
+lynx-registry      (plugin index fetch, checksum verify, version lock)
+lynx-test-utils    (dev-dependency only — fixtures, temp HOME, zsh validators)
+
+lynx-cli           (lx binary — assembles all crates, dispatches subcommands)
 ```
+
+**Hard rules enforced by convention and CI:**
+- `lynx-core` depends on nothing internal
+- `lynx-prompt` cannot depend on `lynx-loader` (circular)
+- `lynx-events` cannot depend on `lynx-plugin` (circular)
+- Nothing depends on `lynx-cli`
+
+---
 
 ## Shell Integration Flow
 
+Lynx uses an *eval-bridge* pattern. The `lx` binary never sources shell scripts
+directly — it prints zsh to stdout, and the shell evals it. This keeps all logic
+in Rust and keeps the shell layer thin and testable.
+
 ```
-.zshrc
+~/.zshrc
   └── source ~/.config/lynx/shell/init.zsh
         └── source shell/core/loader.zsh
               └── eval "$(lx init --context <detected>)"
-                    ├── sets LYNX_DIR, LYNX_CONTEXT, LYNX_PLUGIN_DIR
-                    ├── sources shell/core/hooks.zsh
+                    ├── exports LYNX_DIR, LYNX_CONTEXT, LYNX_PLUGIN_DIR
+                    ├── sources shell/core/hooks.zsh    (zsh hook bridge)
                     └── for each enabled plugin:
                           eval "$(lx plugin exec <name>)"
+                                ├── sources plugin/shell/init.zsh
+                                └── registers hooks: add-zsh-hook <hook> _<name>_plugin_<hook>
 ```
 
+**Shell layer constraints** (enforced, violations are P0):
+- Each file in `shell/` must be under 60 lines
+- No conditional logic in shell files — logic lives in Rust
+- All `lx` calls use `2>/dev/null` — failures are always silent
+- Never source Rust output with `source` — always use `eval "$(...)"` 
+
+---
+
 ## Plugin Lifecycle
+
+Every plugin passes through four stages before its functions are available in
+the shell. The lifecycle is orchestrated by `lynx-loader`.
 
 ```
 DECLARE → RESOLVE → LOAD → ACTIVATE
 
-DECLARE:  parse all plugin.toml manifests from plugins/
-RESOLVE:  topological sort by deps, apply context filter
-LOAD:     eager plugins: exec now; lazy: register deferred trigger
-ACTIVATE: register event subscriptions from manifest hooks[]
+DECLARE:   Parse all plugin.toml manifests from enabled_plugins in config.
+           Validates schema version and required fields.
+
+RESOLVE:   Topological sort by [deps].plugins. Apply context filter:
+           plugins with "interactive" in [contexts].disabled_in are skipped
+           when LYNX_CONTEXT=agent or LYNX_CONTEXT=minimal.
+           Binary deps are checked here — missing dep = plugin skipped, not error.
+
+LOAD:      Eager plugins (lazy=false): eval "$(lx plugin exec <name>)" now.
+           Lazy plugins (lazy=true): register a one-shot trigger that sources
+           on first invocation of any exported function.
+
+ACTIVATE:  For each hook in [load].hooks:
+           eval "add-zsh-hook <hook> _<pluginname>_plugin_<hook>"
+           The hook function convention is _<name>_plugin_<hookname>().
+           Idempotency guard: LYNX_PLUGIN_<NAME>_LOADED prevents double-load.
 ```
+
+---
 
 ## Event System
 
+Events flow from zsh hooks through IPC to the daemon's event bus. Plugin
+handlers are registered at load time and dispatched asynchronously.
+
 ```
-zsh hook (chpwd/preexec/precmd)
-  └── _lynx_hook_* function
-        └── lx event emit "shell:chpwd" --data "$PWD"
-              └── IPC → Unix socket → lynx-daemon
-                    └── EventBus.dispatch()
-                          └── registered plugin handlers
+zsh hook triggered (chpwd / preexec / precmd)
+  └── _lynx_hook_*() in shell/core/hooks.zsh
+        └── lx event emit "shell:<hook>" [--data "$arg"]
+              └── Unix socket → ~/.local/share/lynx/run/daemon.sock
+                    └── lynx-daemon EventBus::dispatch(event)
+                          └── registered handlers (from plugin manifests)
+                                └── callback executes asynchronously
 ```
 
-## Data Flow: Config Mutation
+The precmd hook also runs prompt rendering synchronously before the event:
+
+```
+_lynx_hook_precmd()
+  ├── export LYNX_CACHE_GIT_STATE=<json from _lynx_git_state assoc array>
+  ├── export LYNX_CACHE_KUBECTL_STATE=<json from _lynx_kubectl_state assoc array>
+  ├── eval "$(lx prompt render 2>/dev/null)"   ← sets PROMPT and RPROMPT
+  └── lx event emit "shell:precmd"
+```
+
+---
+
+## Prompt Rendering
+
+Prompt segments are evaluated concurrently via `tokio::join`. No segment may
+perform blocking I/O — slow data (git state, kubectl context) must come from
+the cache, which is populated by plugin hook functions before `lx prompt render`
+is called.
+
+```
+lx prompt render
+  ├── reads LYNX_CACHE_GIT_STATE env var     → cache["git_state"]
+  ├── reads LYNX_CACHE_KUBECTL_STATE env var → cache["kubectl_state"]
+  ├── reads LynxConfig.active_profile        → cache["profile_state"]
+  ├── loads active theme (LYNX_THEME or "default")
+  ├── evaluates all segments concurrently (tokio)
+  └── prints: PROMPT="..." \n RPROMPT="..."   ← eval'd by precmd
+```
+
+---
+
+## Config Mutation Protocol
+
+Every command that mutates config must follow this sequence. Skipping any step
+is a P0 violation (D-007).
 
 ```
 lx <mutating command>
-  ├── snapshot current config
-  ├── validate new state
+  ├── snapshot current config to ~/.config/lynx/snapshots/<timestamp>.toml
+  ├── validate proposed new state
   ├── apply to disk
-  └── emit config:changed event
-        └── shell reloads affected components
+  └── emit config:changed event → shell reloads affected components
 ```
+
+The rollback command (`lx rollback`) lists and restores snapshots.
+
+---
+
+## Context System
+
+Lynx operates in one of three contexts, detected automatically at init time.
+
+| Context | Detected when | Effect |
+|---|---|---|
+| `interactive` | Default — normal terminal session | All plugins and aliases load |
+| `agent` | `CLAUDE_CODE=1`, `CURSOR_IDE=1`, or `CI=true` | Aliases skipped; minimal prompt |
+| `minimal` | `LYNX_MINIMAL=1` | Only essential plugins load |
+
+Detection is automatic — users never set context manually. Plugins declare
+`disabled_in = ["agent", "minimal"]` in `[contexts]` to opt out in non-interactive shells.
+
+---
+
+## Data Flows at a Glance
+
+| Operation | Entry point | Key crates | Output |
+|---|---|---|---|
+| Shell init | `.zshrc` sources `init.zsh` | lynx-cli, lynx-loader, lynx-plugin | zsh eval'd in shell |
+| Plugin load | `lx plugin exec <name>` | lynx-plugin, lynx-manifest | zsh eval'd in shell |
+| Prompt render | `lx prompt render` | lynx-prompt, lynx-theme | `PROMPT=` / `RPROMPT=` assignments |
+| Config change | `lx config set <k> <v>` | lynx-config, lynx-core | TOML on disk + event emitted |
+| Plugin install | `lx plugin add <name>` | lynx-registry, lynx-manifest | plugin dir + config update |
+| Profile switch | `lx profile switch <name>` | lynx-config, lynx-cli | config update + plugin diff eval'd |
