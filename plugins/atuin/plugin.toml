@@ -1,0 +1,20 @@
+[plugin]
+name        = "atuin"
+version     = "0.1.0"
+description = "Atuin enhanced shell history — CTRL-R search with sync and filtering"
+authors     = ["proxikal"]
+
+[load]
+lazy  = false
+hooks = []
+
+[deps]
+binaries = ["atuin"]
+plugins  = []
+
+[exports]
+functions = []
+aliases   = []
+
+[contexts]
+disabled_in = ["agent", "minimal"]

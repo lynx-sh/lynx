@@ -1,0 +1,20 @@
+[plugin]
+name        = "kubectl"
+version     = "0.1.0"
+description = "kubectl integration — fzf context/namespace switcher, prompt segment with prod detection"
+authors     = ["proxikal"]
+
+[load]
+lazy  = false
+hooks = ["chpwd"]
+
+[deps]
+binaries = ["kubectl"]
+plugins  = []
+
+[exports]
+functions = ["kctx", "kns", "kubectl_current_context", "kubectl_current_namespace", "kubectl_refresh_state"]
+aliases   = []
+
+[contexts]
+disabled_in = ["agent", "minimal"]

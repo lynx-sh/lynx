@@ -50,5 +50,8 @@ cron = "0.12"
 humantime = "2"
 chrono = "0.4"
 
+# Regex
+regex = "1"
+
 # Testing utilities
 tempfile = "3"

@@ -63,6 +63,9 @@ pub struct SegmentConfig {
 
     // segment-level cache TTL (ms)
     pub cache_ttl_ms: Option<u64>,
+
+    // kubectl segment — regex pattern that marks a context as production
+    pub prod_pattern: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
@@ -86,4 +89,5 @@ pub const KNOWN_SEGMENTS: &[&str] = &[
     "git_status",
     "cmd_duration",
     "context_badge",
+    "kubectl_context",
 ];

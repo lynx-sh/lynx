@@ -10,6 +10,7 @@ lynx-config = { path = "../lynx-config" }
 lynx-events = { path = "../lynx-events" }
 lynx-template = { path = "../lynx-template" }
 lynx-theme = { path = "../lynx-theme" }
+regex.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 toml.workspace = true

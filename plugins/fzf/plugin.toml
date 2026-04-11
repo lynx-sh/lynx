@@ -1,0 +1,20 @@
+[plugin]
+name        = "fzf"
+version     = "0.1.0"
+description = "fzf integration — CTRL-R history, CTRL-T file search, ALT-C dir jump, git log/branch browser"
+authors     = ["proxikal"]
+
+[load]
+lazy  = false
+hooks = []
+
+[deps]
+binaries = ["fzf"]
+plugins  = []
+
+[exports]
+functions = ["fzf_git_log", "fzf_git_branch"]
+aliases   = []
+
+[contexts]
+disabled_in = ["agent", "minimal"]
