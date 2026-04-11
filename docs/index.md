@@ -11,17 +11,9 @@ Fast, Rust-powered zsh shell framework. Context-aware, plugin-isolated, theme-dr
 | [Theme Authoring](theme-authoring.md) | Theme developers | Theme TOML, all segments, custom segments in Rust |
 | [Registry Index Spec](registry-index-spec.md) | Registry maintainers | Static index format for the plugin registry |
 
-## Decisions (ADRs)
+## Decisions
 
-Architecture decisions are recorded in `docs/decisions/`. These explain *why* key design choices were made — the implementation details are in the code.
-
-| ADR | Decision |
-|---|---|
-| [ADR-001](decisions/adr-001-rust-thin-zsh.md) | Rust core with thin zsh eval-bridge |
-| [ADR-002](decisions/adr-002-drop-omz-compat.md) | No OMZ compatibility layer |
-| [ADR-003](decisions/adr-003-agent-context-detection.md) | Automatic agent context detection via env vars |
-| [ADR-004](decisions/adr-004-toml-everywhere.md) | All config is TOML — no zsh-as-config |
-| [ADR-005](decisions/adr-005-git-backed-sync.md) | Git-backed config sync |
+Architecture decisions are tracked in `pt` (the project tracker). Run `pt decisions` to list all active decisions.
 
 ## Quick links
 
