@@ -162,7 +162,7 @@ fn emit_theme_changed(name: &str) {
     use lynx_events::emit_event;
     use lynx_events::types::Event;
     let data = serde_json::json!({ "theme": name }).to_string();
-    let event = Event::new("theme:changed", data);
+    let event = Event::new(lynx_events::types::THEME_CHANGED, data);
     // Non-blocking best-effort.
     let _ = emit_event(&event);
 }

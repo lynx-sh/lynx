@@ -16,16 +16,23 @@ _lynx_hook_chpwd()
 
 ## Well-Known Event Names (defined in lynx-events/src/types.rs)
 
-```rust
-// Source of truth: crates/lynx-events/src/types.rs
-pub const SHELL_CHPWD:        &str = "shell:chpwd";        // cwd changed
-pub const SHELL_PREEXEC:      &str = "shell:preexec";      // before command runs
-pub const SHELL_PRECMD:       &str = "shell:precmd";       // before prompt renders
-pub const CONFIG_CHANGED:     &str = "config:changed";
-pub const PLUGIN_LOADED:      &str = "plugin:loaded";
-pub const PLUGIN_UNLOADED:    &str = "plugin:unloaded";
-pub const GIT_BRANCH_CHANGED: &str = "git:branch-changed";
-```
+Source of truth: `crates/lynx-events/src/types.rs` — always verify there before adding new events.
+
+| Constant | Value | Emitted by |
+|---|---|---|
+| `SHELL_CHPWD` | `shell:chpwd` | shell hook |
+| `SHELL_PREEXEC` | `shell:preexec` | shell hook |
+| `SHELL_PRECMD` | `shell:precmd` | shell hook |
+| `SHELL_CONTEXT_CHANGED` | `shell:context-changed` | `lx context` |
+| `CONFIG_CHANGED` | `config:changed` | config mutators |
+| `THEME_CHANGED` | `theme:changed` | `lx theme` |
+| `PLUGIN_LOADED` | `plugin:loaded` | plugin lifecycle |
+| `PLUGIN_UNLOADED` | `plugin:unloaded` | plugin lifecycle |
+| `PLUGIN_FAILED` | `plugin:failed` | plugin lifecycle |
+| `GIT_BRANCH_CHANGED` | `git:branch-changed` | git plugin |
+| `GIT_STATE_UPDATED` | `git:state-updated` | git plugin (planned) |
+| `TASK_COMPLETED` | `task:completed` | task scheduler (planned) |
+| `TASK_FAILED` | `task:failed` | task scheduler (planned) |
 
 ## Plugin Registration
 

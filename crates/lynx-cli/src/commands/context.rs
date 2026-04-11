@@ -36,7 +36,7 @@ fn cmd_set(name: &str) -> Result<()> {
 
     // Emit shell:context-changed so the loader reloads plugins in-place.
     let data = serde_json::json!({ "context": name }).to_string();
-    let event = Event::new("shell:context-changed", data);
+    let event = Event::new(lynx_events::types::SHELL_CONTEXT_CHANGED, data);
     let _ = emit_event(&event);
 
     // Print the eval-bridge export statement for the shell to evaluate.
