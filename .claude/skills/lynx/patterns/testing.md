@@ -8,6 +8,7 @@
 | Integration (Rust) | cargo nextest | tests/integration/rust/ | Cross-crate behavior |
 | Shell integration | bats | tests/integration/shell/ | Anything in shell/ |
 | Theme tests | cargo nextest | crates/lynx-theme/src/ | Every theme field change |
+| Guardrail tests | bats + script | tests/integration/shell/test_*.bats + scripts/verify-guardrails.sh | When a new architectural invariant is added or a new drift class is found |
 
 ## Test Isolation Rule
 
@@ -35,7 +36,35 @@ bats tests/integration/shell/
 
 # Syntax check any zsh output
 echo "$zsh_output" | zsh -n
+
+# ALL invariant guardrails (run before every pt fix / session end)
+scripts/verify-guardrails.sh
 ```
+
+## Guardrail Tests
+
+`scripts/verify-guardrails.sh` is the unified offline verifier. It runs 38 checks across 5 drift classes:
+
+| Class | What it checks |
+|---|---|
+| Shell protocol | Line limits (60 for core, 10 for plugin init.zsh), no branching in static files |
+| Context mismatch | `CLAUDE_CODE`, `CURSOR_SESSION`, `CI` constants still in `lynx-shell/src/context.rs` |
+| Dep map drift | Forbidden crate dep pairs from `maps/crate-deps.md` (lynx-core↛lynx-*, etc.) |
+| Checksum enforcement | `validate_index` fn exists and is called in `fetch_plugin` |
+| Docs-command mismatch | Critical `lx` commands documented in README; subcommands declared in `cli.rs` |
+
+**Guardrail tests live in:**
+- `tests/integration/shell/test_init.bats` — shell protocol class
+- `tests/integration/shell/test_context.bats` — context mismatch class
+- `tests/integration/shell/test_doctor.bats` — dep map, checksum, docs-command classes
+
+**When to add a guardrail test:**
+1. A new architectural invariant is established (new decision D-XXX)
+2. A regression from a known drift class is found and fixed
+3. A new forbidden dep pair is added to `maps/crate-deps.md`
+4. A new critical CLI command is added that must stay documented
+
+**When NOT to add a guardrail test:** don't add guardrails for behavior already covered by unit or integration tests. Guardrails catch *structural drift* (wrong patterns in source), not behavioral bugs.
 
 ## Shell Test Pattern (bats)
 

@@ -57,9 +57,10 @@ Tests written:            crate unit tests: ____; bats tests: ____ / n/a
 ```
 ```
 G3 VERIFICATION
-Phase verify condition:   (copy from phase) — PASS / FAIL
-AC check:                 each AC item — met / not met: ____
+Phase verify condition:         (copy from phase) — PASS / FAIL
+AC check:                       each AC item — met / not met: ____
 cargo nextest run -p <crate>:   PASS
+scripts/verify-guardrails.sh:   PASS (run before every pt fix)
 zsh -n on any emitted zsh:      PASS / n/a
 Scope audit (if bug class):     rg "<pattern>" — 0 remaining / N filed as H-XXX
 ```
@@ -87,10 +88,11 @@ Dead code deleted:  none / list
 ```
 ```
 G3 SCOPE AUDIT
-Re-grep:                rg "____"
-Remaining instances:    0 / N — if N > 0: filed as H-XXX
-cargo nextest run:      PASS
-zsh -n (if shell):      PASS / n/a
+Re-grep:                        rg "____"
+Remaining instances:            0 / N — if N > 0: filed as H-XXX
+cargo nextest run:              PASS
+scripts/verify-guardrails.sh:   PASS
+zsh -n (if shell):              PASS / n/a
 ```
 `pt fix H-XXX "cause" "fix" "scope: grep 0 remaining in N files"`
 
@@ -178,6 +180,7 @@ Tested in interactive:      full plugin loads — yes
 
 ## Session End
 ```bash
-cargo nextest run --all    # verify nothing broken
+cargo nextest run --all          # verify nothing broken
+scripts/verify-guardrails.sh     # 38 invariant checks — must pass
 pt done S-XXX success "what was done" "what next agent does first"
 ```

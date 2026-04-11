@@ -14,7 +14,7 @@ lynx-core          ← NO internal deps. Foundation only.
 │           └── lynx-theme     ← lynx-core, lynx-config
 lynx-plugin        ← lynx-core, lynx-manifest, lynx-events, lynx-shell
 lynx-task          ← lynx-core, lynx-config
-lynx-daemon        ← lynx-core, lynx-events, lynx-task (via IPC — not direct)
+lynx-daemon        ← lynx-core, lynx-events, lynx-task
 lynx-registry      ← lynx-core, lynx-manifest
 lynx-test-utils    ← ALL crates (dev-dependency only — never in [dependencies])
 lynx-cli           ← ALL crates (assembles — never implements business logic)
@@ -27,7 +27,6 @@ lynx-cli           ← ALL crates (assembles — never implements business logic
 - lynx-events depending on lynx-plugin (circular)
 - lynx-shell depending on lynx-cli
 - Any crate depending on lynx-cli
-- lynx-daemon directly importing lynx-task logic (IPC only — daemon talks to scheduler via socket, not fn calls)
 
 ## Sideways Dep Rule
 
