@@ -7,8 +7,9 @@ use lynx_prompt::{
     evaluator::evaluate_theme,
     renderer::render_prompt,
     segment::RenderContext,
-    CmdDurationSegment, ContextBadgeSegment, DirSegment, GitBranchSegment, GitStatusSegment,
-    KubectlContextSegment, ProfileBadgeSegment, TaskStatusSegment,
+    BackgroundJobsSegment, CmdDurationSegment, ContextBadgeSegment, DirSegment, ExitCodeSegment,
+    GitBranchSegment, GitStatusSegment, HostnameSegment, KubectlContextSegment, ProfileBadgeSegment,
+    SshIndicatorSegment, TaskStatusSegment, TimeSegment, UsernameSegment, ViModeSegment,
 };
 use lynx_theme::loader::load as load_theme;
 use std::collections::HashMap;
@@ -55,6 +56,9 @@ async fn cmd_render() -> Result<()> {
 
     // --- Build segment registry ---
     let segments: Vec<Box<dyn lynx_prompt::segment::Segment>> = vec![
+        Box::new(UsernameSegment),
+        Box::new(HostnameSegment),
+        Box::new(SshIndicatorSegment),
         Box::new(DirSegment),
         Box::new(GitBranchSegment),
         Box::new(GitStatusSegment),
@@ -62,6 +66,10 @@ async fn cmd_render() -> Result<()> {
         Box::new(ProfileBadgeSegment),
         Box::new(TaskStatusSegment),
         Box::new(CmdDurationSegment),
+        Box::new(ExitCodeSegment),
+        Box::new(BackgroundJobsSegment),
+        Box::new(ViModeSegment),
+        Box::new(TimeSegment),
         Box::new(ContextBadgeSegment),
     ];
 
@@ -110,6 +118,7 @@ fn build_render_context_from_env() -> RenderContext {
     // Capture env snapshot — segments must read from ctx.env, not std::env::var().
     let env_keys = [
         "USER",
+        "UID",
         "HOSTNAME",
         "HOME",
         "SSH_CONNECTION",
