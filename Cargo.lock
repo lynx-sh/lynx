@@ -996,6 +996,7 @@ name = "lynx-prompt"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "futures",
  "lynx-config",
  "lynx-core",

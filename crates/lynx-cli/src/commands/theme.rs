@@ -5,7 +5,8 @@ use anyhow::{bail, Context as _, Result};
 use clap::{Args, Subcommand};
 
 use lynx_config::{load, snapshot::mutate_config_transaction};
-use lynx_theme::loader::{list, load as load_theme, user_theme_dir};
+use lynx_theme::loader::{list, load as load_theme, load_from_path, user_theme_dir};
+use lynx_theme::patch::{self, Side};
 
 #[derive(Args)]
 pub struct ThemeArgs {
@@ -25,6 +26,58 @@ pub enum ThemeCommand {
     Edit,
     /// Show real-world usage examples
     Examples,
+    /// Mutate a single TOML field in the active theme using dot-path addressing.
+    /// e.g. `lx theme patch colors.accent light-blue`
+    Patch {
+        /// Dot-separated TOML path (e.g. colors.accent, segment.dir.color.fg)
+        path: String,
+        /// New value (named color, hex, or literal string)
+        value: String,
+    },
+    /// Set a palette color variable (shorthand for `lx theme patch colors.<key> <value>`)
+    Palette {
+        /// Color key in the [colors] table
+        key: String,
+        /// Color value (named color or hex)
+        value: String,
+    },
+    /// Set the prompt caret symbol (shorthand for mutating segment.prompt_char.symbol)
+    Caret { symbol: String },
+    /// Set the prompt caret foreground color
+    #[clap(name = "caret-color")]
+    CaretColor { color: String },
+    /// Add, remove, or move segments in the prompt order
+    #[command(subcommand)]
+    Segment(SegmentCommand),
+}
+
+#[derive(Subcommand)]
+pub enum SegmentCommand {
+    /// Add a segment to a side of the prompt
+    Add {
+        /// Segment name (e.g. git_branch)
+        name: String,
+        /// Which side: left or right
+        side: String,
+        /// Insert after this segment (optional; appends if omitted)
+        #[arg(long)]
+        after: Option<String>,
+    },
+    /// Remove a segment from the prompt (checks both sides)
+    Remove {
+        /// Segment name to remove
+        name: String,
+    },
+    /// Move a segment to the given side (removes from the other side)
+    Move {
+        /// Segment name to move
+        name: String,
+        /// Target side: left or right
+        side: String,
+        /// Insert after this segment on the target side (optional; appends if omitted)
+        #[arg(long)]
+        after: Option<String>,
+    },
 }
 
 pub async fn run(args: ThemeArgs) -> Result<()> {
@@ -39,6 +92,17 @@ pub async fn run(args: ThemeArgs) -> Result<()> {
             })
             .await
         }
+        ThemeCommand::Patch { path, value } => cmd_patch(&path, &value).await,
+        ThemeCommand::Palette { key, value } => {
+            cmd_patch(&format!("colors.{key}"), &value).await
+        }
+        ThemeCommand::Caret { symbol } => {
+            cmd_patch("segment.prompt_char.symbol", &symbol).await
+        }
+        ThemeCommand::CaretColor { color } => {
+            cmd_patch("segment.prompt_char.color.fg", &color).await
+        }
+        ThemeCommand::Segment(seg) => cmd_segment(seg).await,
     }
 }
 
@@ -147,6 +211,97 @@ async fn cmd_edit() -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Apply a dot-path patch to the active theme with snapshot/validate/rollback.
+async fn cmd_patch(dot_path: &str, value: &str) -> Result<()> {
+    let cfg = load().context("failed to load config")?;
+    let theme_name = &cfg.active_theme;
+    let path = resolve_user_theme_path(theme_name)?;
+
+    let snapshot = std::fs::read_to_string(&path)
+        .with_context(|| format!("failed to read theme file {path:?}"))?;
+
+    let patched = patch::apply_patch(&snapshot, dot_path, value)
+        .with_context(|| format!("failed to apply patch at '{dot_path}'"))?;
+
+    std::fs::write(&path, &patched).with_context(|| "failed to write patched theme")?;
+
+    match load_from_path(&path) {
+        Ok(_) => {
+            emit_theme_changed(theme_name).await;
+            eprintln!("theme '{theme_name}': {dot_path} = {value}");
+        }
+        Err(e) => {
+            std::fs::write(&path, &snapshot)
+                .context("CRITICAL: failed to restore theme snapshot after validation failure")?;
+            bail!("theme validation failed — rolled back: {e}");
+        }
+    }
+
+    Ok(())
+}
+
+/// Apply a segment array operation with snapshot/validate/rollback.
+async fn cmd_segment(cmd: SegmentCommand) -> Result<()> {
+    let cfg = load().context("failed to load config")?;
+    let theme_name = &cfg.active_theme;
+    let path = resolve_user_theme_path(theme_name)?;
+
+    let snapshot = std::fs::read_to_string(&path)
+        .with_context(|| format!("failed to read theme file {path:?}"))?;
+
+    let patched = match &cmd {
+        SegmentCommand::Add { name, side, after } => {
+            let side: Side = side
+                .parse()
+                .with_context(|| format!("invalid side '{side}' — expected left or right"))?;
+            patch::segment_add(&snapshot, name, side, after.as_deref())
+                .with_context(|| format!("failed to add segment '{name}'"))?
+        }
+        SegmentCommand::Remove { name } => {
+            patch::segment_remove(&snapshot, name)
+                .with_context(|| format!("failed to remove segment '{name}'"))?
+        }
+        SegmentCommand::Move { name, side, after } => {
+            let side: Side = side
+                .parse()
+                .with_context(|| format!("invalid side '{side}' — expected left or right"))?;
+            patch::segment_move(&snapshot, name, side, after.as_deref())
+                .with_context(|| format!("failed to move segment '{name}'"))?
+        }
+    };
+
+    std::fs::write(&path, &patched).with_context(|| "failed to write patched theme")?;
+
+    match load_from_path(&path) {
+        Ok(_) => {
+            emit_theme_changed(theme_name).await;
+            let desc = match &cmd {
+                SegmentCommand::Add { name, side, .. } => format!("added '{name}' to {side}"),
+                SegmentCommand::Remove { name } => format!("removed '{name}'"),
+                SegmentCommand::Move { name, side, .. } => format!("moved '{name}' to {side}"),
+            };
+            eprintln!("theme '{theme_name}': {desc}");
+        }
+        Err(e) => {
+            std::fs::write(&path, &snapshot)
+                .context("CRITICAL: failed to restore theme snapshot after validation failure")?;
+            bail!("theme validation failed — rolled back: {e}");
+        }
+    }
+
+    Ok(())
+}
+
+/// Resolve the mutable user-theme path, copying from built-in if needed.
+fn resolve_user_theme_path(theme_name: &str) -> Result<PathBuf> {
+    let user_path = user_theme_dir().join(format!("{theme_name}.toml"));
+    if user_path.exists() {
+        Ok(user_path)
+    } else {
+        copy_builtin_to_user(theme_name)
+    }
 }
 
 fn copy_builtin_to_user(name: &str) -> Result<PathBuf> {

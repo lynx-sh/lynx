@@ -1,5 +1,6 @@
 pub mod color;
 pub mod loader;
+pub mod patch;
 pub mod schema;
 pub mod terminal;
 
