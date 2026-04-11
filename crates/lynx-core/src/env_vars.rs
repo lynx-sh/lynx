@@ -44,6 +44,9 @@ pub const XDG_RUNTIME_DIR: &str = "XDG_RUNTIME_DIR";
 /// Shell `$HOME` — used for all config/data path derivation.
 pub const HOME: &str = "HOME";
 
+/// System `$PATH` — used for binary discovery (`find_binary`).
+pub const PATH: &str = "PATH";
+
 /// Returns the canonical plugin load-guard variable name for a given plugin name.
 ///
 /// Pattern: `LYNX_PLUGIN_{NAME_UPPERCASE_UNDERSCORED}_LOADED`

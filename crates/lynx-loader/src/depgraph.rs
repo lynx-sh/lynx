@@ -177,18 +177,8 @@ fn dfs_cycle<'a>(
     None
 }
 
-/// Minimal PATH lookup (mirrors the one in lynx-manifest).
 fn which(bin: &str) -> Option<std::path::PathBuf> {
-    std::env::var_os("PATH").and_then(|path| {
-        std::env::split_paths(&path).find_map(|dir| {
-            let candidate = dir.join(bin);
-            if candidate.is_file() {
-                Some(candidate)
-            } else {
-                None
-            }
-        })
-    })
+    lynx_core::paths::find_binary(bin)
 }
 
 // ── helpers for tests ────────────────────────────────────────────────────────
