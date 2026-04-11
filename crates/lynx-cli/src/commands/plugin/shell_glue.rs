@@ -1,0 +1,198 @@
+// Shell eval-bridge helpers for plugin exec and unload.
+//
+// These functions generate zsh that is eval'd by the shell via the eval-bridge pattern.
+// All output goes to stdout — the shell captures it with $().
+// Never write to stderr here; the shell's 2>/dev/null suppresses it on load.
+
+use anyhow::Result;
+use lynx_manifest::schema::PluginManifest;
+use lynx_plugin::exec::generate_exec_script;
+use std::path::{Path, PathBuf};
+
+/// Emit zsh that activates the plugin's exported symbols and sets its load guard.
+pub(super) async fn cmd_exec(name: &str) -> Result<()> {
+    let script = generate_exec_script_for_plugin(name)?;
+    print!("{}", script);
+    Ok(())
+}
+
+/// Emit zsh that removes the plugin's exported symbols and clears its load guard.
+pub(super) async fn cmd_unload(name: &str) -> Result<()> {
+    let script = generate_unload_script_for_plugin(name)?;
+    print!("{}", script);
+    Ok(())
+}
+
+fn generate_exec_script_for_plugin(name: &str) -> Result<String> {
+    let lynx_dir = resolve_lynx_dir();
+    let resolved_dir = resolve_plugin_dir(name, &lynx_dir)
+        .ok_or_else(|| anyhow::anyhow!("plugin '{}' not found. Run: lx doctor", name))?;
+
+    let manifest = read_plugin_manifest(&resolved_dir)?
+        .ok_or_else(|| anyhow::anyhow!("plugin '{}' has no plugin.toml", name))?;
+
+    generate_exec_script(&manifest, &resolved_dir).map_err(|e| anyhow::anyhow!("{}", e))
+}
+
+fn generate_unload_script_for_plugin(name: &str) -> Result<String> {
+    let lynx_dir = resolve_lynx_dir();
+    let resolved_dir = resolve_plugin_dir(name, &lynx_dir);
+    let manifest = match resolved_dir {
+        Some(dir) => read_plugin_manifest(&dir)?,
+        None => None,
+    };
+    Ok(build_unload_script(name, manifest.as_ref()))
+}
+
+/// Prefer LYNX_DIR env var; fall back to XDG default.
+fn resolve_lynx_dir() -> String {
+    std::env::var("LYNX_DIR").unwrap_or_else(|_| {
+        format!(
+            "{}/.local/share/lynx",
+            std::env::var("HOME").unwrap_or_else(|_| ".".into())
+        )
+    })
+}
+
+/// Check LYNX_DIR/plugins/<name> first, then the in-repo plugins/ directory.
+fn resolve_plugin_dir(name: &str, lynx_dir: &str) -> Option<PathBuf> {
+    let plugin_dir = PathBuf::from(lynx_dir).join("plugins").join(name);
+    if plugin_dir.exists() {
+        return Some(plugin_dir);
+    }
+
+    let repo_plugin_dir = PathBuf::from("plugins").join(name);
+    if repo_plugin_dir.exists() {
+        return Some(repo_plugin_dir);
+    }
+
+    None
+}
+
+pub(super) fn read_plugin_manifest(plugin_dir: &Path) -> Result<Option<PluginManifest>> {
+    let manifest_path = plugin_dir.join("plugin.toml");
+    if !manifest_path.exists() {
+        return Ok(None);
+    }
+    let content = std::fs::read_to_string(&manifest_path)?;
+    let manifest = lynx_manifest::parse(&content).map_err(|e| anyhow::anyhow!("{}", e))?;
+    Ok(Some(manifest))
+}
+
+fn build_unload_script(name: &str, manifest: Option<&PluginManifest>) -> String {
+    let guard_var = format!(
+        "LYNX_PLUGIN_{}_LOADED",
+        name.to_uppercase().replace('-', "_")
+    );
+    let mut out = String::new();
+
+    if let Some(manifest) = manifest {
+        for func in &manifest.exports.functions {
+            out.push_str(&format!("unfunction {} 2>/dev/null\n", func));
+        }
+        for alias in &manifest.exports.aliases {
+            out.push_str(&format!("unalias {} 2>/dev/null\n", alias));
+        }
+        for hook in &manifest.load.hooks {
+            let fn_name = format!("_{}_plugin_{}", name.replace('-', "_"), hook);
+            out.push_str(&format!(
+                "add-zsh-hook -d {} {} 2>/dev/null\n",
+                hook, fn_name
+            ));
+        }
+    }
+
+    out.push_str(&format!("unset {}\n", guard_var));
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use lynx_test_utils::{fixture_plugin, temp_home};
+    use std::sync::{Mutex, OnceLock};
+
+    fn env_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
+
+    struct EnvGuard {
+        old_lynx_dir: Option<String>,
+    }
+
+    impl EnvGuard {
+        fn new() -> Self {
+            Self {
+                old_lynx_dir: std::env::var("LYNX_DIR").ok(),
+            }
+        }
+    }
+
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            if let Some(v) = &self.old_lynx_dir {
+                std::env::set_var("LYNX_DIR", v);
+            } else {
+                std::env::remove_var("LYNX_DIR");
+            }
+        }
+    }
+
+    #[test]
+    fn build_unload_script_with_manifest_unloads_all_exports_and_hooks() {
+        let git_plugin = fixture_plugin("git");
+        let manifest = read_plugin_manifest(&git_plugin)
+            .expect("manifest read")
+            .expect("manifest present");
+        let script = build_unload_script("git", Some(&manifest));
+        assert!(script.contains("unfunction git_branch 2>/dev/null"));
+        assert!(script.contains("unalias gst 2>/dev/null"));
+        assert!(script.contains("add-zsh-hook -d chpwd _git_plugin_chpwd 2>/dev/null"));
+        assert!(script.contains("unset LYNX_PLUGIN_GIT_LOADED"));
+    }
+
+    #[test]
+    fn build_unload_script_without_manifest_only_unsets_guard() {
+        let script = build_unload_script("missing-plugin", None);
+        assert!(script.contains("unset LYNX_PLUGIN_MISSING_PLUGIN_LOADED"));
+        assert!(!script.contains("unfunction"));
+        assert!(!script.contains("unalias"));
+    }
+
+    #[test]
+    fn resolve_plugin_dir_prefers_lynx_dir_plugins() {
+        let temp = temp_home();
+        let plugin_path = temp.path().join("plugins").join("demo");
+        std::fs::create_dir_all(&plugin_path).expect("create plugin path");
+        let resolved = resolve_plugin_dir("demo", temp.path().to_str().expect("utf8"));
+        assert_eq!(resolved, Some(plugin_path));
+    }
+
+    #[test]
+    fn read_plugin_manifest_returns_none_when_missing() {
+        let temp = temp_home();
+        let manifest = read_plugin_manifest(temp.path()).expect("read result");
+        assert!(manifest.is_none());
+    }
+
+    #[test]
+    fn generate_exec_script_for_plugin_contains_hook_wiring() {
+        let _lock = env_lock().lock().expect("lock");
+        let _guard = EnvGuard::new();
+        let git_plugin = fixture_plugin("git");
+        let plugins_dir = git_plugin.parent().expect("plugins dir parent");
+        let lynx_dir = plugins_dir.parent().expect("lynx dir parent");
+        std::env::set_var("LYNX_DIR", lynx_dir);
+
+        let script = generate_exec_script_for_plugin("git").expect("exec script");
+        assert!(script.contains("add-zsh-hook chpwd _git_plugin_chpwd"));
+        assert!(script.contains("LYNX_PLUGIN_GIT_LOADED"));
+    }
+
+    #[test]
+    fn generate_exec_script_for_missing_plugin_errors() {
+        let err = generate_exec_script_for_plugin("definitely-missing-plugin");
+        assert!(err.is_err());
+    }
+}

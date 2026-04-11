@@ -1,19 +1,74 @@
 use anyhow::Result;
 use lynx_core::runtime;
+use lynx_events::{bridge::IpcMessage, logger, types::Event, EventBus};
 use lynx_task::{load_tasks, run_scheduler};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::net::UnixListener;
 use tracing::{error, info, warn};
 
+// DispatchState is cloned into each connection handler task so every task
+// gets a handle to the shared bus and subscriber registry without locking
+// across await points.
+#[derive(Clone)]
+struct DispatchState {
+    bus: Arc<EventBus>,
+    subscribers: Arc<Mutex<HashMap<String, Vec<String>>>>,
+}
+
+impl DispatchState {
+    fn new() -> Self {
+        Self {
+            bus: Arc::new(EventBus::new()),
+            subscribers: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+
+    fn subscribe(&self, event_name: &str, zsh_fn: &str) -> Result<()> {
+        validate_event_name(event_name)?;
+        validate_subscriber_name(zsh_fn)?;
+
+        {
+            let mut lock = self
+                .subscribers
+                .lock()
+                .map_err(|_| anyhow::anyhow!("subscriber registry lock poisoned"))?;
+            lock.entry(event_name.to_string())
+                .or_default()
+                .push(zsh_fn.to_string());
+        }
+
+        let subscriber_source = format!("daemon:subscriber:{zsh_fn}");
+        self.bus.subscribe(event_name, move |event| {
+            let source = subscriber_source.clone();
+            async move {
+                let _ = logger::write_entry(&event, &source);
+            }
+        });
+
+        Ok(())
+    }
+
+    async fn dispatch(&self, event: Event) -> usize {
+        let _ = logger::write_entry(&event, "daemon:emit");
+        self.bus.dispatch(event).await
+    }
+
+    fn subscriber_count(&self, event_name: &str) -> usize {
+        self.subscribers
+            .lock()
+            .ok()
+            .and_then(|map| map.get(event_name).map(|subs| subs.len()))
+            .unwrap_or(0)
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt()
-        .with_env_filter(
-            std::env::var("LYNX_LOG")
-                .unwrap_or_else(|_| "info".into()),
-        )
+        .with_env_filter(std::env::var("LYNX_LOG").unwrap_or_else(|_| "info".into()))
         .init();
 
     info!("lynx-daemon starting");
@@ -38,13 +93,16 @@ async fn main() -> Result<()> {
     let listener = UnixListener::bind(&socket_path)?;
     info!("IPC socket open at {}", socket_path.display());
 
+    let dispatch_state = DispatchState::new();
+
     // Spawn IPC accept loop.
     tokio::spawn(async move {
         loop {
             match listener.accept().await {
                 Ok((stream, _)) => {
+                    let state = dispatch_state.clone();
                     tokio::spawn(async move {
-                        handle_connection(stream).await;
+                        handle_connection(stream, state).await;
                     });
                 }
                 Err(e) => {
@@ -55,12 +113,8 @@ async fn main() -> Result<()> {
     });
 
     // Signal handling.
-    let mut sigterm = tokio::signal::unix::signal(
-        tokio::signal::unix::SignalKind::terminate(),
-    )?;
-    let mut sighup = tokio::signal::unix::signal(
-        tokio::signal::unix::SignalKind::hangup(),
-    )?;
+    let mut sigterm = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
+    let mut sighup = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::hangup())?;
 
     loop {
         tokio::select! {
@@ -92,7 +146,7 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn handle_connection(stream: tokio::net::UnixStream) {
+async fn handle_connection(stream: tokio::net::UnixStream, state: DispatchState) {
     let mut reader = BufReader::new(stream);
     let mut line = String::new();
     loop {
@@ -104,12 +158,11 @@ async fn handle_connection(stream: tokio::net::UnixStream) {
                 if trimmed.is_empty() {
                     continue;
                 }
-                // Deserialize and handle IPC messages (event emit/subscribe).
-                match serde_json::from_str::<serde_json::Value>(trimmed) {
+                match serde_json::from_str::<IpcMessage>(trimmed) {
                     Ok(msg) => {
-                        info!(msg_type = ?msg.get("msg_type"), "IPC message received");
-                        // Full event bus integration is handled by lynx-events;
-                        // daemon acknowledges but doesn't re-emit back on this socket.
+                        if let Err(e) = handle_message(msg, &state).await {
+                            warn!("IPC message rejected: {e}");
+                        }
                     }
                     Err(e) => {
                         warn!("IPC bad JSON: {e} — line: {trimmed}");
@@ -124,9 +177,148 @@ async fn handle_connection(stream: tokio::net::UnixStream) {
     }
 }
 
+async fn handle_message(msg: IpcMessage, state: &DispatchState) -> Result<()> {
+    match msg {
+        IpcMessage::Emit { name, data } => {
+            let event = Event::new(name.clone(), data);
+            let dispatched = state.dispatch(event).await;
+            info!(event = %name, handlers = dispatched, "event dispatched");
+        }
+        IpcMessage::Subscribe { event_name, zsh_fn } => {
+            state.subscribe(&event_name, &zsh_fn)?;
+            let count = state.subscriber_count(&event_name);
+            info!(event = %event_name, zsh_fn = %zsh_fn, subscribers = count, "subscriber registered");
+        }
+    }
+    Ok(())
+}
+
+fn validate_event_name(event_name: &str) -> Result<()> {
+    if event_name.trim().is_empty() {
+        anyhow::bail!("event_name cannot be empty");
+    }
+    if !event_name.contains(':') {
+        anyhow::bail!("event_name must include namespace prefix (example: shell:precmd)");
+    }
+    Ok(())
+}
+
+fn validate_subscriber_name(zsh_fn: &str) -> Result<()> {
+    if zsh_fn.trim().is_empty() {
+        anyhow::bail!("subscriber function name cannot be empty");
+    }
+    if zsh_fn.chars().any(|c| c.is_whitespace()) {
+        anyhow::bail!("subscriber function name cannot contain whitespace");
+    }
+    Ok(())
+}
+
 fn tasks_toml_path() -> PathBuf {
     let home = std::env::var("HOME").unwrap_or_default();
     PathBuf::from(home).join(".config/lynx/tasks.toml")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    #[tokio::test]
+    async fn subscribe_then_emit_dispatches_and_logs() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        std::env::set_var("HOME", tmp.path());
+
+        let state = DispatchState::new();
+        handle_message(
+            IpcMessage::Subscribe {
+                event_name: "shell:chpwd".into(),
+                zsh_fn: "_test_hook".into(),
+            },
+            &state,
+        )
+        .await
+        .expect("subscribe");
+        handle_message(
+            IpcMessage::Emit {
+                name: "shell:chpwd".into(),
+                data: "/tmp/project".into(),
+            },
+            &state,
+        )
+        .await
+        .expect("emit");
+
+        let entries = logger::tail_log(10, Some("shell:")).expect("tail");
+        assert!(entries.iter().any(|e| e.source == "daemon:emit"));
+        assert!(entries
+            .iter()
+            .any(|e| e.source == "daemon:subscriber:_test_hook"));
+
+        std::env::remove_var("HOME");
+    }
+
+    #[tokio::test]
+    async fn invalid_subscribe_is_rejected() {
+        let state = DispatchState::new();
+        let err = handle_message(
+            IpcMessage::Subscribe {
+                event_name: "shell:precmd".into(),
+                zsh_fn: "bad name".into(),
+            },
+            &state,
+        )
+        .await
+        .expect_err("expected invalid subscriber to fail");
+
+        assert!(err.to_string().contains("cannot contain whitespace"));
+    }
+
+    #[tokio::test]
+    async fn ipc_connection_dispatches_emit_and_writes_event_log() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        std::env::set_var("HOME", tmp.path());
+
+        let state = DispatchState::new();
+        let (server_std, mut client_std) =
+            std::os::unix::net::UnixStream::pair().expect("unix pair");
+        server_std
+            .set_nonblocking(true)
+            .expect("set server nonblocking");
+        client_std
+            .set_nonblocking(false)
+            .expect("set client blocking");
+        let server = tokio::net::UnixStream::from_std(server_std).expect("tokio server");
+
+        let handle = tokio::spawn(async move {
+            handle_connection(server, state).await;
+        });
+
+        let sub = serde_json::to_string(&IpcMessage::Subscribe {
+            event_name: "shell:precmd".into(),
+            zsh_fn: "_precmd_hook".into(),
+        })
+        .expect("serialize subscribe");
+        let emit = serde_json::to_string(&IpcMessage::Emit {
+            name: "shell:precmd".into(),
+            data: "payload".into(),
+        })
+        .expect("serialize emit");
+
+        client_std
+            .write_all(format!("{sub}\n{emit}\n").as_bytes())
+            .expect("write lines");
+        drop(client_std);
+        handle.await.expect("connection task");
+
+        let entries = logger::tail_log(10, Some("shell:precmd")).expect("tail");
+        assert!(!entries.is_empty(), "expected shell:precmd entries");
+        assert!(entries.iter().any(|e| e.source == "daemon:emit"));
+        assert!(entries
+            .iter()
+            .any(|e| e.source == "daemon:subscriber:_precmd_hook"));
+
+        std::env::remove_var("HOME");
+    }
 }
 
 fn log_dir_path() -> PathBuf {
