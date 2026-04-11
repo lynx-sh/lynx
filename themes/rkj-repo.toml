@@ -5,8 +5,8 @@ author      = "proxikal"
 
 # ── Layout ─────────────────────────────────────────────────────────────────────
 #
-# Line 1 (top):   ┌─[user@host] - [~/full/path] - [YYYY-MM-DD HH:MM:SS]
-# Line 2 (input): └─[✘ N] <branch+✱>
+# Line 1 (top):   ┌─[user@host] - [~/full/path] - [YYYY-MM-DD HH:MM:SS] [branch+✱]
+# Line 2 (input): └─[✘ N]
 #
 # Exit code brackets only appear on non-zero exit.
 # Git section only appears inside a git repo.
@@ -22,6 +22,10 @@ order = [
   "custom_mid2",
   "time",
   "custom_top_close",
+  "custom_git_open",
+  "git_branch",
+  "git_status",
+  "custom_git_close",
 ]
 
 [segments.left]
@@ -30,10 +34,6 @@ order = [
   "custom_bot_open",
   "exit_code",
   "custom_bot_close",
-  "custom_git_open",
-  "git_branch",
-  "git_status",
-  "custom_git_close",
 ]
 
 [segments.right]
@@ -105,7 +105,7 @@ color     = { fg = "blue", bold = true }
 
 # Git section — only inside a git repo.
 [segment.custom_git_open]
-template  = " <"
+template  = " ["
 show_when = { in_git_repo = true }
 color     = { fg = "blue", bold = true }
 
@@ -124,7 +124,7 @@ untracked = { icon = "✈" }
 color = { fg = "yellow" }
 
 [segment.custom_git_close]
-template  = ">"
+template  = "]"
 show_when = { in_git_repo = true }
 color     = { fg = "blue", bold = true }
 
