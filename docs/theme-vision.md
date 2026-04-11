@@ -33,9 +33,49 @@ Lynx themes eliminate that.
 | **Segment config** | Shared config blocks (Starship) | Each segment owns its typed config |
 | **Context awareness** | Limited or opt-in | First-class: interactive / agent / minimal auto-detected |
 | **File listing colors** | User's problem | Defined in `[ls_colors]`, emitted on theme switch |
+| **Composition** | OMZ: zsh functions (code). Starship: `format` strings | `format` strings + `custom_*` template segments — data not code |
+| **Custom segments** | OMZ: write a zsh function. Starship: `[custom]` runs a shell command | `[segment.custom_NAME]` template over RenderContext — no I/O, no code |
 | **CLI customization** | `starship config key value` (scalars only) | `lx theme patch` (any TOML path) + human shorthands + array/segment ops |
 | **Visual theme builder** | None | `lx theme studio` — local WYSIWYG in the browser |
 | **Safety** | No rollback | Snapshot → validate → rollback on every mutation |
+
+### Themes are data, not code (D-024)
+
+OMZ themes are zsh programs. Every theme is different code — nothing is
+composable, toolable, or AI-editable. Starship moved to pure TOML. Lynx
+goes further: TOML data with a **templating layer** gives the same power
+as OMZ functions without the chaos.
+
+Two mechanisms replace zsh functions entirely:
+
+**1. Segment `format` strings (H-068)** — control how a segment's sub-values
+are composed into output without touching Rust:
+```toml
+[segment.git_branch]
+# default: just the branch name with icon
+format = "$icon$branch"
+
+# custom: wrap in brackets, show remote
+format = "[$icon$branch → $remote]"
+```
+Each segment exposes named variables (`$branch`, `$icon`, `$status`, etc.).
+The format string is a template, not code.
+
+**2. Custom template segments (H-069)** — define a one-off segment entirely
+in TOML using RenderContext data:
+```toml
+[segment.custom_greeting]
+template = "[$env.USER@$env.HOSTNAME]"
+color    = { fg = "$accent" }
+show_in  = ["interactive"]
+
+[segment.custom_clock]
+template = "$time.hms"
+color    = { fg = "$muted" }
+```
+Available template vars: `$env.USER`, `$env.HOSTNAME`, `$env.SSH_CONNECTION`,
+`$cwd`, `$context`, `$cache.git_state.branch`, `$time.hms`, `$time.date`.
+No I/O. No shell execution. Just data already in RenderContext.
 
 ---
 
@@ -248,6 +288,8 @@ Priority order. Each issue has full context in `pt issue H-XXX`.
 | H-054 | `[ls_colors]` emitted as `LS_COLORS` / `EZA_COLORS` | Full environment ownership |
 | H-060 | `lx theme patch` CLI with scalar mutation | Power user / AI interface |
 | H-061 | Array mutation + `lx theme segment` shorthands | Structural CLI customization |
+| H-068 | Segment `format` strings — compose sub-values in TOML | Replaces OMZ zsh functions for layout |
+| H-069 | `custom_*` template segments over RenderContext | Replaces OMZ zsh functions for custom output |
 
 ### P2 — Completeness
 
@@ -278,3 +320,4 @@ Priority order. Each issue has full context in `pt issue H-XXX`.
 | D-020 | `lx theme patch` is the AI/automation interface; shorthands are for humans |
 | D-021 | `lx theme studio` is the blessed human authoring tool; patch is for automation |
 | D-022 | Studio frontend is a single embedded HTML file — no npm, no build step |
+| D-024 | Themes are data not code — format strings and `custom_*` templates, never executable zsh |
