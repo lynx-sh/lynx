@@ -61,4 +61,6 @@ pub enum Command {
     /// Refresh all enabled plugin state caches in one eval (called by precmd hook)
     #[command(name = "refresh-state")]
     RefreshState(crate::commands::refresh_state::RefreshStateArgs),
+    /// Developer utilities — sync source assets to installed LYNX_DIR
+    Dev(crate::commands::dev::DevArgs),
 }
