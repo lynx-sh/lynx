@@ -29,10 +29,10 @@ pub enum ThemeCommand {
 
 pub async fn run(args: ThemeArgs) -> Result<()> {
     match args.command {
-        ThemeCommand::Set { name } => cmd_set(&name),
-        ThemeCommand::Random => cmd_random(),
+        ThemeCommand::Set { name } => cmd_set(&name).await,
+        ThemeCommand::Random => cmd_random().await,
         ThemeCommand::List => cmd_list(),
-        ThemeCommand::Edit => cmd_edit(),
+        ThemeCommand::Edit => cmd_edit().await,
         ThemeCommand::Examples => {
             crate::commands::examples::run(crate::commands::examples::ExamplesArgs {
                 command: Some("theme".into()),
@@ -42,7 +42,7 @@ pub async fn run(args: ThemeArgs) -> Result<()> {
     }
 }
 
-fn cmd_set(name: &str) -> Result<()> {
+async fn cmd_set(name: &str) -> Result<()> {
     // Validate theme exists.
     load_theme(name).with_context(|| format!("theme '{name}' not found"))?;
 
@@ -52,14 +52,14 @@ fn cmd_set(name: &str) -> Result<()> {
     })
     .with_context(|| "failed to save config")?;
 
-    // Emit theme:changed event so the shell can reload via precmd.
-    emit_theme_changed(name);
+    // Emit theme:changed in-process so plugin handlers fire.
+    emit_theme_changed(name).await;
 
     println!("theme set to '{name}'");
     Ok(())
 }
 
-fn cmd_random() -> Result<()> {
+async fn cmd_random() -> Result<()> {
     let cfg = load().context("failed to load config")?;
     let current = &cfg.active_theme;
     let available: Vec<String> = list().into_iter().filter(|n| n != current).collect();
@@ -75,7 +75,7 @@ fn cmd_random() -> Result<()> {
         .unwrap_or(0)
         % available.len();
 
-    cmd_set(&available[idx])
+    cmd_set(&available[idx]).await
 }
 
 fn cmd_list() -> Result<()> {
@@ -92,7 +92,7 @@ fn cmd_list() -> Result<()> {
     Ok(())
 }
 
-fn cmd_edit() -> Result<()> {
+async fn cmd_edit() -> Result<()> {
     let cfg = load().context("failed to load config")?;
     let theme_name = &cfg.active_theme;
 
@@ -123,7 +123,7 @@ fn cmd_edit() -> Result<()> {
     // Validate the saved file.
     match lynx_theme::loader::load_from_path(&path) {
         Ok(_) => {
-            emit_theme_changed(theme_name);
+            emit_theme_changed(theme_name).await;
             println!("theme '{theme_name}' saved and validated");
         }
         Err(e) => {
@@ -155,16 +155,16 @@ fn copy_builtin_to_user(name: &str) -> Result<PathBuf> {
     Ok(dest)
 }
 
-fn emit_theme_changed(name: &str) {
-    // Fire-and-forget: emit a theme:changed event so the shell's precmd hook can reload.
-    // We use the eval-bridge output format — the shell evals stdout.
-    // On error (e.g., daemon not running) we silently continue.
-    use lynx_events::emit_event;
-    use lynx_events::types::Event;
+async fn emit_theme_changed(name: &str) {
+    use lynx_events::types::{Event, THEME_CHANGED};
+    let config = match lynx_config::load() {
+        Ok(c) => c,
+        Err(_) => return,
+    };
+    let plugins_dir = lynx_core::paths::installed_plugins_dir();
+    let bus = crate::bus::build_active_bus(&config.active_context, &plugins_dir);
     let data = serde_json::json!({ "theme": name }).to_string();
-    let event = Event::new(lynx_events::types::THEME_CHANGED, data);
-    // Non-blocking best-effort.
-    let _ = emit_event(&event);
+    bus.emit(Event::new(THEME_CHANGED, data)).await;
 }
 
 #[cfg(test)]

@@ -3,7 +3,7 @@ use clap::{Args, Subcommand};
 
 use lynx_config::{load, snapshot::mutate_config_transaction};
 use lynx_core::types::Context;
-use lynx_events::{emit_event, types::Event};
+use lynx_events::types::{Event, SHELL_CONTEXT_CHANGED};
 use lynx_shell::context::{detect_context_outcome, DetectionMethod};
 
 #[derive(Args)]
@@ -22,22 +22,23 @@ pub enum ContextCommand {
 
 pub async fn run(args: ContextArgs) -> Result<()> {
     match args.command.unwrap_or(ContextCommand::Status) {
-        ContextCommand::Set { name } => cmd_set(&name),
+        ContextCommand::Set { name } => cmd_set(&name).await,
         ContextCommand::Status => cmd_status(),
     }
 }
 
-fn cmd_set(name: &str) -> Result<()> {
+async fn cmd_set(name: &str) -> Result<()> {
     let ctx = parse_context(name)?;
     mutate_config_transaction("context-set", |cfg| {
         cfg.active_context = ctx.clone();
         Ok(())
     })?;
 
-    // Emit shell:context-changed so the loader reloads plugins in-place.
+    // Emit shell:context-changed in-process so plugin handlers fire.
+    let plugins_dir = lynx_core::paths::installed_plugins_dir();
+    let bus = crate::bus::build_active_bus(&ctx, &plugins_dir);
     let data = serde_json::json!({ "context": name }).to_string();
-    let event = Event::new(lynx_events::types::SHELL_CONTEXT_CHANGED, data);
-    let _ = emit_event(&event);
+    bus.emit(Event::new(SHELL_CONTEXT_CHANGED, data)).await;
 
     // Print the eval-bridge export statement for the shell to evaluate.
     println!("export LYNX_CONTEXT={name}");
