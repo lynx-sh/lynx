@@ -1,6 +1,7 @@
 use anyhow::Result;
 use clap::Args;
 use lynx_config::load as load_config;
+use lynx_manifest::schema::PluginManifest;
 use lynx_shell::{
     context::detect_context,
     init::{generate_init_script, InitParams},
@@ -41,15 +42,47 @@ pub async fn run(args: InitArgs) -> Result<()> {
     let lynx_dir = resolve_lynx_dir();
     let plugin_dir = format!("{}/plugins", lynx_dir);
 
+    // Resolve load order: topological sort, binary dep exclusion, lazy/eager split.
+    let manifests = load_plugin_manifests(&plugin_dir, &config.enabled_plugins);
+    let enabled_plugins: Vec<String> = match lynx_loader::depgraph::resolve(&manifests) {
+        Ok(order) => {
+            for (name, bin) in &order.excluded {
+                eprintln!("lx: plugin '{}' excluded — missing binary '{}'", name, bin);
+            }
+            order.eager.into_iter().chain(order.lazy).collect()
+        }
+        Err(e) => {
+            eprintln!("lx: plugin dependency error: {}", e);
+            config.enabled_plugins.clone()
+        }
+    };
+
     let script = generate_init_script(&InitParams {
         context: &context,
         lynx_dir: &lynx_dir,
         plugin_dir: &plugin_dir,
-        enabled_plugins: &config.enabled_plugins,
+        enabled_plugins: &enabled_plugins,
     });
 
     print!("{}", script);
     Ok(())
+}
+
+/// Load plugin.toml manifests for the given plugin names from plugin_dir.
+/// Plugins with missing or invalid manifests are skipped with a diagnostic.
+fn load_plugin_manifests(plugin_dir: &str, enabled: &[String]) -> Vec<PluginManifest> {
+    let mut manifests = Vec::new();
+    for name in enabled {
+        let toml_path = format!("{}/{}/plugin.toml", plugin_dir, name);
+        match std::fs::read_to_string(&toml_path) {
+            Ok(content) => match lynx_manifest::parse_and_validate(&content) {
+                Ok(m) => manifests.push(m),
+                Err(e) => eprintln!("lx: skipping plugin '{}': invalid manifest: {}", name, e),
+            },
+            Err(_) => {} // plugin dir missing or no manifest — silently skip
+        }
+    }
+    manifests
 }
 
 /// Resolve LYNX_DIR: env override → default install location.
