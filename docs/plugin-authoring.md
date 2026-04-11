@@ -4,6 +4,10 @@ Lynx plugins are self-contained directories with a `plugin.toml` manifest,
 a thin zsh shell layer, and any Rust prompt segments they need. This guide
 walks you through building a real plugin from scratch.
 
+> **Stable API reference:** See [plugin-api.md](plugin-api.md) for the
+> complete list of stable env vars, lx commands, and shell variable contracts
+> that plugins may depend on.
+
 ---
 
 ## Table of Contents
