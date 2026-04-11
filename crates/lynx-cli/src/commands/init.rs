@@ -1,13 +1,13 @@
 use anyhow::Result;
 use clap::Args;
 use lynx_config::load as load_config;
+use lynx_core::types::Context;
 use lynx_manifest::schema::PluginManifest;
 use lynx_shell::{
-    context::detect_context,
+    context::detect_context_for_init,
     init::{generate_init_script, InitParams},
     safemode::generate_safemode_script,
 };
-use lynx_core::types::Context;
 
 #[derive(Args)]
 pub struct InitArgs {
@@ -27,13 +27,16 @@ pub async fn run(args: InitArgs) -> Result<()> {
         }
     };
 
-    let detected = detect_context();
+    let detected = detect_context_for_init();
     let context = match args.context.as_deref() {
         Some("agent") => Context::Agent,
         Some("minimal") => Context::Minimal,
         Some("interactive") => Context::Interactive,
         Some(other) => {
-            eprintln!("lx: unknown context '{}', falling back to auto-detect", other);
+            eprintln!(
+                "lx: unknown context '{}', falling back to auto-detect",
+                other
+            );
             detected
         }
         None => detected,
@@ -90,5 +93,5 @@ fn resolve_lynx_dir() -> String {
         return dir;
     }
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
-    format!("{}/.local/share/lynx", home)
+    format!("{}/.config/lynx", home)
 }
