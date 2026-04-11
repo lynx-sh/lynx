@@ -5,40 +5,8 @@
 typeset -gA _lynx_git_state
 
 # Refresh the git state cache. Called on chpwd and precmd hooks.
-git_refresh_state() {
-  local root branch dirty stash ahead behind
-
-  root=$(git rev-parse --show-toplevel 2>/dev/null)
-  if [[ -z "$root" ]]; then
-    _lynx_git_state=()
-    return 0
-  fi
-
-  branch=$(git symbolic-ref --short HEAD 2>/dev/null || git rev-parse --short HEAD 2>/dev/null)
-  dirty=$([[ -n "$(git status --porcelain 2>/dev/null)" ]] && echo "1" || echo "0")
-  stash=$(git stash list 2>/dev/null | wc -l | tr -d ' ')
-
-  local upstream
-  upstream=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null)
-  if [[ -n "$upstream" ]]; then
-    local counts
-    counts=$(git rev-list --left-right --count HEAD..."$upstream" 2>/dev/null)
-    ahead=${counts%$'\t'*}
-    behind=${counts#*$'\t'}
-  else
-    ahead=0
-    behind=0
-  fi
-
-  _lynx_git_state=(
-    root    "$root"
-    branch  "$branch"
-    dirty   "$dirty"
-    stash   "$stash"
-    ahead   "$ahead"
-    behind  "$behind"
-  )
-}
+# All logic lives in Rust (lx git-state) — D-001.
+git_refresh_state() { eval "$(lx git-state 2>/dev/null)" }
 
 # Public helpers — read from cache (fast, safe in prompt)
 git_branch()      { echo "${_lynx_git_state[branch]}" }

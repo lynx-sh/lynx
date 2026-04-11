@@ -52,4 +52,7 @@ pub enum Command {
     Profile(crate::commands::profile::ProfileArgs),
     /// Render PROMPT/RPROMPT for eval by shell precmd hook
     Prompt(crate::commands::prompt::PromptArgs),
+    /// Emit zsh that populates _lynx_git_state (called by git plugin)
+    #[command(name = "git-state")]
+    GitState(crate::commands::git::GitStateArgs),
 }
