@@ -1,29 +1,36 @@
+pub mod benchmark;
+pub mod config;
+pub mod context;
+pub mod doctor;
 pub mod event;
 pub mod init;
+pub mod migrate;
 pub mod plugin;
-pub mod theme;
-pub mod task;
+pub mod rollback;
 pub mod sync;
+pub mod task;
+pub mod theme;
+pub mod uninstall;
+pub mod update;
 
 use anyhow::Result;
 use crate::cli::{Cli, Command};
 
 pub async fn dispatch(cli: Cli) -> Result<()> {
     match cli.command {
-        Command::Init(args)    => init::run(args).await,
-        Command::Event(args)   => event::run(args).await,
-        Command::Plugin(args)  => plugin::run(args).await,
-        Command::Theme(args)   => theme::run(args).await,
-        Command::Task(args)    => task::run(args).await,
-        Command::Context{name} => context(name).await,
-        Command::Doctor        => doctor().await,
-        Command::Benchmark     => benchmark().await,
-        Command::Rollback      => rollback().await,
-        Command::Sync(args)    => sync::run(args).await,
+        Command::Init(args)      => init::run(args).await,
+        Command::Event(args)     => event::run(args).await,
+        Command::Plugin(args)    => plugin::run(args).await,
+        Command::Theme(args)     => theme::run(args).await,
+        Command::Task(args)      => task::run(args).await,
+        Command::Context(args)   => context::run(args).await,
+        Command::Doctor(args)    => doctor::run(args).await,
+        Command::Benchmark(args) => benchmark::run(args).await,
+        Command::Rollback(args)  => rollback::run(args).await,
+        Command::Sync(args)      => sync::run(args).await,
+        Command::Config(args)    => config::run(args).await,
+        Command::Migrate(args)   => migrate::run(args).await,
+        Command::Update(args)    => update::run(args).await,
+        Command::Uninstall(args) => uninstall::run(args).await,
     }
 }
-
-async fn context(name: String) -> Result<()> { println!("context: {name}"); Ok(()) }
-async fn doctor()              -> Result<()> { println!("doctor"); Ok(()) }
-async fn benchmark()           -> Result<()> { println!("benchmark"); Ok(()) }
-async fn rollback()            -> Result<()> { println!("rollback"); Ok(()) }

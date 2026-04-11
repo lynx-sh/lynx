@@ -24,14 +24,22 @@ pub enum Command {
     Theme(crate::commands::theme::ThemeArgs),
     /// Manage task scheduler
     Task(crate::commands::task::TaskArgs),
-    /// Switch context (interactive, agent, minimal)
-    Context { name: String },
+    /// Switch or show context (interactive, agent, minimal)
+    Context(crate::commands::context::ContextArgs),
     /// Diagnose issues with your Lynx setup
-    Doctor,
+    Doctor(crate::commands::doctor::DoctorArgs),
     /// Benchmark startup time per component
-    Benchmark,
-    /// Rollback to last known good config
-    Rollback,
+    Benchmark(crate::commands::benchmark::BenchmarkArgs),
+    /// Rollback config to a previous snapshot
+    Rollback(crate::commands::rollback::RollbackArgs),
     /// Sync config via git
     Sync(crate::commands::sync::SyncArgs),
+    /// Show, edit, or modify configuration
+    Config(crate::commands::config::ConfigArgs),
+    /// Run config schema migrations
+    Migrate(crate::commands::migrate::MigrateArgs),
+    /// Check for and install lx updates
+    Update(crate::commands::update::UpdateArgs),
+    /// Remove Lynx from this system
+    Uninstall(crate::commands::uninstall::UninstallArgs),
 }

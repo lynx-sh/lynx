@@ -1,6 +1,7 @@
 pub mod defaults;
 pub mod migrate;
 pub mod schema;
+pub mod snapshot;
 
 use lynx_core::error::{LynxError, Result};
 use schema::LynxConfig;
