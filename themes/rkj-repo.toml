@@ -1,0 +1,140 @@
+[meta]
+name        = "rkj-repo"
+description = "Port of the rkj-repo OMZ theme — two-line prompt with full path, timestamp, git status"
+author      = "proxikal"
+
+# ── Layout ─────────────────────────────────────────────────────────────────────
+#
+# Line 1 (top):   ┌─[user@host] - [~/full/path] - [YYYY-MM-DD HH:MM:SS]
+# Line 2 (input): └─[✘ N] <branch+✱>
+#
+# Exit code brackets only appear on non-zero exit.
+# Git section only appears inside a git repo.
+
+[segments.top]
+order = [
+  "custom_top_open",
+  "username",
+  "custom_at",
+  "hostname",
+  "custom_mid1",
+  "dir",
+  "custom_mid2",
+  "time",
+  "custom_top_close",
+]
+
+[segments.left]
+order = [
+  "custom_bot_prefix",
+  "custom_bot_open",
+  "exit_code",
+  "custom_bot_close",
+  "custom_git_open",
+  "git_branch",
+  "git_status",
+  "custom_git_close",
+]
+
+[segments.right]
+order = []
+
+# ── Separators ─────────────────────────────────────────────────────────────────
+# No gap between segments — each segment owns its own spacing/glyphs.
+[separators]
+left.char  = ""
+right.char = ""
+
+# ── Top-line segments ──────────────────────────────────────────────────────────
+
+[segment.custom_top_open]
+template = "┌─["
+color    = { fg = "blue", bold = true }
+
+[segment.username]
+color = { fg = "green", bold = true }
+
+[segment.custom_at]
+template = "@"
+color    = { fg = "grey" }
+
+[segment.hostname]
+show_when_ssh = false   # always show, not only over SSH
+color         = { fg = "cyan" }
+
+[segment.custom_mid1]
+template = "] - ["
+color    = { fg = "blue", bold = true }
+
+[segment.dir]
+max_depth        = 50
+truncate_to_repo = false
+color            = { bold = true }   # bold terminal-default — matches %{$fg_bold[default]%}
+
+[segment.custom_mid2]
+template = "] - ["
+color    = { fg = "blue", bold = true }
+
+[segment.time]
+format = "%Y-%m-%d %I:%M:%S"   # date + 12-hour time, matches %D{"%Y-%m-%d %I:%M:%S"}
+color  = { fg = "yellow" }
+
+[segment.custom_top_close]
+template = "]"
+color    = { fg = "blue", bold = true }
+
+# ── Bottom / input-line segments ───────────────────────────────────────────────
+
+[segment.custom_bot_prefix]
+template = "└─"
+color    = { fg = "blue", bold = true }
+
+# [ and ] only appear when last exit was non-zero (cleaner than showing [0] always).
+[segment.custom_bot_open]
+template  = "["
+show_when = { exit_code_nonzero = true }
+color     = { fg = "blue", bold = true }
+
+[segment.exit_code]
+color = { fg = "magenta", bold = true }
+
+[segment.custom_bot_close]
+template  = "]"
+show_when = { exit_code_nonzero = true }
+color     = { fg = "blue", bold = true }
+
+# Git section — only inside a git repo.
+[segment.custom_git_open]
+template  = " <"
+show_when = { in_git_repo = true }
+color     = { fg = "blue", bold = true }
+
+[segment.git_branch]
+icon   = ""
+format = "$branch"
+color  = { fg = "blue", bold = true }
+
+[segment.git_status]
+staged    = { icon = "+" }
+modified  = { icon = "✱" }
+untracked = { icon = "✈" }
+
+# git_status uses cache_key "git_state" for renderer color lookup.
+[segment.git_state]
+color = { fg = "yellow" }
+
+[segment.custom_git_close]
+template  = ">"
+show_when = { in_git_repo = true }
+color     = { fg = "blue", bold = true }
+
+# ── ls_colors ─────────────────────────────────────────────────────────────────
+[ls_colors]
+dir            = { fg = "cyan",    bold = true }
+symlink        = { fg = "cyan"                 }
+executable     = { fg = "green",   bold = true }
+archive        = { fg = "red"                  }
+image          = { fg = "magenta"              }
+audio          = { fg = "cyan"                 }
+broken         = { fg = "red",     bold = true }
+other_writable = { fg = "blue",    bg = "dark-green" }

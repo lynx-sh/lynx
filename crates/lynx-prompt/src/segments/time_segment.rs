@@ -5,7 +5,8 @@ use crate::segment::{RenderContext, RenderedSegment, Segment};
 
 #[derive(Deserialize, Default)]
 struct TimeConfig {
-    /// Clock format: `"12h"` or `"24h"`. Default: `"24h"`.
+    /// Clock format: `"12h"`, `"24h"`, or a custom strftime pattern (e.g. `"%Y-%m-%d %H:%M:%S"`).
+    /// Default: `"24h"` → `%H:%M`.
     format: Option<String>,
 }
 
@@ -20,7 +21,8 @@ impl Segment for TimeSegment {
         let cfg: TimeConfig = config.clone().try_into().unwrap_or_default();
         let fmt = match cfg.format.as_deref() {
             Some("12h") => "%I:%M %p",
-            _ => "%H:%M",
+            Some("24h") | None => "%H:%M",
+            Some(custom) => custom,
         };
         let text = Local::now().format(fmt).to_string();
         Some(RenderedSegment::new(text))
@@ -64,5 +66,15 @@ mod tests {
             "expected AM/PM in 12h output: {}",
             r.text
         );
+    }
+
+    #[test]
+    fn renders_custom_strftime_format() {
+        let cfg: toml::Value = toml::from_str(r#"format = "%Y-%m-%d %H:%M:%S""#).unwrap();
+        let r = TimeSegment.render(&cfg, &ctx()).unwrap();
+        // YYYY-MM-DD HH:MM:SS — 19 chars, dash at pos 4 and 7
+        assert_eq!(r.text.len(), 19, "unexpected length: {}", r.text);
+        assert_eq!(r.text.chars().nth(4), Some('-'), "expected dash at pos 4: {}", r.text);
+        assert_eq!(r.text.chars().nth(10), Some(' '), "expected space at pos 10: {}", r.text);
     }
 }
