@@ -1,11 +1,11 @@
 use anyhow::{bail, Context, Result};
 use clap::{Args, Subcommand};
 use lynx_task::{
-    schema::{OnFail, Task, TasksFile},
+    parse_tasks_file, read_last_run, read_tasks_file, write_tasks_file,
+    schema::{OnFail, Task},
     validate_task,
 };
 use std::io::{BufRead, BufReader};
-use std::path::{Path, PathBuf};
 
 #[derive(Args)]
 pub struct TaskArgs {
@@ -103,39 +103,12 @@ pub async fn run(args: TaskArgs) -> Result<()> {
 
 // ── helpers ─────────────────────────────────────────────────────────────────
 
-fn tasks_toml_path() -> PathBuf {
-    let home = std::env::var("HOME").unwrap_or_default();
-    PathBuf::from(home).join(".config/lynx/tasks.toml")
+fn tasks_toml_path() -> std::path::PathBuf {
+    lynx_core::paths::tasks_file()
 }
 
-fn log_dir() -> PathBuf {
-    let home = std::env::var("HOME").unwrap_or_default();
-    PathBuf::from(home).join(".config/lynx/logs/tasks")
-}
-
-/// Load tasks.toml as a raw string (returns empty string if missing).
-fn read_tasks_file(path: &Path) -> Result<String> {
-    if !path.exists() {
-        return Ok(String::new());
-    }
-    std::fs::read_to_string(path).context("failed to read tasks.toml")
-}
-
-/// Parse raw TOML string, preserving the full `TasksFile` structure.
-fn parse_tasks_file(content: &str) -> Result<TasksFile> {
-    if content.trim().is_empty() {
-        return Ok(TasksFile::default());
-    }
-    toml::from_str::<TasksFile>(content).context("tasks.toml parse error")
-}
-
-/// Write a `TasksFile` back to disk.
-fn write_tasks_file(path: &Path, file: &TasksFile) -> Result<()> {
-    let parent = path.parent().unwrap_or(path);
-    std::fs::create_dir_all(parent).context("failed to create config directory")?;
-
-    let content = toml::to_string_pretty(file).context("failed to serialize tasks.toml")?;
-    std::fs::write(path, content).context("failed to write tasks.toml")
+fn task_logs_dir() -> std::path::PathBuf {
+    lynx_core::paths::task_logs_dir()
 }
 
 /// Signal the daemon to reload via SIGHUP if a PID file exists.
@@ -222,7 +195,7 @@ async fn cmd_list() -> Result<()> {
         return Ok(());
     }
 
-    let log_dir = log_dir();
+    let log_dir = task_logs_dir();
 
     println!(
         "{:<20} {:<18} {:<8} {:<12} {:<10}",
@@ -245,50 +218,8 @@ async fn cmd_list() -> Result<()> {
     Ok(())
 }
 
-/// Read the last entry from a task's JSONL log. Returns ("never", "—") if no log.
-fn read_last_run(log_dir: &Path, task_name: &str) -> (String, String) {
-    let log_path = log_dir.join(format!("{task_name}.jsonl"));
-    let Ok(file) = std::fs::File::open(&log_path) else {
-        return ("never".into(), "—".into());
-    };
-
-    let reader = BufReader::new(file);
-    let last = reader.lines().map_while(Result::ok).last();
-
-    let Some(line) = last else {
-        return ("never".into(), "—".into());
-    };
-
-    let Ok(val) = serde_json::from_str::<serde_json::Value>(&line) else {
-        return ("?".into(), "?".into());
-    };
-
-    let ts = val["started_at"].as_u64().unwrap_or(0);
-    let exit = match val["exit_code"].as_i64() {
-        Some(c) => c.to_string(),
-        None if val["timed_out"].as_bool() == Some(true) => "timeout".into(),
-        None => "?".into(),
-    };
-
-    let time_str = if ts == 0 {
-        "?".into()
-    } else {
-        // Format as YYYY-MM-DD HH:MM
-        let secs = ts;
-        // Simple formatting without pulling in chrono just for display:
-        // Use humantime to render elapsed instead.
-        let elapsed = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|now| now.as_secs().saturating_sub(secs))
-            .unwrap_or(0);
-        format!("{}s ago", elapsed)
-    };
-
-    (time_str, exit)
-}
-
 async fn cmd_logs(name: String, tail_n: usize, follow: bool) -> Result<()> {
-    let log_path = log_dir().join(format!("{name}.jsonl"));
+    let log_path = task_logs_dir().join(format!("{name}.jsonl"));
 
     if !log_path.exists() {
         println!("No logs found for task '{name}'.");
@@ -373,7 +304,7 @@ async fn cmd_run(name: String) -> Result<()> {
 
     // Build a ValidatedTask and run it directly in this process.
     let vt = validate_task(task.clone()).context("task validation failed")?;
-    let log_dir = log_dir();
+    let log_dir = task_logs_dir();
     std::fs::create_dir_all(&log_dir).context("failed to create log dir")?;
 
     println!("Running task '{name}'...");
