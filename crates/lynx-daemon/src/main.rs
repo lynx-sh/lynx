@@ -1,7 +1,7 @@
 use anyhow::Result;
 use lynx_core::runtime;
 use lynx_task::{load_tasks, run_scheduler};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::net::UnixListener;
@@ -134,7 +134,7 @@ fn log_dir_path() -> PathBuf {
     PathBuf::from(home).join(".config/lynx/logs")
 }
 
-fn load_tasks_safe(path: &PathBuf) -> Vec<lynx_task::ValidatedTask> {
+fn load_tasks_safe(path: &Path) -> Vec<lynx_task::ValidatedTask> {
     if !path.exists() {
         info!("tasks.toml not found — no tasks scheduled");
         return Vec::new();

@@ -39,8 +39,7 @@ impl Segment for KubectlContextSegment {
             })
             .unwrap_or(false);
 
-        let icon = if is_prod { "⎈ " } else { "⎈ " };
-        let text = format!("{icon}{context}:{namespace}");
+        let text = format!("⎈ {context}:{namespace}");
 
         let mut seg = RenderedSegment::new(text).with_cache_key("kubectl_state");
         if is_prod {

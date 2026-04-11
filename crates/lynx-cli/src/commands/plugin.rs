@@ -166,15 +166,13 @@ async fn cmd_list(json: bool) -> Result<()> {
             .map(|p| serde_json::json!({ "name": p, "context": context_str, "status": "enabled" }))
             .collect();
         println!("{}", serde_json::to_string_pretty(&plugins)?);
+    } else if config.enabled_plugins.is_empty() {
+        println!("No plugins installed.");
     } else {
-        if config.enabled_plugins.is_empty() {
-            println!("No plugins installed.");
-        } else {
-            println!("{:<20} {:<12} {}", "NAME", "STATUS", "CONTEXT");
-            println!("{}", "-".repeat(44));
-            for p in &config.enabled_plugins {
-                println!("{:<20} {:<12} {}", p, "enabled", context_str);
-            }
+        println!("{:<20} {:<12} CONTEXT", "NAME", "STATUS");
+        println!("{}", "-".repeat(44));
+        for p in &config.enabled_plugins {
+            println!("{:<20} {:<12} {}", p, "enabled", context_str);
         }
     }
     Ok(())
@@ -286,7 +284,6 @@ async fn cmd_reinstall(name: &str) -> Result<()> {
 
 async fn cmd_search(query: &str, refresh: bool) -> Result<()> {
     let idx = tokio::task::spawn_blocking({
-        let refresh = refresh;
         move || get_index(refresh, None)
     })
     .await??;
@@ -298,7 +295,7 @@ async fn cmd_search(query: &str, refresh: bool) -> Result<()> {
     }
 
     let lock = load_lock().unwrap_or_default();
-    println!("{:<20} {:<10} {}", "NAME", "VERSION", "DESCRIPTION");
+    println!("{:<20} {:<10} DESCRIPTION", "NAME", "VERSION");
     println!("{}", "-".repeat(60));
     for entry in results {
         let installed = if lock.find(&entry.name).is_some() { "*" } else { " " };

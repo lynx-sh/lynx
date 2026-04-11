@@ -11,7 +11,7 @@
 /// - JSON  `"key": "value"`
 pub fn redact(s: &str) -> String {
     s.lines()
-        .map(|line| redact_line(line))
+        .map(redact_line)
         .collect::<Vec<_>>()
         .join("\n")
         // Preserve trailing newline if original had one.

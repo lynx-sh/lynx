@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use clap::Args;
@@ -69,7 +69,7 @@ pub async fn run(args: UninstallArgs) -> Result<()> {
     Ok(())
 }
 
-fn remove_from_zshrc(home: &PathBuf) -> Result<()> {
+fn remove_from_zshrc(home: &Path) -> Result<()> {
     let zshrc = home.join(".zshrc");
     if !zshrc.exists() {
         println!("  .zshrc not found — skipping");
@@ -122,7 +122,7 @@ fn stop_daemon() {
     }
 }
 
-fn remove_binary(home: &PathBuf) {
+fn remove_binary(home: &Path) {
     let candidates = vec![
         home.join(".local/bin").join(brand::CLI),
         PathBuf::from(format!("/usr/local/bin/{}", brand::CLI)),
@@ -138,7 +138,7 @@ fn remove_binary(home: &PathBuf) {
     }
 }
 
-fn list_user_files(config_dir: &PathBuf) {
+fn list_user_files(config_dir: &Path) {
     let subdirs = ["plugins", "themes"];
     for sub in subdirs {
         let dir = config_dir.join(sub);

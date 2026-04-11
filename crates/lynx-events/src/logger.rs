@@ -65,7 +65,7 @@ pub fn write_entry(event: &Event, source: &str) -> std::io::Result<()> {
     };
 
     let mut line = serde_json::to_string(&entry)
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        .map_err(std::io::Error::other)?;
     line.push('\n');
 
     let mut file = std::fs::OpenOptions::new()

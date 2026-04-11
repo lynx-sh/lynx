@@ -55,7 +55,7 @@ impl LynxError {
         };
         let fix = match e.kind() {
             std::io::ErrorKind::NotFound => {
-                if path.extension().map_or(false, |ext| ext == "toml") {
+                if path.extension().is_some_and(|ext| ext == "toml") {
                     "run `lx init` to regenerate config, or `lx doctor` to diagnose".into()
                 } else {
                     "check that the path exists and is readable".into()

@@ -1,32 +1,22 @@
 use serde::{Deserialize, Serialize};
 
 /// The context Lynx is running in — determines what gets loaded.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum Context {
+    #[default]
     Interactive,  // normal shell use
     Agent,        // AI agentic coding (Claude Code, Cursor, etc.)
     Minimal,      // bare minimum — scripts, SSH, CI
 }
 
-impl Default for Context {
-    fn default() -> Self {
-        Self::Interactive
-    }
-}
-
 /// Load strategy for a plugin or module.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum LoadStrategy {
+    #[default]
     Eager,   // load at startup
     Lazy,    // defer until first use
-}
-
-impl Default for LoadStrategy {
-    fn default() -> Self {
-        Self::Eager
-    }
 }
 
 #[cfg(test)]

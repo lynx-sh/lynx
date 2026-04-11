@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use anyhow::{bail, Context as _, Result};
@@ -134,14 +134,14 @@ fn cmd_status() -> Result<()> {
     Ok(())
 }
 
-fn ensure_git_repo(dir: &PathBuf) -> Result<()> {
+fn ensure_git_repo(dir: &Path) -> Result<()> {
     if !dir.join(".git").exists() {
         bail!("config dir is not a git repo — run: lx sync init <remote>");
     }
     Ok(())
 }
 
-fn git(dir: &PathBuf, args: &[&str]) -> Result<()> {
+fn git(dir: &Path, args: &[&str]) -> Result<()> {
     let status = Command::new("git")
         .current_dir(dir)
         .args(args)
@@ -153,7 +153,7 @@ fn git(dir: &PathBuf, args: &[&str]) -> Result<()> {
     Ok(())
 }
 
-fn git_output(dir: &PathBuf, args: &[&str]) -> Result<String> {
+fn git_output(dir: &Path, args: &[&str]) -> Result<String> {
     let output = Command::new("git")
         .current_dir(dir)
         .args(args)
