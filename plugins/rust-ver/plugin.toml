@@ -1,0 +1,20 @@
+[plugin]
+name        = "rust-ver"
+version     = "0.1.0"
+description = "Rust toolchain version detection — reads rust-toolchain.toml or rust-toolchain; shows rust_version prompt segment"
+authors     = ["proxikal"]
+
+[load]
+lazy  = false
+hooks = []
+
+[deps]
+binaries = []
+plugins  = []
+
+[exports]
+functions = ["rust_ver_gather_state"]
+aliases   = []
+
+[contexts]
+disabled_in = ["agent", "minimal"]

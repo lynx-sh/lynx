@@ -1,4 +1,8 @@
 pub mod background_jobs;
+pub mod golang_version;
+pub mod node_version;
+pub mod ruby_version;
+pub mod rust_version;
 pub mod cmd_duration;
 pub mod conda_env;
 pub mod context_badge;
@@ -41,3 +45,8 @@ pub use time_segment::TimeSegment;
 pub use username::UsernameSegment;
 pub use venv::VenvSegment;
 pub use vi_mode::ViModeSegment;
+
+pub use golang_version::GolangVersionSegment;
+pub use node_version::NodeVersionSegment;
+pub use ruby_version::RubyVersionSegment;
+pub use rust_version::RustVersionSegment;

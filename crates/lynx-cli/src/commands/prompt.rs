@@ -9,8 +9,9 @@ use lynx_prompt::{
     segment::RenderContext,
     BackgroundJobsSegment, CmdDurationSegment, CondaEnvSegment, ContextBadgeSegment, DirSegment,
     ExitCodeSegment, GitActionSegment, GitAheadBehindSegment, GitBranchSegment, GitStashSegment,
-    GitStatusSegment, HostnameSegment, KubectlContextSegment, NewlineSegment, ProfileBadgeSegment,
-    PromptCharSegment, SshIndicatorSegment, TaskStatusSegment, TimeSegment, UsernameSegment,
+    GitStatusSegment, GolangVersionSegment, HostnameSegment, KubectlContextSegment, NewlineSegment,
+    NodeVersionSegment, ProfileBadgeSegment, PromptCharSegment, RubyVersionSegment,
+    RustVersionSegment, SshIndicatorSegment, TaskStatusSegment, TimeSegment, UsernameSegment,
     VenvSegment, ViModeSegment,
 };
 use lynx_theme::loader::load as load_theme;
@@ -72,6 +73,10 @@ async fn cmd_render(transient: bool) -> Result<()> {
         Box::new(GitAheadBehindSegment),
         Box::new(GitStashSegment),
         Box::new(KubectlContextSegment),
+        Box::new(NodeVersionSegment),
+        Box::new(RubyVersionSegment),
+        Box::new(GolangVersionSegment),
+        Box::new(RustVersionSegment),
         Box::new(VenvSegment),
         Box::new(CondaEnvSegment),
         Box::new(ProfileBadgeSegment),
@@ -120,6 +125,30 @@ fn build_render_context_from_env() -> RenderContext {
     if let Ok(kubectl_json) = std::env::var(env_vars::LYNX_CACHE_KUBECTL_STATE) {
         if let Ok(v) = serde_json::from_str::<serde_json::Value>(&kubectl_json) {
             cache.insert(cache_keys::KUBECTL_STATE.into(), v);
+        }
+    }
+
+    if let Ok(json) = std::env::var(env_vars::LYNX_CACHE_NODE_STATE) {
+        if let Ok(v) = serde_json::from_str::<serde_json::Value>(&json) {
+            cache.insert(cache_keys::NODE_STATE.into(), v);
+        }
+    }
+
+    if let Ok(json) = std::env::var(env_vars::LYNX_CACHE_RUBY_STATE) {
+        if let Ok(v) = serde_json::from_str::<serde_json::Value>(&json) {
+            cache.insert(cache_keys::RUBY_STATE.into(), v);
+        }
+    }
+
+    if let Ok(json) = std::env::var(env_vars::LYNX_CACHE_GOLANG_STATE) {
+        if let Ok(v) = serde_json::from_str::<serde_json::Value>(&json) {
+            cache.insert(cache_keys::GOLANG_STATE.into(), v);
+        }
+    }
+
+    if let Ok(json) = std::env::var(env_vars::LYNX_CACHE_RUST_STATE) {
+        if let Ok(v) = serde_json::from_str::<serde_json::Value>(&json) {
+            cache.insert(cache_keys::RUST_STATE.into(), v);
         }
     }
 

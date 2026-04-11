@@ -24,6 +24,18 @@ pub const LYNX_CACHE_GIT_STATE: &str = "LYNX_CACHE_GIT_STATE";
 /// JSON-serialized kubectl context cache. Set by the kubectl plugin.
 pub const LYNX_CACHE_KUBECTL_STATE: &str = "LYNX_CACHE_KUBECTL_STATE";
 
+/// JSON-serialized Node.js version cache. Set by the node plugin from .node-version/.nvmrc.
+pub const LYNX_CACHE_NODE_STATE: &str = "LYNX_CACHE_NODE_STATE";
+
+/// JSON-serialized Ruby version cache. Set by the ruby plugin from .ruby-version.
+pub const LYNX_CACHE_RUBY_STATE: &str = "LYNX_CACHE_RUBY_STATE";
+
+/// JSON-serialized Go version cache. Set by the golang plugin from go.mod.
+pub const LYNX_CACHE_GOLANG_STATE: &str = "LYNX_CACHE_GOLANG_STATE";
+
+/// JSON-serialized Rust toolchain cache. Set by the rust-ver plugin from rust-toolchain.toml.
+pub const LYNX_CACHE_RUST_STATE: &str = "LYNX_CACHE_RUST_STATE";
+
 /// Set by `lx init` to the plugin directory path.
 pub const LYNX_PLUGIN_DIR: &str = "LYNX_PLUGIN_DIR";
 

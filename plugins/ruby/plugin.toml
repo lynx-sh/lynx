@@ -1,0 +1,20 @@
+[plugin]
+name        = "ruby"
+version     = "0.1.0"
+description = "Ruby version detection — reads .ruby-version; shows ruby_version prompt segment"
+authors     = ["proxikal"]
+
+[load]
+lazy  = false
+hooks = []
+
+[deps]
+binaries = []
+plugins  = []
+
+[exports]
+functions = ["ruby_gather_state"]
+aliases   = []
+
+[contexts]
+disabled_in = ["agent", "minimal"]

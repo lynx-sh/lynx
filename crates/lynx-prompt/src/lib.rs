@@ -9,7 +9,8 @@ pub use segment::{RenderContext, RenderedSegment, Segment};
 pub use segments::{
     BackgroundJobsSegment, CmdDurationSegment, CondaEnvSegment, ContextBadgeSegment, DirSegment,
     ExitCodeSegment, GitActionSegment, GitAheadBehindSegment, GitBranchSegment, GitStashSegment,
-    GitStatusSegment, HostnameSegment, KubectlContextSegment, NewlineSegment, ProfileBadgeSegment,
-    PromptCharSegment, SshIndicatorSegment, TaskStatusSegment, TimeSegment, UsernameSegment,
+    GitStatusSegment, GolangVersionSegment, HostnameSegment, KubectlContextSegment, NewlineSegment,
+    NodeVersionSegment, ProfileBadgeSegment, PromptCharSegment, RubyVersionSegment,
+    RustVersionSegment, SshIndicatorSegment, TaskStatusSegment, TimeSegment, UsernameSegment,
     VenvSegment, ViModeSegment,
 };

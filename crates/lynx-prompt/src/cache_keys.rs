@@ -12,3 +12,15 @@ pub const KUBECTL_STATE: &str = "kubectl_state";
 
 /// Active profile state JSON — currently active profile name.
 pub const PROFILE_STATE: &str = "profile_state";
+
+/// Node.js version state JSON — set by the node plugin from .node-version/.nvmrc.
+pub const NODE_STATE: &str = "node_state";
+
+/// Ruby version state JSON — set by the ruby plugin from .ruby-version.
+pub const RUBY_STATE: &str = "ruby_state";
+
+/// Go version state JSON — set by the golang plugin from go.mod.
+pub const GOLANG_STATE: &str = "golang_state";
+
+/// Rust toolchain state JSON — set by the rust-ver plugin from rust-toolchain.toml.
+pub const RUST_STATE: &str = "rust_state";
