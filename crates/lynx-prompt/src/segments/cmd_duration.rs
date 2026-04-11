@@ -1,10 +1,13 @@
 use serde::Deserialize;
 
-use crate::segment::{RenderContext, RenderedSegment, Segment};
+use crate::segment::{apply_format, RenderContext, RenderedSegment, Segment};
 
 #[derive(Deserialize, Default)]
 struct CmdDurationConfig {
     min_ms: Option<u64>,
+    /// Format template. Available vars: `$duration`.
+    /// Default: `"$duration"`.
+    format: Option<String>,
 }
 
 pub struct CmdDurationSegment;
@@ -21,7 +24,12 @@ impl Segment for CmdDurationSegment {
         if ms < threshold {
             return None;
         }
-        Some(RenderedSegment::new(format_duration(ms)))
+        let dur = format_duration(ms);
+        let text = match cfg.format.as_deref() {
+            Some(tmpl) => apply_format(tmpl, &[("duration", &dur)]),
+            None => dur,
+        };
+        Some(RenderedSegment::new(text))
     }
 }
 

@@ -2,12 +2,15 @@ use std::path::Path;
 
 use serde::Deserialize;
 
-use crate::segment::{RenderContext, RenderedSegment, Segment};
+use crate::segment::{apply_format, RenderContext, RenderedSegment, Segment};
 
 #[derive(Deserialize, Default)]
 struct DirConfig {
     max_depth: Option<u32>,
     truncate_to_repo: Option<bool>,
+    /// Format template. Available vars: `$path`.
+    /// Default: `"$path"`.
+    format: Option<String>,
 }
 
 pub struct DirSegment;
@@ -28,7 +31,11 @@ impl Segment for DirSegment {
             shorten(&ctx.cwd, max_depth, truncate_to_repo, &ctx.cache)
         };
 
-        Some(RenderedSegment::new(display))
+        let text = match cfg.format.as_deref() {
+            Some(tmpl) => apply_format(tmpl, &[("path", &display)]),
+            None => display,
+        };
+        Some(RenderedSegment::new(text))
     }
 }
 

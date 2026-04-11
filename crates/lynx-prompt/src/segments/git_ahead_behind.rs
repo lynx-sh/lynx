@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use crate::segment::{RenderContext, RenderedSegment, Segment};
+use crate::segment::{apply_format, RenderContext, RenderedSegment, Segment};
 
 #[derive(Deserialize, Default)]
 struct GitAheadBehindConfig {
@@ -8,6 +8,10 @@ struct GitAheadBehindConfig {
     ahead_symbol: Option<String>,
     /// Symbol for behind count. Default: "↓".
     behind_symbol: Option<String>,
+    /// Format template. Available vars: `$ahead`, `$behind`.
+    /// Each expands to `<symbol><count>` when non-zero, or empty string.
+    /// Default: `"$ahead $behind"` (space-joined, trimmed).
+    format: Option<String>,
 }
 
 pub struct GitAheadBehindSegment;
@@ -42,15 +46,28 @@ impl Segment for GitAheadBehindSegment {
         let ahead_sym = cfg.ahead_symbol.unwrap_or_else(|| "↑".to_string());
         let behind_sym = cfg.behind_symbol.unwrap_or_else(|| "↓".to_string());
 
-        let mut parts: Vec<String> = Vec::new();
-        if ahead > 0 {
-            parts.push(format!("{ahead_sym}{ahead}"));
-        }
-        if behind > 0 {
-            parts.push(format!("{behind_sym}{behind}"));
+        let ahead_str = if ahead > 0 { format!("{ahead_sym}{ahead}") } else { String::new() };
+        let behind_str = if behind > 0 { format!("{behind_sym}{behind}") } else { String::new() };
+
+        let text = match cfg.format.as_deref() {
+            Some(tmpl) => {
+                let s = apply_format(tmpl, &[("ahead", &ahead_str), ("behind", &behind_str)]);
+                // Trim leading/trailing whitespace that results from empty vars.
+                s.trim().to_string()
+            }
+            None => {
+                let mut parts: Vec<&str> = Vec::new();
+                if !ahead_str.is_empty() { parts.push(&ahead_str); }
+                if !behind_str.is_empty() { parts.push(&behind_str); }
+                parts.join(" ")
+            }
+        };
+
+        if text.is_empty() {
+            return None;
         }
 
-        Some(RenderedSegment::new(parts.join(" ")).with_cache_key("git_ahead_behind"))
+        Some(RenderedSegment::new(text).with_cache_key("git_ahead_behind"))
     }
 }
 
