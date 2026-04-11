@@ -1,11 +1,11 @@
 # git plugin — functions.zsh
-# All git state is cached into _lynx_git_state[] on chpwd/precmd.
+# All git state is cached into _lynx_git_state[] by lx refresh-state (precmd hook).
 # Prompt segments read from the cache — no git calls in render path.
 
 typeset -gA _lynx_git_state
 
-# Refresh the git state cache. Called on chpwd and precmd hooks.
-# All logic lives in Rust (lx git-state) — D-001.
+# Manual refresh — useful in interactive scripts or after a rebase/reset.
+# Under normal use lx refresh-state handles this automatically each precmd.
 git_refresh_state() { eval "$(lx git-state 2>/dev/null)" }
 
 # Public helpers — read from cache (fast, safe in prompt)
@@ -23,7 +23,3 @@ git_ahead_behind() {
   [[ "$a" == "0" && "$b" == "0" ]] && return 0
   echo "+${a}/-${b}"
 }
-
-# Hook targets — registered via plugin.toml hooks[]
-_git_plugin_chpwd()  { git_refresh_state }
-_git_plugin_precmd() { git_refresh_state }
