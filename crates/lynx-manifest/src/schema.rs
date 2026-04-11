@@ -18,6 +18,39 @@ pub struct PluginManifest {
     pub contexts: ContextsConfig,
     #[serde(default)]
     pub state: StateConfig,
+    /// Shell integration config — ZLE widgets, keybindings, and fpath entries.
+    #[serde(default)]
+    pub shell: ShellConfig,
+}
+
+/// Shell integration config for a plugin.
+///
+/// Emitted by `lx plugin exec` as eval-able zsh during plugin load.
+/// All paths in `fpath` are relative to the plugin directory.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+pub struct ShellConfig {
+    /// Directories to prepend to `$fpath` (relative to plugin dir).
+    /// Convention: `completions/` for zsh completion files.
+    /// Emitted as `fpath=("$LYNX_PLUGIN_DIR/<dir>" $fpath)` before init.zsh is sourced.
+    #[serde(default)]
+    pub fpath: Vec<String>,
+    /// ZLE widgets to register with `zle -N`.
+    /// The widget function must be defined in functions.zsh and listed in exports.functions.
+    #[serde(default)]
+    pub widgets: Vec<String>,
+    /// Key bindings to register with `bindkey`.
+    /// Each entry binds a key sequence to a ZLE widget.
+    #[serde(default)]
+    pub keybindings: Vec<KeyBinding>,
+}
+
+/// A single key → widget binding emitted as `bindkey '<key>' <widget>`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct KeyBinding {
+    /// The key sequence (e.g. `"^F"`, `"\\eOA"`, `"${terminfo[kcuu1]}"`).
+    pub key: String,
+    /// The ZLE widget to invoke (must be declared in `shell.widgets`).
+    pub widget: String,
 }
 
 fn default_schema_version() -> u32 {

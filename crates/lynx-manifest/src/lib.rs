@@ -94,4 +94,53 @@ aliases   = []
         let m = parse(toml).unwrap();
         assert!(m.state.gather.is_none());
     }
+
+    #[test]
+    fn plugin_toml_without_shell_section_defaults_to_empty() {
+        // Backwards compat: existing plugin.toml files have no [shell] section.
+        let m = parse(GIT_PLUGIN_TOML).unwrap();
+        assert!(m.shell.fpath.is_empty());
+        assert!(m.shell.widgets.is_empty());
+        assert!(m.shell.keybindings.is_empty());
+    }
+
+    #[test]
+    fn plugin_toml_shell_fpath_parses() {
+        let toml = r#"
+[plugin]
+name    = "fzf-plugin"
+version = "0.1.0"
+
+[shell]
+fpath = ["completions", "extra-fpath"]
+"#;
+        let m = parse(toml).unwrap();
+        assert_eq!(m.shell.fpath, vec!["completions", "extra-fpath"]);
+    }
+
+    #[test]
+    fn plugin_toml_shell_widgets_and_keybindings_parse() {
+        let toml = r#"
+[plugin]
+name    = "fzf-plugin"
+version = "0.1.0"
+
+[shell]
+widgets = ["fzf_history_widget", "fzf_file_widget"]
+
+[[shell.keybindings]]
+key    = "^R"
+widget = "fzf_history_widget"
+
+[[shell.keybindings]]
+key    = "^T"
+widget = "fzf_file_widget"
+"#;
+        let m = parse(toml).unwrap();
+        assert_eq!(m.shell.widgets, vec!["fzf_history_widget", "fzf_file_widget"]);
+        assert_eq!(m.shell.keybindings.len(), 2);
+        assert_eq!(m.shell.keybindings[0].key, "^R");
+        assert_eq!(m.shell.keybindings[0].widget, "fzf_history_widget");
+        assert_eq!(m.shell.keybindings[1].key, "^T");
+    }
 }

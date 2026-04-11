@@ -95,6 +95,7 @@ mod tests {
             },
             contexts: ContextsConfig::default(),
             state: StateConfig::default(),
+            shell: ShellConfig::default(),
         }
     }
 
