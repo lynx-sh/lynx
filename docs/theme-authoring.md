@@ -514,6 +514,65 @@ lx theme switch powerline
 
 ---
 
+## CLI Theme Customization
+
+Lynx provides three layers of CLI customization — all write to the same TOML
+file through the same snapshot/validate/rollback pipeline:
+
+### Layer 1 — Convenience shorthands (humans)
+
+```bash
+lx theme caret "❯"                    # change prompt character
+lx theme caret-color light-blue       # change caret color (named or hex)
+lx theme palette accent "#7aa2f7"     # change a palette key
+lx theme palette error dark-red       # named colors work everywhere
+
+lx theme segment remove cmd_duration  # hide a segment entirely
+lx theme segment move git_branch right  # move to right side
+lx theme segment add venv left --after dir  # insert after dir on left
+```
+
+### Layer 2 — Surgical patch (power users and AI agents)
+
+`lx theme patch <dot.path> <value>` mutates any scalar field in the active
+theme TOML by dot-separated path:
+
+```bash
+# Colors
+lx theme patch colors.accent light-blue
+lx theme patch segment.dir.color.fg "#7aa2f7"
+lx theme patch segment.git_branch.color.bold true
+
+# Structure
+lx theme patch segment.git_branch.icon "["
+lx theme patch segment.git_status.staged.icon "+"
+
+# Visibility
+lx theme patch segment.username.show_in '["interactive"]'
+lx theme patch segment.context_badge.hide_in '["minimal"]'
+```
+
+All patch operations: copy built-in to user dir if needed → snapshot → apply
+→ validate → rollback on failure → emit `theme:changed`.
+
+### Layer 3 — Full editor
+
+```bash
+lx theme edit   # opens active theme in $EDITOR with rollback on bad save
+```
+
+### lx theme studio (WYSIWYG — planned, H-062)
+
+```bash
+lx theme studio   # starts a local web server, opens browser
+```
+
+A local web UI with live prompt preview, drag-and-drop segment ordering,
+color pickers backed by the named color registry, and one-click apply.
+No npm, no build step — ships embedded in the binary.
+
+---
+
 ## Testing Your Theme
 
 Validate the TOML schema:
