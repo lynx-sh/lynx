@@ -10,8 +10,8 @@ lynx-core          ← NO internal deps. Foundation only.
 ├── lynx-template  ← lynx-core, lynx-config
 ├── lynx-shell     ← lynx-core, lynx-manifest
 │   └── lynx-loader    ← lynx-core, lynx-manifest, lynx-events, lynx-shell
-│       └── lynx-prompt    ← lynx-core, lynx-config, lynx-events, lynx-template
-│           └── lynx-theme     ← lynx-core, lynx-config
+│       └── lynx-prompt    ← lynx-core, lynx-config, lynx-events, lynx-template, lynx-theme
+lynx-theme         ← lynx-core, lynx-config
 lynx-plugin        ← lynx-core, lynx-manifest, lynx-events, lynx-shell
 lynx-task          ← lynx-core, lynx-config
 lynx-daemon        ← lynx-core, lynx-events, lynx-task
