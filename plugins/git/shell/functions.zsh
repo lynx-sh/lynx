@@ -11,6 +11,9 @@ git_refresh_state() { eval "$(lx git-state 2>/dev/null)" }
 # Public helpers — read from cache (fast, safe in prompt)
 git_branch()      { echo "${_lynx_git_state[branch]}" }
 git_dirty()       { echo "${_lynx_git_state[dirty]:-0}" }
+git_staged()      { echo "${_lynx_git_state[staged]:-0}" }
+git_modified()    { echo "${_lynx_git_state[modified]:-0}" }
+git_untracked()   { echo "${_lynx_git_state[untracked]:-0}" }
 git_stash_count() { echo "${_lynx_git_state[stash]:-0}" }
 git_root()        { echo "${_lynx_git_state[root]}" }
 

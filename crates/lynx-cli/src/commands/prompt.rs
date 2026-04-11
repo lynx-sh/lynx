@@ -202,10 +202,11 @@ mod tests {
     fn valid_git_cache_json_is_loaded() {
         let _lock = env_lock().lock().expect("lock");
         let _guard = EnvGuard::new(&[lynx_core::env_vars::LYNX_CACHE_GIT_STATE, "PWD"]);
-        std::env::set_var(lynx_core::env_vars::LYNX_CACHE_GIT_STATE, r#"{"branch":"main","dirty":"0"}"#);
+        std::env::set_var(lynx_core::env_vars::LYNX_CACHE_GIT_STATE, r#"{"branch":"main","dirty":false,"staged":false,"modified":false,"untracked":false,"stash":0,"ahead":0,"behind":0}"#);
         std::env::set_var("PWD", "/");
         let ctx = build_render_context_from_env();
         assert_eq!(ctx.cache[lynx_prompt::cache_keys::GIT_STATE]["branch"], "main");
+        assert_eq!(ctx.cache[lynx_prompt::cache_keys::GIT_STATE]["staged"], false);
     }
 
     #[test]
