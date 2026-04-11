@@ -4,12 +4,12 @@ use anyhow::{Context, Result};
 use clap::Args;
 use lynx_core::brand;
 
-const LYNX_INIT_LINE: &str = r#"eval "$(lx init)""#;
-const LYNX_INIT_PATTERN: &str = r#"eval "$(lx init"#;
+const LYNX_INIT_LINE: &str = r#"source "${HOME}/.config/lynx/shell/init.zsh""#;
+const LYNX_INIT_PATTERN: &str = r#"source "${HOME}/.config/lynx/shell/init.zsh""#;
 
 #[derive(Args)]
 pub struct InstallArgs {
-    /// Also add `eval "$(lx init)"` to ~/.zshrc
+    /// Also add `source ~/.config/lynx/shell/init.zsh` to ~/.zshrc
     #[arg(long)]
     pub zshrc: bool,
 

@@ -5,7 +5,7 @@ use clap::Args;
 
 use lynx_core::brand;
 
-const LYNX_INIT_PATTERN: &str = r#"eval "$(lx init"#;
+const LYNX_INIT_PATTERN: &str = r#"source "${HOME}/.config/lynx/shell/init.zsh""#;
 
 #[derive(Args)]
 pub struct UninstallArgs {
@@ -44,7 +44,10 @@ pub async fn run(args: UninstallArgs) -> Result<()> {
     let config_dir = home.join(brand::CONFIG_DIR);
     if args.purge && config_dir.exists() {
         if !args.yes {
-            eprint!("Remove {} (including your themes, plugins, and snapshots)? [y/N] ", config_dir.display());
+            eprint!(
+                "Remove {} (including your themes, plugins, and snapshots)? [y/N] ",
+                config_dir.display()
+            );
             let mut input = String::new();
             std::io::stdin().read_line(&mut input)?;
             if !input.trim().eq_ignore_ascii_case("y") {
@@ -61,7 +64,10 @@ pub async fn run(args: UninstallArgs) -> Result<()> {
     } else if args.purge {
         println!("  config dir not found — nothing to remove");
     } else {
-        println!("  config preserved at {} (use --purge to remove)", config_dir.display());
+        println!(
+            "  config preserved at {} (use --purge to remove)",
+            config_dir.display()
+        );
     }
 
     println!();

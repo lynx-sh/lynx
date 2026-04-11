@@ -48,10 +48,7 @@ pub fn generate_init_script(params: &InitParams<'_>) -> String {
     for plugin in params.enabled_plugins {
         // In agent/minimal contexts, plugin aliases are suppressed by the plugin itself
         // via disabled_in — we still call the bridge so functions load.
-        out.push_str(&format!(
-            "  lynx_eval_plugin {}\n",
-            shell_quote(plugin)
-        ));
+        out.push_str(&format!("  lynx_eval_plugin {}\n", shell_quote(plugin)));
     }
 
     out.push_str("  export LYNX_INITIALIZED=1\n");
@@ -91,11 +88,26 @@ mod tests {
     fn eval_bridge_is_sourced_before_plugins() {
         let plugins = vec!["git".to_string()];
         let script = generate_init_script(&base_params(&Context::Interactive, &plugins));
-        assert!(script.contains("eval-bridge.zsh"), "eval-bridge must be sourced");
+        assert!(
+            script.contains("eval-bridge.zsh"),
+            "eval-bridge must be sourced"
+        );
         // eval-bridge must appear before the first lynx_eval_plugin call
         let bridge_pos = script.find("eval-bridge.zsh").unwrap();
         let plugin_pos = script.find("lynx_eval_plugin").unwrap();
-        assert!(bridge_pos < plugin_pos, "eval-bridge must be sourced before plugin calls");
+        assert!(
+            bridge_pos < plugin_pos,
+            "eval-bridge must be sourced before plugin calls"
+        );
+    }
+
+    #[test]
+    fn daemon_is_not_autostarted_on_init() {
+        let script = generate_init_script(&base_params(&Context::Interactive, &[]));
+        assert!(
+            !script.contains("lx daemon"),
+            "daemon must not auto-start on shell init — it is opt-in only"
+        );
     }
 
     #[test]

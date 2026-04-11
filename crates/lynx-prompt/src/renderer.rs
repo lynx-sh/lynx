@@ -12,7 +12,7 @@ pub fn render_prompt(left: &[RenderedSegment], right: &[RenderedSegment], theme:
     let rprompt = assemble(right, theme);
 
     // Output as shell assignments for eval by precmd hook.
-    format!("PROMPT={prompt:?}\nRPROMPT={rprompt:?}\n")
+    format!("PROMPT=\"{prompt}\"\nRPROMPT=\"{rprompt}\"\n")
 }
 
 /// Assemble a prompt string from segments, applying theme colors.
