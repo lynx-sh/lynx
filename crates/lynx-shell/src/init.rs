@@ -38,6 +38,12 @@ pub fn generate_init_script(params: &InitParams<'_>) -> String {
         dir = shell_quote(params.lynx_dir),
     ));
 
+    // Source eval-bridge so lynx_eval_plugin / lynx_eval_safe are available
+    out.push_str(&format!(
+        "  source {dir}/shell/lib/eval-bridge.zsh 2>/dev/null\n",
+        dir = shell_quote(params.lynx_dir),
+    ));
+
     // Eval-bridge calls for each enabled plugin
     for plugin in params.enabled_plugins {
         // In agent/minimal contexts, plugin aliases are suppressed by the plugin itself
@@ -79,6 +85,17 @@ mod tests {
         assert!(script.contains("LYNX_DIR="));
         assert!(script.contains("LYNX_CONTEXT=interactive"));
         assert!(script.contains("LYNX_PLUGIN_DIR="));
+    }
+
+    #[test]
+    fn eval_bridge_is_sourced_before_plugins() {
+        let plugins = vec!["git".to_string()];
+        let script = generate_init_script(&base_params(&Context::Interactive, &plugins));
+        assert!(script.contains("eval-bridge.zsh"), "eval-bridge must be sourced");
+        // eval-bridge must appear before the first lynx_eval_plugin call
+        let bridge_pos = script.find("eval-bridge.zsh").unwrap();
+        let plugin_pos = script.find("lynx_eval_plugin").unwrap();
+        assert!(bridge_pos < plugin_pos, "eval-bridge must be sourced before plugin calls");
     }
 
     #[test]

@@ -16,8 +16,16 @@ pub fn snapshots_dir() -> PathBuf {
 /// Create a snapshot of the config dir, returning the snapshot path.
 /// Trims oldest snapshots to keep at most MAX_SNAPSHOTS.
 pub fn create(config_dir: &Path, label: &str) -> Result<PathBuf> {
-    let dir = snapshots_dir();
-    std::fs::create_dir_all(&dir).map_err(LynxError::Io)?;
+    create_in(&snapshots_dir(), config_dir, label)
+}
+
+/// List snapshots sorted newest-first as (timestamp_label, path).
+pub fn list() -> Result<Vec<(String, PathBuf)>> {
+    list_in(&snapshots_dir())
+}
+
+fn create_in(snaps_dir: &Path, config_dir: &Path, label: &str) -> Result<PathBuf> {
+    std::fs::create_dir_all(snaps_dir).map_err(LynxError::Io)?;
 
     let ts = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -29,26 +37,24 @@ pub fn create(config_dir: &Path, label: &str) -> Result<PathBuf> {
         .map(|c| if c.is_ascii_alphanumeric() || c == '-' { c } else { '_' })
         .collect();
 
-    let snap_dir = dir.join(format!("{ts}_{safe_label}"));
+    let snap_dir = snaps_dir.join(format!("{ts}_{safe_label}"));
     std::fs::create_dir_all(&snap_dir).map_err(LynxError::Io)?;
 
     // Copy config files (non-recursive: direct children only).
     copy_config_files(config_dir, &snap_dir)?;
 
     // Trim to MAX_SNAPSHOTS.
-    trim_snapshots(&dir)?;
+    trim_snapshots(snaps_dir)?;
 
     Ok(snap_dir)
 }
 
-/// List snapshots sorted newest-first as (timestamp_label, path).
-pub fn list() -> Result<Vec<(String, PathBuf)>> {
-    let dir = snapshots_dir();
-    if !dir.exists() {
+fn list_in(snaps_dir: &Path) -> Result<Vec<(String, PathBuf)>> {
+    if !snaps_dir.exists() {
         return Ok(vec![]);
     }
 
-    let mut entries: Vec<(String, PathBuf)> = std::fs::read_dir(&dir)
+    let mut entries: Vec<(String, PathBuf)> = std::fs::read_dir(snaps_dir)
         .map_err(LynxError::Io)?
         .flatten()
         .filter(|e| e.path().is_dir())
@@ -116,25 +122,25 @@ mod tests {
     use super::*;
     use std::fs;
 
+    /// Returns (config_dir, snaps_dir) — both isolated temp dirs.
     fn setup() -> (tempfile::TempDir, tempfile::TempDir) {
         let config = tempfile::tempdir().unwrap();
         let snaps = tempfile::tempdir().unwrap();
-        // Write a dummy config file.
         fs::write(config.path().join("config.toml"), "active_theme = \"default\"").unwrap();
         (config, snaps)
     }
 
     #[test]
     fn create_snapshot_copies_files() {
-        let (config, _) = setup();
-        let snap = create(config.path(), "test-label").unwrap();
+        let (config, snaps) = setup();
+        let snap = create_in(snaps.path(), config.path(), "test-label").unwrap();
         assert!(snap.join("config.toml").exists());
     }
 
     #[test]
     fn restore_copies_files_back() {
-        let (config, _) = setup();
-        let snap = create(config.path(), "restore-test").unwrap();
+        let (config, snaps) = setup();
+        let snap = create_in(snaps.path(), config.path(), "restore-test").unwrap();
 
         // Corrupt the config.
         fs::write(config.path().join("config.toml"), "broken = true").unwrap();
@@ -146,29 +152,27 @@ mod tests {
 
     #[test]
     fn list_returns_newest_first() {
-        let (config, _) = setup();
-        create(config.path(), "first").unwrap();
+        let (config, snaps) = setup();
+        create_in(snaps.path(), config.path(), "first").unwrap();
         std::thread::sleep(std::time::Duration::from_millis(10));
-        create(config.path(), "second").unwrap();
+        create_in(snaps.path(), config.path(), "second").unwrap();
 
-        let snaps = list().unwrap();
-        // The test snapshots will be mixed with any real ones; just verify ordering.
-        // Each entry's name starts with a unix timestamp so sorting is correct.
-        for window in snaps.windows(2) {
+        let entries = list_in(snaps.path()).unwrap();
+        assert_eq!(entries.len(), 2);
+        for window in entries.windows(2) {
             assert!(window[0].0 >= window[1].0, "list not newest-first");
         }
     }
 
     #[test]
     fn trim_keeps_max_snapshots() {
-        let (config, _) = setup();
+        let (config, snaps) = setup();
         // Create MAX_SNAPSHOTS + 2 snapshots with small delays.
         for i in 0..=(MAX_SNAPSHOTS + 1) {
-            create(config.path(), &format!("s{i}")).unwrap();
-            // Tiny sleep so timestamps differ.
+            create_in(snaps.path(), config.path(), &format!("s{i}")).unwrap();
             std::thread::sleep(std::time::Duration::from_millis(2));
         }
-        let snaps = list().unwrap();
-        assert!(snaps.len() <= MAX_SNAPSHOTS, "too many snapshots: {}", snaps.len());
+        let entries = list_in(snaps.path()).unwrap();
+        assert!(entries.len() <= MAX_SNAPSHOTS, "too many snapshots: {}", entries.len());
     }
 }

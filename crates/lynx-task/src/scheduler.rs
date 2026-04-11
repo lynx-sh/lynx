@@ -235,6 +235,10 @@ async fn write_log(log_dir: &Path, log: &TaskRunLog) {
         Ok(mut f) => {
             if let Err(e) = f.write_all(line.as_bytes()).await {
                 error!("failed to write task log: {e}");
+                return;
+            }
+            if let Err(e) = f.flush().await {
+                error!("failed to flush task log: {e}");
             }
         }
         Err(e) => error!("failed to open task log {}: {e}", path.display()),
