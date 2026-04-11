@@ -51,17 +51,18 @@ evidence = [
 owner_phase = "B13-P07"
 
 [captures.daemon_event_dataflow]
-status = "deviating"
+status = "conforming"
 actual = [
-  "event bridge sends emit/subscribe IPC messages",
-  "daemon currently logs incoming IPC JSON but does not dispatch to EventBus"
+  "EventBus runs in-process inside lx commands via bus::build_active_bus()",
+  "daemon owns task scheduler only — no IPC socket, no EventBus",
+  "lx event on removed; persistent subscriptions handled by add-zsh-hook via plugin manifests"
 ]
 evidence = [
-  "crates/lynx-events/src/bridge.rs:11",
-  "crates/lynx-daemon/src/main.rs:100",
-  "docs/architecture.md:107"
+  "crates/lynx-cli/src/bus.rs",
+  "crates/lynx-daemon/src/main.rs",
+  "crates/lynx-events/src/bus.rs"
 ]
-owner_phase = "B13-P04"
+resolved_by = "H-045"
 
 [captures.config_mutation_protocol]
 status = "deviating"

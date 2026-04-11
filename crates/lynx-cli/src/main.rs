@@ -1,3 +1,4 @@
+mod bus;
 mod cli;
 mod commands;
 

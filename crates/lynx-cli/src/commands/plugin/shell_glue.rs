@@ -5,14 +5,30 @@
 // Never write to stderr here; the shell's 2>/dev/null suppresses it on load.
 
 use anyhow::Result;
+use lynx_events::types::{Event, PLUGIN_LOADED};
 use lynx_manifest::schema::PluginManifest;
-use lynx_plugin::exec::generate_exec_script;
+use lynx_plugin::{exec::generate_exec_script, lifecycle};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 /// Emit zsh that activates the plugin's exported symbols and sets its load guard.
+///
+/// After emitting the shell glue, activates the plugin's EventBus subscriptions
+/// in-process and emits plugin:loaded so any registered handlers run.
 pub(super) async fn cmd_exec(name: &str) -> Result<()> {
     let script = generate_exec_script_for_plugin(name)?;
     print!("{}", script);
+
+    // Activate in-process: register this plugin's hook subscriptions on a
+    // short-lived bus, emit plugin:loaded, then exit.
+    if let Some(plugin_dir) = resolve_plugin_dir(name) {
+        if let Ok(Some(manifest)) = read_plugin_manifest(&plugin_dir) {
+            let bus = Arc::new(lynx_events::EventBus::new());
+            let _ = lifecycle::activate(name, &manifest, Arc::clone(&bus));
+            bus.emit(Event::new(PLUGIN_LOADED, name)).await;
+        }
+    }
+
     Ok(())
 }
 
@@ -24,8 +40,7 @@ pub(super) async fn cmd_unload(name: &str) -> Result<()> {
 }
 
 fn generate_exec_script_for_plugin(name: &str) -> Result<String> {
-    let lynx_dir = resolve_lynx_dir();
-    let resolved_dir = resolve_plugin_dir(name, &lynx_dir)
+    let resolved_dir = resolve_plugin_dir(name)
         .ok_or_else(|| anyhow::anyhow!("plugin '{}' not found. Run: lx doctor", name))?;
 
     let manifest = read_plugin_manifest(&resolved_dir)?
@@ -35,8 +50,7 @@ fn generate_exec_script_for_plugin(name: &str) -> Result<String> {
 }
 
 fn generate_unload_script_for_plugin(name: &str) -> Result<String> {
-    let lynx_dir = resolve_lynx_dir();
-    let resolved_dir = resolve_plugin_dir(name, &lynx_dir);
+    let resolved_dir = resolve_plugin_dir(name);
     let manifest = match resolved_dir {
         Some(dir) => read_plugin_manifest(&dir)?,
         None => None,
@@ -44,23 +58,19 @@ fn generate_unload_script_for_plugin(name: &str) -> Result<String> {
     Ok(build_unload_script(name, manifest.as_ref()))
 }
 
-/// Prefer LYNX_DIR env var; fall back to default install location.
-fn resolve_lynx_dir() -> String {
-    lynx_core::paths::lynx_dir()
-        .to_string_lossy()
-        .into_owned()
-}
-
-/// Check LYNX_DIR/plugins/<name> first, then the in-repo plugins/ directory.
-fn resolve_plugin_dir(name: &str, lynx_dir: &str) -> Option<PathBuf> {
-    let plugin_dir = PathBuf::from(lynx_dir).join("plugins").join(name);
-    if plugin_dir.exists() {
-        return Some(plugin_dir);
+/// Resolve the plugin directory for the given name.
+///
+/// Checks the installed plugins dir first, then the in-repo plugins/ directory
+/// (used during development and tests).
+fn resolve_plugin_dir(name: &str) -> Option<PathBuf> {
+    let installed = lynx_core::paths::installed_plugins_dir().join(name);
+    if installed.exists() {
+        return Some(installed);
     }
 
-    let repo_plugin_dir = PathBuf::from("plugins").join(name);
-    if repo_plugin_dir.exists() {
-        return Some(repo_plugin_dir);
+    let repo = PathBuf::from("plugins").join(name);
+    if repo.exists() {
+        return Some(repo);
     }
 
     None
@@ -155,11 +165,15 @@ mod tests {
     }
 
     #[test]
-    fn resolve_plugin_dir_prefers_lynx_dir_plugins() {
+    fn resolve_plugin_dir_finds_installed_plugin() {
+        let _lock = env_lock().lock().expect("lock");
+        let _guard = EnvGuard::new();
         let temp = temp_home();
+        // installed_plugins_dir() = LYNX_DIR/plugins — set LYNX_DIR to temp root
+        std::env::set_var("LYNX_DIR", temp.path());
         let plugin_path = temp.path().join("plugins").join("demo");
         std::fs::create_dir_all(&plugin_path).expect("create plugin path");
-        let resolved = resolve_plugin_dir("demo", temp.path().to_str().expect("utf8"));
+        let resolved = resolve_plugin_dir("demo");
         assert_eq!(resolved, Some(plugin_path));
     }
 

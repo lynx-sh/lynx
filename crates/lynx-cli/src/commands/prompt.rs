@@ -1,11 +1,14 @@
 use anyhow::Result;
 use clap::{Args, Subcommand};
 use lynx_config::load as load_config;
-use lynx_core::types::Context;
+use lynx_core::{brand, env_vars, types::Context};
 use lynx_prompt::{
-    evaluator::evaluate_theme, renderer::render_prompt, segment::RenderContext, CmdDurationSegment,
-    ContextBadgeSegment, DirSegment, GitBranchSegment, GitStatusSegment, KubectlContextSegment,
-    ProfileBadgeSegment, TaskStatusSegment,
+    cache_keys,
+    evaluator::evaluate_theme,
+    renderer::render_prompt,
+    segment::RenderContext,
+    CmdDurationSegment, ContextBadgeSegment, DirSegment, GitBranchSegment, GitStatusSegment,
+    KubectlContextSegment, ProfileBadgeSegment, TaskStatusSegment,
 };
 use lynx_theme::loader::load as load_theme;
 use std::collections::HashMap;
@@ -31,9 +34,24 @@ pub async fn run(args: PromptArgs) -> Result<()> {
 async fn cmd_render() -> Result<()> {
     let ctx = build_render_context_from_env();
 
+    // Run in-process plugin lifecycle and emit shell:precmd so plugin handlers
+    // fire before the prompt is built. Bus is discarded when this fn returns.
+    let plugins_dir = lynx_core::paths::installed_plugins_dir();
+    let bus = crate::bus::build_active_bus(&ctx.shell_context, &plugins_dir);
+    bus.emit(lynx_events::types::Event::new(
+        lynx_events::types::SHELL_PRECMD,
+        &ctx.cwd,
+    ))
+    .await;
+
     // --- Load theme ---
-    let theme_name = std::env::var("LYNX_THEME").unwrap_or_else(|_| "default".into());
-    let theme = load_theme(&theme_name).or_else(|_| load_theme("default"))?;
+    // Priority: LYNX_THEME env var (runtime override) → config.active_theme
+    // (user's configured choice) → brand::DEFAULT_THEME (last-resort fallback).
+    let config_theme = load_config()
+        .map(|c| c.active_theme)
+        .unwrap_or_else(|_| brand::DEFAULT_THEME.into());
+    let theme_name = std::env::var(env_vars::LYNX_THEME).unwrap_or(config_theme);
+    let theme = load_theme(&theme_name).or_else(|_| load_theme(brand::DEFAULT_THEME))?;
 
     // --- Build segment registry ---
     let segments: Vec<Box<dyn lynx_prompt::segment::Segment>> = vec![
@@ -60,21 +78,21 @@ fn build_render_context_from_env() -> RenderContext {
         .ok()
         .and_then(|v| Context::from_str(&v))
         .unwrap_or(Context::Interactive);
-    let last_cmd_ms = std::env::var("LYNX_LAST_CMD_MS")
+    let last_cmd_ms = std::env::var(env_vars::LYNX_LAST_CMD_MS)
         .ok()
         .and_then(|v| v.parse::<u64>().ok());
 
     let mut cache: HashMap<String, serde_json::Value> = HashMap::new();
 
-    if let Ok(git_json) = std::env::var("LYNX_CACHE_GIT_STATE") {
+    if let Ok(git_json) = std::env::var(env_vars::LYNX_CACHE_GIT_STATE) {
         if let Ok(v) = serde_json::from_str::<serde_json::Value>(&git_json) {
-            cache.insert("git_state".into(), v);
+            cache.insert(cache_keys::GIT_STATE.into(), v);
         }
     }
 
-    if let Ok(kubectl_json) = std::env::var("LYNX_CACHE_KUBECTL_STATE") {
+    if let Ok(kubectl_json) = std::env::var(env_vars::LYNX_CACHE_KUBECTL_STATE) {
         if let Ok(v) = serde_json::from_str::<serde_json::Value>(&kubectl_json) {
-            cache.insert("kubectl_state".into(), v);
+            cache.insert(cache_keys::KUBECTL_STATE.into(), v);
         }
     }
 
@@ -82,7 +100,7 @@ fn build_render_context_from_env() -> RenderContext {
         if let Some(profile) = &config.active_profile {
             if !profile.is_empty() {
                 cache.insert(
-                    "profile_state".into(),
+                    cache_keys::PROFILE_STATE.into(),
                     serde_json::json!({ "name": profile }),
                 );
             }
@@ -163,8 +181,8 @@ mod tests {
     #[test]
     fn parses_last_command_ms_from_env() {
         let _lock = env_lock().lock().expect("lock");
-        let _guard = EnvGuard::new(&["LYNX_LAST_CMD_MS", "PWD"]);
-        std::env::set_var("LYNX_LAST_CMD_MS", "1234");
+        let _guard = EnvGuard::new(&[lynx_core::env_vars::LYNX_LAST_CMD_MS, "PWD"]);
+        std::env::set_var(lynx_core::env_vars::LYNX_LAST_CMD_MS, "1234");
         std::env::set_var("PWD", "/");
         let ctx = build_render_context_from_env();
         assert_eq!(ctx.last_cmd_ms, Some(1234));
@@ -173,8 +191,8 @@ mod tests {
     #[test]
     fn invalid_last_command_ms_is_ignored() {
         let _lock = env_lock().lock().expect("lock");
-        let _guard = EnvGuard::new(&["LYNX_LAST_CMD_MS", "PWD"]);
-        std::env::set_var("LYNX_LAST_CMD_MS", "not-a-number");
+        let _guard = EnvGuard::new(&[lynx_core::env_vars::LYNX_LAST_CMD_MS, "PWD"]);
+        std::env::set_var(lynx_core::env_vars::LYNX_LAST_CMD_MS, "not-a-number");
         std::env::set_var("PWD", "/");
         let ctx = build_render_context_from_env();
         assert_eq!(ctx.last_cmd_ms, None);
@@ -183,34 +201,34 @@ mod tests {
     #[test]
     fn valid_git_cache_json_is_loaded() {
         let _lock = env_lock().lock().expect("lock");
-        let _guard = EnvGuard::new(&["LYNX_CACHE_GIT_STATE", "PWD"]);
-        std::env::set_var("LYNX_CACHE_GIT_STATE", r#"{"branch":"main","dirty":"0"}"#);
+        let _guard = EnvGuard::new(&[lynx_core::env_vars::LYNX_CACHE_GIT_STATE, "PWD"]);
+        std::env::set_var(lynx_core::env_vars::LYNX_CACHE_GIT_STATE, r#"{"branch":"main","dirty":"0"}"#);
         std::env::set_var("PWD", "/");
         let ctx = build_render_context_from_env();
-        assert_eq!(ctx.cache["git_state"]["branch"], "main");
+        assert_eq!(ctx.cache[lynx_prompt::cache_keys::GIT_STATE]["branch"], "main");
     }
 
     #[test]
     fn invalid_git_cache_json_is_ignored() {
         let _lock = env_lock().lock().expect("lock");
-        let _guard = EnvGuard::new(&["LYNX_CACHE_GIT_STATE", "PWD"]);
-        std::env::set_var("LYNX_CACHE_GIT_STATE", "not-json");
+        let _guard = EnvGuard::new(&[lynx_core::env_vars::LYNX_CACHE_GIT_STATE, "PWD"]);
+        std::env::set_var(lynx_core::env_vars::LYNX_CACHE_GIT_STATE, "not-json");
         std::env::set_var("PWD", "/");
         let ctx = build_render_context_from_env();
-        assert!(!ctx.cache.contains_key("git_state"));
+        assert!(!ctx.cache.contains_key(lynx_prompt::cache_keys::GIT_STATE));
     }
 
     #[test]
     fn valid_kubectl_cache_json_is_loaded() {
         let _lock = env_lock().lock().expect("lock");
-        let _guard = EnvGuard::new(&["LYNX_CACHE_KUBECTL_STATE", "PWD"]);
+        let _guard = EnvGuard::new(&[lynx_core::env_vars::LYNX_CACHE_KUBECTL_STATE, "PWD"]);
         std::env::set_var(
-            "LYNX_CACHE_KUBECTL_STATE",
+            lynx_core::env_vars::LYNX_CACHE_KUBECTL_STATE,
             r#"{"context":"dev","namespace":"default"}"#,
         );
         std::env::set_var("PWD", "/");
         let ctx = build_render_context_from_env();
-        assert_eq!(ctx.cache["kubectl_state"]["context"], "dev");
+        assert_eq!(ctx.cache[lynx_prompt::cache_keys::KUBECTL_STATE]["context"], "dev");
     }
 
     #[test]
@@ -235,6 +253,6 @@ active_profile = "work"
         .expect("write config");
 
         let ctx = build_render_context_from_env();
-        assert_eq!(ctx.cache["profile_state"]["name"], "work");
+        assert_eq!(ctx.cache[lynx_prompt::cache_keys::PROFILE_STATE]["name"], "work");
     }
 }

@@ -13,11 +13,11 @@ impl Segment for KubectlContextSegment {
     }
 
     fn cache_key(&self) -> Option<&'static str> {
-        Some("kubectl_state")
+        Some(crate::cache_keys::KUBECTL_STATE)
     }
 
     fn render(&self, config: &SegmentConfig, ctx: &RenderContext) -> Option<RenderedSegment> {
-        let state = ctx.cache.get("kubectl_state")?;
+        let state = ctx.cache.get(crate::cache_keys::KUBECTL_STATE)?;
 
         let context = state.get("context")?.as_str()?;
         if context.is_empty() || context == "default" {
@@ -41,7 +41,7 @@ impl Segment for KubectlContextSegment {
 
         let text = format!("⎈ {context}:{namespace}");
 
-        let mut seg = RenderedSegment::new(text).with_cache_key("kubectl_state");
+        let mut seg = RenderedSegment::new(text).with_cache_key(crate::cache_keys::KUBECTL_STATE);
         if is_prod {
             // Signal prod context — consumers can apply red styling via theme color config
             seg.text = format!("[PROD] {}", seg.text);
@@ -59,7 +59,7 @@ mod tests {
     fn ctx_with_kubectl(context: &str, namespace: &str) -> RenderContext {
         let mut cache = HashMap::new();
         cache.insert(
-            "kubectl_state".to_string(),
+            crate::cache_keys::KUBECTL_STATE.to_string(),
             serde_json::json!({ "context": context, "namespace": namespace }),
         );
         RenderContext {

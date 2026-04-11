@@ -34,7 +34,7 @@ fn shorten(
 ) -> String {
     // If truncate_to_repo, find the repo root from cache and show relative path.
     if truncate_to_repo {
-        if let Some(serde_json::Value::Object(obj)) = cache.get("git_state") {
+        if let Some(serde_json::Value::Object(obj)) = cache.get(crate::cache_keys::GIT_STATE) {
             if let Some(serde_json::Value::String(root)) = obj.get("repo_root") {
                 if let Some(rel) = cwd.strip_prefix(root.as_str()) {
                     let rel = rel.trim_start_matches('/');

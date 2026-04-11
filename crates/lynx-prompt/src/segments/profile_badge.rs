@@ -13,7 +13,7 @@ impl Segment for ProfileBadgeSegment {
     }
 
     fn cache_key(&self) -> Option<&'static str> {
-        Some("profile_state")
+        Some(crate::cache_keys::PROFILE_STATE)
     }
 
     fn render(&self, config: &SegmentConfig, ctx: &RenderContext) -> Option<RenderedSegment> {
@@ -26,7 +26,7 @@ impl Segment for ProfileBadgeSegment {
 
         let profile_name = ctx
             .cache
-            .get("profile_state")
+            .get(crate::cache_keys::PROFILE_STATE)
             .and_then(|v| v.get("name"))
             .and_then(|v| v.as_str())?;
 
@@ -35,7 +35,7 @@ impl Segment for ProfileBadgeSegment {
         }
 
         let icon = config.icon.as_deref().unwrap_or("⬡ ");
-        Some(RenderedSegment::new(format!("{icon}{profile_name}")).with_cache_key("profile_state"))
+        Some(RenderedSegment::new(format!("{icon}{profile_name}")).with_cache_key(crate::cache_keys::PROFILE_STATE))
     }
 }
 
@@ -47,7 +47,7 @@ mod tests {
     fn ctx_with_profile(name: &str, shell_ctx: lynx_core::types::Context) -> RenderContext {
         let mut cache = HashMap::new();
         cache.insert(
-            "profile_state".to_string(),
+            crate::cache_keys::PROFILE_STATE.to_string(),
             serde_json::json!({ "name": name }),
         );
         RenderContext {
