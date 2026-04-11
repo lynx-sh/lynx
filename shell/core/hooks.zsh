@@ -23,7 +23,7 @@ _lynx_async_done() {
   exec {_lynx_async_fd}<&- 2>/dev/null
   _lynx_async_fd=
   eval "$output" 2>/dev/null
-  eval "$(lx prompt render 2>/dev/null)"
+  eval "$(COLUMNS=$COLUMNS lx prompt render 2>/dev/null)"
   zle && zle reset-prompt 2>/dev/null
 }
 
@@ -39,7 +39,7 @@ _lynx_hook_precmd() {
   fi
 
   # Phase 1: render immediately with stale state from last cycle.
-  eval "$(lx prompt render 2>/dev/null)"
+  eval "$(COLUMNS=$COLUMNS lx prompt render 2>/dev/null)"
 
   # Phase 2: gather fresh state async; re-render via _lynx_async_done.
   exec {_lynx_async_fd}< <(lx refresh-state 2>/dev/null)
