@@ -94,7 +94,7 @@ mod tests {
     fn fixture_plugin_returns_valid_path() {
         let p = fixture_plugin("git");
         assert!(p.exists(), "plugins/git fixture not found at {:?}", p);
-        assert!(p.join("plugin.toml").exists());
+        assert!(p.join(lynx_core::brand::PLUGIN_MANIFEST).exists());
     }
 
     #[test]

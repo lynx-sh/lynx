@@ -234,7 +234,7 @@ mod tests {
         let tmp_home = tempfile::tempdir().unwrap();
         std::env::set_var("HOME", tmp_home.path());
 
-        let cfg_dir = tmp_home.path().join(".config/lynx");
+        let cfg_dir = tmp_home.path().join(lynx_core::brand::CONFIG_DIR);
         std::fs::create_dir_all(&cfg_dir).unwrap();
         std::fs::write(
             cfg_dir.join("config.toml"),
@@ -263,7 +263,7 @@ enabled_plugins = []
         let tmp_home = tempfile::tempdir().unwrap();
         std::env::set_var("HOME", tmp_home.path());
 
-        let cfg_dir = tmp_home.path().join(".config/lynx");
+        let cfg_dir = tmp_home.path().join(lynx_core::brand::CONFIG_DIR);
         std::fs::create_dir_all(&cfg_dir).unwrap();
         std::fs::write(
             cfg_dir.join("config.toml"),

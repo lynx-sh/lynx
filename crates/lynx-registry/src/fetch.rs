@@ -201,7 +201,7 @@ fn extract_tar_gz(archive: &Path, dest: &Path) -> Result<()> {
 }
 
 fn validate_plugin_dir(dir: &Path, name: &str) -> Result<()> {
-    let manifest_path = dir.join("plugin.toml");
+    let manifest_path = dir.join(lynx_core::brand::PLUGIN_MANIFEST);
     if !manifest_path.exists() {
         bail!(
             "extracted plugin '{name}' is missing plugin.toml at {}",
@@ -314,7 +314,7 @@ mod tests {
     #[test]
     fn checksum_plugin_dir_changes_when_content_changes() {
         let dir = tempfile::tempdir().unwrap();
-        std::fs::write(dir.path().join("plugin.toml"), "a").unwrap();
+        std::fs::write(dir.path().join(lynx_core::brand::PLUGIN_MANIFEST), "a").unwrap();
         std::fs::create_dir_all(dir.path().join("shell")).unwrap();
         std::fs::write(dir.path().join("shell/init.zsh"), "b").unwrap();
 
@@ -331,9 +331,9 @@ mod tests {
 
         std::fs::create_dir_all(d1.path().join("shell")).unwrap();
         std::fs::write(d1.path().join("shell/functions.zsh"), "x").unwrap();
-        std::fs::write(d1.path().join("plugin.toml"), "y").unwrap();
+        std::fs::write(d1.path().join(lynx_core::brand::PLUGIN_MANIFEST), "y").unwrap();
 
-        std::fs::write(d2.path().join("plugin.toml"), "y").unwrap();
+        std::fs::write(d2.path().join(lynx_core::brand::PLUGIN_MANIFEST), "y").unwrap();
         std::fs::create_dir_all(d2.path().join("shell")).unwrap();
         std::fs::write(d2.path().join("shell/functions.zsh"), "x").unwrap();
 
@@ -355,7 +355,7 @@ mod tests {
     fn validate_plugin_dir_rejects_name_mismatch() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(
-            dir.path().join("plugin.toml"),
+            dir.path().join(lynx_core::brand::PLUGIN_MANIFEST),
             r#"
 [plugin]
 name = "wrongname"
@@ -385,7 +385,7 @@ disabled_in = []
     fn validate_plugin_dir_accepts_valid_manifest() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(
-            dir.path().join("plugin.toml"),
+            dir.path().join(lynx_core::brand::PLUGIN_MANIFEST),
             r#"
 [plugin]
 name = "myplugin"
