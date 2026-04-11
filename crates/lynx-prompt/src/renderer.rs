@@ -11,13 +11,18 @@ use crate::segment::RenderedSegment;
 /// When `top` is non-empty the output is a two-line prompt:
 ///   PROMPT="<top line>"$'\n'"<left line> "
 ///
+/// When `top_right` is non-empty, its content is right-aligned on the top line
+/// using `columns` to compute padding (falls back to no padding if unknown).
+///
 /// When `continuation` is non-empty, PROMPT2 is also emitted.
 pub fn render_prompt(
     left: &[RenderedSegment],
     right: &[RenderedSegment],
     top: &[RenderedSegment],
+    top_right: &[RenderedSegment],
     continuation: &[RenderedSegment],
     theme: &Theme,
+    columns: Option<u32>,
 ) -> String {
     let sep = &theme.separators;
 
@@ -29,10 +34,24 @@ pub fn render_prompt(
         format!("PROMPT=\"{left_str}\"\nRPROMPT=\"{rprompt}\"\n")
     } else {
         let top_str = assemble(top, theme, sep, true);
+        let top_line = if !top_right.is_empty() {
+            let top_right_str = assemble_no_trail(top_right, theme, sep, true);
+            let top_visible = visible_len(&top_str);
+            let right_visible = visible_len(&top_right_str);
+            let padding = columns
+                .map(|cols| {
+                    let used = top_visible + right_visible;
+                    if cols as usize > used { cols as usize - used } else { 0 }
+                })
+                .unwrap_or(1);
+            format!("{top_str}{}{top_right_str}", " ".repeat(padding))
+        } else {
+            top_str
+        };
         // Use ANSI-C quoting ($'\n') to embed a real newline between the two
         // prompt lines. A literal \n inside PROMPT="..." is NOT a newline in
         // zsh — it renders as the two characters '\' and 'n'.
-        format!("PROMPT=\"{top_str}\"$'\\n'\"{left_str}\"\nRPROMPT=\"{rprompt}\"\n")
+        format!("PROMPT=\"{top_line}\"$'\\n'\"{left_str}\"\nRPROMPT=\"{rprompt}\"\n")
     };
 
     if !continuation.is_empty() {
@@ -41,6 +60,49 @@ pub fn render_prompt(
     }
 
     out
+}
+
+/// Compute the visible (display) length of a prompt string by stripping
+/// zsh zero-width markers `%{...%}` and ANSI escape sequences.
+fn visible_len(s: &str) -> usize {
+    let mut len = 0;
+    let mut chars = s.chars().peekable();
+    while let Some(ch) = chars.next() {
+        if ch == '%' && chars.peek() == Some(&'{') {
+            // Skip everything until closing %}.
+            chars.next(); // consume '{'
+            let mut depth = 1usize;
+            for c in chars.by_ref() {
+                if c == '%' { depth += 1; }
+                if c == '}' {
+                    depth -= 1;
+                    if depth == 0 { break; }
+                }
+            }
+        } else if ch == '\x1b' && chars.peek() == Some(&'[') {
+            // Skip ANSI CSI sequence: ESC [ ... <final byte 0x40-0x7E>
+            chars.next(); // consume '['
+            for c in chars.by_ref() {
+                if c >= '@' && c <= '~' { break; }
+            }
+        } else {
+            len += 1;
+        }
+    }
+    len
+}
+
+/// Like `assemble` but without the trailing space (used for top_right so padding
+/// is controlled externally).
+fn assemble_no_trail(
+    segs: &[RenderedSegment],
+    theme: &Theme,
+    sep: &Separators,
+    is_left: bool,
+) -> String {
+    let assembled = assemble(segs, theme, sep, is_left);
+    // assemble() always appends a trailing space; strip it for right-side content.
+    assembled.strip_suffix(' ').unwrap_or(&assembled).to_string()
 }
 
 /// Emit a minimal transient PROMPT (replaces full prompt after command runs).
@@ -211,7 +273,7 @@ mod tests {
         let theme = load("default").unwrap();
         let left = vec![RenderedSegment::new("~/code").with_cache_key("dir")];
         let right = vec![RenderedSegment::new("main").with_cache_key("git_branch")];
-        let out = render_prompt(&left, &right, &[], &[], &theme);
+        let out = render_prompt(&left, &right, &[], &[], &[], &theme, None);
         assert!(out.contains("PROMPT="));
         assert!(out.contains("RPROMPT="));
     }
@@ -219,7 +281,7 @@ mod tests {
     #[test]
     fn empty_segments_produce_bare_prompt() {
         let theme = load("default").unwrap();
-        let out = render_prompt(&[], &[], &[], &[], &theme);
+        let out = render_prompt(&[], &[], &[], &[], &[], &theme, None);
         assert!(out.contains("PROMPT="));
     }
 
@@ -228,15 +290,28 @@ mod tests {
         let theme = load("default").unwrap();
         let top = vec![RenderedSegment::new("info").with_cache_key("dir")];
         let left = vec![RenderedSegment::new("~/code").with_cache_key("dir")];
-        let out = render_prompt(&left, &[], &top, &[], &theme);
+        let out = render_prompt(&left, &[], &top, &[], &[], &theme, None);
         assert!(out.contains("$'\\n'"), "expected ANSI-C newline ($'\\n') in two-line prompt");
+    }
+
+    #[test]
+    fn top_right_padded_to_right_edge() {
+        override_capability(TermCapability::None);
+        let theme = load("default").unwrap();
+        let top = vec![RenderedSegment::new("info").with_cache_key("dir")];
+        let top_right = vec![RenderedSegment::new("[main]").with_cache_key("git_branch")];
+        let out = render_prompt(&[], &[], &top, &top_right, &[], &theme, Some(80));
+        // top_right content must appear in the top line
+        assert!(out.contains("[main]"), "expected top_right content in output: {out:?}");
+        // padding spaces must appear between top and top_right
+        assert!(out.contains("  "), "expected padding spaces in output: {out:?}");
     }
 
     #[test]
     fn continuation_emits_prompt2() {
         let theme = load("default").unwrap();
         let cont = vec![RenderedSegment::new("> ").with_cache_key("prompt_char")];
-        let out = render_prompt(&[], &[], &[], &cont, &theme);
+        let out = render_prompt(&[], &[], &[], &[], &cont, &theme, None);
         assert!(out.contains("PROMPT2="));
     }
 

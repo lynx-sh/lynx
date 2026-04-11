@@ -91,6 +91,10 @@ pub struct SegmentLayout {
     /// When non-empty, the renderer emits a top line + newline + left segments.
     #[serde(default)]
     pub top: SegmentOrder,
+    /// Segments rendered right-aligned on the top line (requires `top` to be non-empty).
+    /// Uses `$COLUMNS` to compute padding so content is flush to the right edge.
+    #[serde(default)]
+    pub top_right: SegmentOrder,
     /// Segments rendered as PROMPT2 (continuation prompt for multi-line input).
     #[serde(default)]
     pub continuation: SegmentOrder,

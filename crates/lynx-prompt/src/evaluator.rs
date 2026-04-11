@@ -183,17 +183,21 @@ pub async fn evaluate_theme(
     Vec<RenderedSegment>,
     Vec<RenderedSegment>,
     Vec<RenderedSegment>,
+    Vec<RenderedSegment>,
 ) {
     let left = evaluate(segments, &theme.segments.left.order, &theme.segment, ctx);
     let right = evaluate(segments, &theme.segments.right.order, &theme.segment, ctx);
     let top = evaluate(segments, &theme.segments.top.order, &theme.segment, ctx);
+    let top_right = evaluate(segments, &theme.segments.top_right.order, &theme.segment, ctx);
     let continuation = evaluate(
         segments,
         &theme.segments.continuation.order,
         &theme.segment,
         ctx,
     );
-    tokio::join!(left, right, top, continuation)
+    let (left, right, top, top_right, continuation) =
+        tokio::join!(left, right, top, top_right, continuation);
+    (left, right, top, top_right, continuation)
 }
 
 #[cfg(test)]
