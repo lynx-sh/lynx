@@ -78,14 +78,45 @@ pub fn apply_resolve(
     }
 }
 
-/// ACTIVATE stage: register event subscriptions from the manifest's hooks list.
+/// Map a plugin.toml short hook name to the canonical EventBus event name.
+///
+/// Two subscription pathways exist:
+/// - **Shell-side (working now):** `lx init` output wires `_pluginname_hook()` functions
+///   into zsh hook arrays (chpwd_functions, precmd_functions, etc.). This is what
+///   actually runs today.
+/// - **Daemon-side (this function):** registers Rust handlers on the EventBus so the
+///   daemon can act when events arrive over IPC. NOTE: `activate()` is not yet called
+///   by the daemon — see wiring issue filed against lynx-daemon.
+///
+/// Both pathways are valid; they serve different purposes:
+/// - Shell hooks: run zsh-side plugin code during prompt render cycle
+/// - EventBus handlers: run Rust-side daemon logic (caching, side effects)
+fn hook_event_name(hook: &str) -> String {
+    match hook {
+        "chpwd" => "shell:chpwd".to_string(),
+        "precmd" => "shell:precmd".to_string(),
+        "preexec" => "shell:preexec".to_string(),
+        other => format!("shell:{other}"),
+    }
+}
+
+/// ACTIVATE stage: register EventBus subscriptions from the manifest's hooks list.
+///
+/// Handlers trace the dispatch so daemon-side hook delivery is observable.
+/// Shell-side hook execution (the working path today) is a separate mechanism
+/// wired by `lx init` output — see `hook_event_name` doc above.
 pub fn activate(name: &str, manifest: &PluginManifest, bus: Arc<EventBus>) -> Result<()> {
     for hook in &manifest.load.hooks {
-        let hook_name = hook.clone();
+        let event_name = hook_event_name(hook);
         let plugin_name = name.to_string();
-        bus.subscribe(&hook_name, move |_ev| {
-            let _plugin = plugin_name.clone();
-            async move {}
+        let hook_short = hook.clone();
+        bus.subscribe(&event_name, move |ev| {
+            let plugin = plugin_name.clone();
+            let hook = hook_short.clone();
+            async move {
+                tracing::debug!(plugin = %plugin, hook = %hook, data = %ev.data,
+                    "plugin hook dispatched via EventBus");
+            }
         });
     }
     Ok(())
