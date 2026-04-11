@@ -24,6 +24,8 @@ pub enum Command {
     Theme(crate::commands::theme::ThemeArgs),
     /// Manage task scheduler
     Task(crate::commands::task::TaskArgs),
+    /// Manage the Lynx background daemon
+    Daemon(crate::commands::daemon::DaemonArgs),
     /// Switch or show context (interactive, agent, minimal)
     Context(crate::commands::context::ContextArgs),
     /// Diagnose issues with your Lynx setup

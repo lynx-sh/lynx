@@ -17,6 +17,7 @@ lynx-manifest = { path = "../lynx-manifest" }
 lynx-plugin   = { path = "../lynx-plugin" }
 lynx-theme   = { path = "../lynx-theme" }
 lynx-task    = { path = "../lynx-task" }
+lynx-daemon  = { path = "../lynx-daemon" }
 lynx-shell   = { path = "../lynx-shell" }
 clap.workspace = true
 serde_json.workspace = true

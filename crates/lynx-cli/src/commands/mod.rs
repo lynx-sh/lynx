@@ -1,6 +1,7 @@
 pub mod benchmark;
 pub mod config;
 pub mod context;
+pub mod daemon;
 pub mod doctor;
 pub mod event;
 pub mod init;
@@ -23,6 +24,7 @@ pub async fn dispatch(cli: Cli) -> Result<()> {
         Command::Plugin(args)    => plugin::run(args).await,
         Command::Theme(args)     => theme::run(args).await,
         Command::Task(args)      => task::run(args).await,
+        Command::Daemon(args)    => daemon::run(args).await,
         Command::Context(args)   => context::run(args).await,
         Command::Doctor(args)    => doctor::run(args).await,
         Command::Benchmark(args) => benchmark::run(args).await,

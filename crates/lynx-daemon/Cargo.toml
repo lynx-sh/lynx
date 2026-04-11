@@ -4,9 +4,22 @@ version.workspace = true
 edition.workspace = true
 authors.workspace = true
 
+[[bin]]
+name = "lynx-daemon"
+path = "src/main.rs"
+
+[lib]
+name = "lynx_daemon"
+path = "src/lib.rs"
+
 [dependencies]
 lynx-core = { path = "../lynx-core" }
+lynx-task = { path = "../lynx-task" }
 serde.workspace = true
+serde_json.workspace = true
 toml.workspace = true
 anyhow.workspace = true
 thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true

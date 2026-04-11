@@ -7,7 +7,7 @@ author = "proxikal"
 order = ["dir", "git_branch", "git_status"]
 
 [segments.right]
-order = ["cmd_duration", "context_badge"]
+order = ["cmd_duration", "task_status", "context_badge"]
 
 [segment.dir]
 max_depth = 3
@@ -26,6 +26,9 @@ untracked = { icon = "?", color = "grey" }
 [segment.cmd_duration]
 min_ms = 500
 color = { fg = "grey" }
+
+[segment.task_status]
+color = { fg = "yellow" }
 
 [segment.context_badge]
 show_in = ["agent"]
