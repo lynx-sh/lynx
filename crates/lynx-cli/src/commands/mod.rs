@@ -12,7 +12,7 @@ pub mod refresh_state;
 pub mod event;
 pub mod examples;
 pub mod init;
-pub mod install;
+pub mod setup;
 pub mod migrate;
 pub mod plugin;
 pub mod profile;
@@ -31,7 +31,7 @@ use anyhow::Result;
 pub async fn dispatch(cli: Cli) -> Result<()> {
     match cli.command {
         Command::Init(args) => init::run(args).await,
-        Command::Install(args) => install::run(args).await,
+        Command::Setup(args) => setup::run(args).await,
         Command::Event(args) => event::run(args).await,
         Command::Plugin(args) => plugin::run(args).await,
         Command::Theme(args) => theme::run(args).await,

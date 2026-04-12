@@ -893,7 +893,7 @@ lx theme patch segment.context_badge.hide_in '["minimal"]'
 
 All patch operations: snapshot → apply → validate → rollback on failure →
 emit `theme:changed`. Theme files live in `~/.config/lynx/themes/` (set up
-by `lx install`).
+by `lx setup`).
 
 ### Layer 3 — Full editor
 

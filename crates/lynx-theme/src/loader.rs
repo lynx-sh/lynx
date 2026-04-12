@@ -17,7 +17,7 @@ pub fn load(name: &str) -> Result<Theme> {
     if path.exists() {
         return load_from_path(&path);
     }
-    Err(LynxError::Theme(format!("theme '{name}' not found — run `lx install` to set up default themes")))
+    Err(LynxError::Theme(format!("theme '{name}' not found — run `lx setup` to set up default themes")))
 }
 
 /// Load a theme from an explicit file path.

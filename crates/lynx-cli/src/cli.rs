@@ -16,8 +16,8 @@ pub struct Cli {
 pub enum Command {
     /// Initialize Lynx in a new shell session
     Init(crate::commands::init::InitArgs),
-    /// Install Lynx files to LYNX_DIR and optionally patch .zshrc
-    Install(crate::commands::install::InstallArgs),
+    /// Set up Lynx files in LYNX_DIR and optionally patch .zshrc
+    Setup(crate::commands::setup::SetupArgs),
     /// Emit or subscribe to events
     Event(crate::commands::event::EventArgs),
     /// Manage plugins

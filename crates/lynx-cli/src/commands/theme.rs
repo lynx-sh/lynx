@@ -283,7 +283,7 @@ async fn cmd_edit() -> Result<()> {
     // Determine the path: prefer user theme dir, else error (built-ins are read-only).
     let user_path = user_theme_dir().join(format!("{theme_name}.toml"));
     if !user_path.exists() {
-        bail!("theme '{theme_name}' not found — run `lx install` to set up default themes");
+        bail!("theme '{theme_name}' not found — run `lx setup` to set up default themes");
     }
     let path = user_path;
 
@@ -406,7 +406,7 @@ fn resolve_user_theme_path(theme_name: &str) -> Result<PathBuf> {
     if user_path.exists() {
         Ok(user_path)
     } else {
-        bail!("theme '{theme_name}' not found — run `lx install` to set up default themes")
+        bail!("theme '{theme_name}' not found — run `lx setup` to set up default themes")
     }
 }
 
