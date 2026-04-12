@@ -269,4 +269,91 @@ mod tests {
         let toml_str = to_lynx_toml(&theme, "myname");
         assert!(toml_str.contains("name = \"myname\""));
     }
+
+    #[test]
+    fn omp_complex_theme_valid_toml() {
+        // Simulates a theme with many language segments (atomic-style).
+        let json = r##"{
+            "version": 2,
+            "blocks": [
+                {
+                    "type": "prompt",
+                    "alignment": "left",
+                    "segments": [
+                        {"type": "path", "style": "powerline", "foreground": "#2d3436", "background": "#FF9248", "powerline_symbol": "\ue0b0", "template": " {{ .Path }} "},
+                        {"type": "git", "style": "powerline", "foreground": "#011627", "background": "#FFFB38", "template": " {{ .HEAD }} "}
+                    ]
+                },
+                {
+                    "type": "prompt",
+                    "alignment": "right",
+                    "segments": [
+                        {"type": "node", "style": "diamond", "foreground": "#3C873A", "background": "#303030", "leading_diamond": "\ue0b6", "trailing_diamond": " ", "template": "\ue718 {{ .Full }}"},
+                        {"type": "python", "style": "diamond", "foreground": "#FFE873", "background": "#306998", "leading_diamond": "\ue0b6", "trailing_diamond": " ", "template": "\ue235 {{ .Full }}"},
+                        {"type": "go", "style": "diamond", "foreground": "#06aad5", "background": "#ffffff", "leading_diamond": "\ue0b6", "trailing_diamond": " ", "template": "\ue627 {{ .Full }}"},
+                        {"type": "rust", "style": "diamond", "foreground": "#925837", "background": "#f3f0ec", "leading_diamond": "\ue0b6", "trailing_diamond": " ", "template": "\ue7a8 {{ .Full }}"},
+                        {"type": "java", "style": "diamond", "foreground": "#ffffff", "background": "#0e8ac8", "leading_diamond": "\ue0b6", "trailing_diamond": " ", "template": "\ue738 {{ .Full }}"},
+                        {"type": "ruby", "style": "diamond", "foreground": "#9c1006", "background": "#ffffff", "leading_diamond": "\ue0b6", "trailing_diamond": " ", "template": "\ue791 {{ .Full }}"},
+                        {"type": "time", "style": "diamond", "foreground": "#ffffff", "background": "#40c4ff", "leading_diamond": "\ue0b6", "trailing_diamond": "\ue0b4", "template": "\uf64f {{ .CurrentDate }}"}
+                    ]
+                },
+                {
+                    "type": "prompt",
+                    "alignment": "left",
+                    "newline": true,
+                    "segments": [
+                        {"type": "text", "style": "plain", "foreground": "#21c7c7", "template": "╰─"},
+                        {"type": "exit", "style": "plain", "foreground": "#e0f8ff", "template": "\uf42e "}
+                    ]
+                }
+            ],
+            "transient_prompt": {"template": "❯ ", "foreground": "#e0f8ff"}
+        }"##;
+        let theme = crate::omp::parse(json).unwrap();
+        let toml_str = omp_to_lynx_toml(&theme, "complex_test");
+        let parsed: Result<toml::Value, _> = toml::from_str(&toml_str);
+        assert!(parsed.is_ok(), "invalid TOML:\n{toml_str}\nerror: {}", parsed.unwrap_err());
+        // Verify unique segment names
+        assert!(toml_str.contains("[segment.lang_version_node]"));
+        assert!(toml_str.contains("[segment.lang_version_python]"));
+        assert!(toml_str.contains("[segment.lang_version_go]"));
+        assert!(toml_str.contains("[segment.lang_version_rust]"));
+        assert!(toml_str.contains("[segment.lang_version_java]"));
+        assert!(toml_str.contains("[segment.lang_version_ruby]"));
+        // Palette uses semantic names
+        assert!(toml_str.contains("[colors]"));
+        assert!(toml_str.contains("[transient]"));
+    }
+
+    #[test]
+    fn omp_bubbles_style_valid_toml() {
+        // Diamond-style theme with mixed segments.
+        let json = r##"{
+            "version": 2,
+            "blocks": [{
+                "type": "prompt",
+                "alignment": "right",
+                "segments": [
+                    {"type": "session", "style": "diamond", "foreground": "#E64747", "background": "#29315A", "leading_diamond": "\ue0b6", "trailing_diamond": " ", "template": " {{ .UserName }} "},
+                    {"type": "path", "style": "diamond", "foreground": "#3EC669", "background": "#29315A", "leading_diamond": "\ue0b6", "trailing_diamond": "", "template": " \uf07b {{ .Path }} "},
+                    {"type": "python", "style": "diamond", "foreground": "#E4F34A", "background": "#29315A", "leading_diamond": " ", "trailing_diamond": "", "template": " \ue235 {{ .Full }} "},
+                    {"type": "node", "style": "diamond", "foreground": "#42E66C", "background": "#29315A", "leading_diamond": " ", "trailing_diamond": "", "template": " \ue718 {{ .Full }} "}
+                ]
+            },
+            {
+                "type": "prompt",
+                "alignment": "left",
+                "newline": true,
+                "segments": [
+                    {"type": "text", "style": "plain", "foreground": "#7FD5EA", "template": "❯"}
+                ]
+            }]
+        }"##;
+        let theme = crate::omp::parse(json).unwrap();
+        let toml_str = omp_to_lynx_toml(&theme, "bubbles_test");
+        let parsed: Result<toml::Value, _> = toml::from_str(&toml_str);
+        assert!(parsed.is_ok(), "invalid TOML:\n{toml_str}\nerror: {}", parsed.unwrap_err());
+        assert!(toml_str.contains("[segment.lang_version_python]"));
+        assert!(toml_str.contains("[segment.lang_version_node]"));
+    }
 }

@@ -199,6 +199,19 @@ pub fn parse(json: &str) -> Result<ConvertedTheme, String> {
         theme.left = std::mem::take(&mut theme.top);
     }
 
+    // Deduplicate segment names globally — TOML requires unique [segment.X] keys.
+    // Collect all segments, deduplicate, then scatter back.
+    let mut all: Vec<ConvertedSegment> = Vec::new();
+    let top_len = theme.top.len();
+    let top_right_len = theme.top_right.len();
+    all.extend(std::mem::take(&mut theme.top));
+    all.extend(std::mem::take(&mut theme.top_right));
+    all.extend(std::mem::take(&mut theme.left));
+    deduplicate_names(&mut all);
+    theme.top = all.drain(..top_len).collect();
+    theme.top_right = all.drain(..top_right_len).collect();
+    theme.left = all;
+
     // Transient prompt.
     if let Some(ref t) = omp.transient_prompt {
         if !t.template.is_empty() {
@@ -411,6 +424,51 @@ fn extract_static_text(template: &str) -> String {
     result.trim().to_string()
 }
 
+/// Make segment names unique within a list. When multiple segments share
+/// the same mapped name (e.g. node/python/go all → "lang_version"), append
+/// the OMP type as a suffix: "lang_version_node", "lang_version_python".
+/// For unknown types that fall back to "text", use a numeric suffix.
+fn deduplicate_names(segments: &mut [ConvertedSegment]) {
+    // Count occurrences of each name.
+    let mut counts: HashMap<String, u32> = HashMap::new();
+    for seg in segments.iter() {
+        *counts.entry(seg.name.clone()).or_default() += 1;
+    }
+
+    // For names with count > 1, make them unique.
+    let mut seen: HashMap<String, u32> = HashMap::new();
+    for seg in segments.iter_mut() {
+        if counts.get(&seg.name).copied().unwrap_or(0) > 1 {
+            let idx = seen.entry(seg.name.clone()).or_default();
+            // Use OMP type as suffix if it differs from the mapped name.
+            let suffix = if !seg.omp_type.is_empty() && seg.omp_type != seg.name {
+                seg.omp_type.clone()
+            } else {
+                format!("{}", *idx)
+            };
+            // Check if this suffix was already used (two segments with same omp_type).
+            seg.name = format!("{}_{}", seg.name, suffix);
+            *idx += 1;
+        }
+    }
+
+    // Final pass: if suffixed names still collide, append index.
+    let mut final_counts: HashMap<String, u32> = HashMap::new();
+    for seg in segments.iter() {
+        *final_counts.entry(seg.name.clone()).or_default() += 1;
+    }
+    let mut final_seen: HashMap<String, u32> = HashMap::new();
+    for seg in segments.iter_mut() {
+        if final_counts.get(&seg.name).copied().unwrap_or(0) > 1 {
+            let idx = final_seen.entry(seg.name.clone()).or_default();
+            if *idx > 0 {
+                seg.name = format!("{}_{}", seg.name, *idx);
+            }
+            *idx += 1;
+        }
+    }
+}
+
 fn non_empty(s: &str) -> Option<String> {
     if s.is_empty() { None } else { Some(s.to_string()) }
 }
@@ -552,6 +610,94 @@ mod tests {
         }"##;
         let theme = parse(json).unwrap();
         assert_eq!(theme.left[0].bg.as_deref(), Some("#1a1b26"));
+    }
+
+    #[test]
+    fn duplicate_lang_segments_get_unique_names() {
+        let json = r##"{
+            "version": 2,
+            "blocks": [{
+                "type": "prompt",
+                "alignment": "left",
+                "segments": [
+                    {"type": "node", "style": "plain", "template": "{{ .Full }}"},
+                    {"type": "python", "style": "plain", "template": "{{ .Full }}"},
+                    {"type": "go", "style": "plain", "template": "{{ .Full }}"},
+                    {"type": "rust", "style": "plain", "template": "{{ .Full }}"}
+                ]
+            }]
+        }"##;
+        let theme = parse(json).unwrap();
+        let names: Vec<&str> = theme.left.iter().map(|s| s.name.as_str()).collect();
+        assert_eq!(names, vec!["lang_version_node", "lang_version_python", "lang_version_go", "lang_version_rust"]);
+    }
+
+    #[test]
+    fn duplicate_text_segments_get_unique_names() {
+        let json = r##"{
+            "version": 2,
+            "blocks": [{
+                "type": "prompt",
+                "alignment": "left",
+                "segments": [
+                    {"type": "text", "style": "plain", "template": "A"},
+                    {"type": "text", "style": "plain", "template": "B"},
+                    {"type": "angular", "style": "plain", "template": "C"}
+                ]
+            }]
+        }"##;
+        let theme = parse(json).unwrap();
+        let names: Vec<&str> = theme.left.iter().map(|s| s.name.as_str()).collect();
+        // text+text+angular(→text) = 3 texts, all need unique names
+        assert_eq!(names.len(), 3);
+        // All names should be unique
+        let mut unique = names.clone();
+        unique.sort();
+        unique.dedup();
+        assert_eq!(unique.len(), 3);
+    }
+
+    #[test]
+    fn single_lang_segment_keeps_base_name() {
+        let json = r##"{
+            "version": 2,
+            "blocks": [{
+                "type": "prompt",
+                "alignment": "left",
+                "segments": [
+                    {"type": "path", "style": "plain", "template": "{{ .Path }}"},
+                    {"type": "node", "style": "plain", "template": "{{ .Full }}"}
+                ]
+            }]
+        }"##;
+        let theme = parse(json).unwrap();
+        // Only one lang_version — no suffix needed
+        assert_eq!(theme.left[1].name, "lang_version");
+    }
+
+    #[test]
+    fn omp_to_toml_roundtrip_multi_lang() {
+        let json = r##"{
+            "version": 2,
+            "blocks": [{
+                "type": "prompt",
+                "alignment": "left",
+                "segments": [
+                    {"type": "path", "style": "plain", "foreground": "#fff", "template": "{{ .Path }}"},
+                    {"type": "node", "style": "plain", "foreground": "#3C873A", "template": "{{ .Full }}"},
+                    {"type": "python", "style": "plain", "foreground": "#FFE873", "template": "{{ .Full }}"},
+                    {"type": "go", "style": "plain", "foreground": "#06aad5", "template": "{{ .Full }}"}
+                ]
+            }]
+        }"##;
+        let theme = parse(json).unwrap();
+        let toml_str = crate::emit::omp_to_lynx_toml(&theme, "test_multi");
+        let parsed: Result<toml::Value, _> = toml::from_str(&toml_str);
+        assert!(parsed.is_ok(), "invalid TOML: {}\n{}", parsed.unwrap_err(), toml_str);
+        // Verify segment sections exist with unique names
+        assert!(toml_str.contains("[segment.lang_version_node]"), "missing node section:\n{toml_str}");
+        assert!(toml_str.contains("[segment.lang_version_python]"), "missing python section:\n{toml_str}");
+        assert!(toml_str.contains("[segment.lang_version_go]"), "missing go section:\n{toml_str}");
     }
 
     #[test]
