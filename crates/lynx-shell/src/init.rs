@@ -123,12 +123,11 @@ pub fn generate_init_script(params: &InitParams<'_>) -> String {
     for plugin in params.enabled_plugins {
         if params.zle_hook_plugins.contains(plugin.as_str()) {
             let guard = env_vars::plugin_guard_var(plugin);
-            let plugin_dir = shell_quote(params.plugin_dir);
+            let full_plugin_dir = shell_quote(&format!("{}/{}", params.plugin_dir, plugin));
             out.push_str(&format!(
-                "  if [[ -z \"${{{guard}}}\" ]]; then\n    LYNX_PLUGIN_DIR={plugin_dir}/{plugin}\n    source \"$LYNX_PLUGIN_DIR/shell/init.zsh\" 2>/dev/null\n    typeset -g {guard}=1\n  fi\n",
+                "  if [[ -z \"${{{guard}}}\" ]]; then\n    LYNX_PLUGIN_DIR={full_plugin_dir}\n    source \"$LYNX_PLUGIN_DIR/shell/init.zsh\" 2>/dev/null\n    typeset -g {guard}=1\n  fi\n",
                 guard = guard,
-                plugin_dir = plugin_dir,
-                plugin = plugin,
+                full_plugin_dir = full_plugin_dir,
             ));
         } else {
             out.push_str(&format!("  lynx_eval_plugin {}\n", shell_quote(plugin)));
