@@ -88,6 +88,14 @@ pub async fn run(args: InitArgs) -> Result<()> {
     // Must print BEFORE the eval script so it appears above the first prompt.
     maybe_show_intro(&config, context.clone());
 
+    // Collect plugins that require direct source (zle_hook = true in plugin.toml).
+    // These cannot go through eval "$()" — zle -N widget binding fails inside eval.
+    let zle_hook_plugins: std::collections::HashSet<String> = manifests
+        .iter()
+        .filter(|m| m.shell.zle_hook)
+        .map(|m| m.plugin.name.clone())
+        .collect();
+
     let script = generate_init_script(&InitParams {
         context: &context,
         lynx_dir: &lynx_dir,
@@ -98,6 +106,7 @@ pub async fn run(args: InitArgs) -> Result<()> {
         bsd_lscolors: bsd_lscolors_str.as_deref(),
         syntax_highlight_styles: syntax_styles_str.as_deref(),
         autosuggest_style: autosuggest_str.as_deref(),
+        zle_hook_plugins,
     });
 
     print!("{}", script);

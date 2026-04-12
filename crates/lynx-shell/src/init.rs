@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use lynx_core::env_vars;
 use lynx_core::types::Context;
 
@@ -17,6 +19,9 @@ pub struct InitParams<'a> {
     pub syntax_highlight_styles: Option<&'a str>,
     /// ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE value from the active theme.
     pub autosuggest_style: Option<&'a str>,
+    /// Plugins that hook into ZLE (zle -N) and must be sourced directly.
+    /// These cannot go through eval "$()" — zle widget binding fails inside eval.
+    pub zle_hook_plugins: HashSet<String>,
 }
 
 /// Generate the zsh init script that the shell evals on startup.
@@ -111,9 +116,23 @@ pub fn generate_init_script(params: &InitParams<'_>) -> String {
         ));
     }
 
-    // Eval-bridge calls for each enabled plugin
+    // Load each enabled plugin.
+    // ZLE-hook plugins (syntax-highlight, autosuggestions, etc.) must be sourced
+    // directly — zle -N widget binding fails inside eval "$(...)".
+    // All other plugins go through lynx_eval_plugin (the standard eval-bridge).
     for plugin in params.enabled_plugins {
-        out.push_str(&format!("  lynx_eval_plugin {}\n", shell_quote(plugin)));
+        if params.zle_hook_plugins.contains(plugin.as_str()) {
+            let guard = env_vars::plugin_guard_var(plugin);
+            let plugin_dir = shell_quote(params.plugin_dir);
+            out.push_str(&format!(
+                "  if [[ -z \"${{{guard}}}\" ]]; then\n    LYNX_PLUGIN_DIR={plugin_dir}/{plugin}\n    source \"$LYNX_PLUGIN_DIR/shell/init.zsh\" 2>/dev/null\n    typeset -g {guard}=1\n  fi\n",
+                guard = guard,
+                plugin_dir = plugin_dir,
+                plugin = plugin,
+            ));
+        } else {
+            out.push_str(&format!("  lynx_eval_plugin {}\n", shell_quote(plugin)));
+        }
     }
 
     // Not exported — must not leak into child shells or lx init would skip there too
@@ -146,6 +165,7 @@ mod tests {
             bsd_lscolors: None,
             syntax_highlight_styles: None,
             autosuggest_style: None,
+            zle_hook_plugins: HashSet::new(),
         }
     }
 
@@ -202,6 +222,19 @@ mod tests {
     fn idempotency_guard_present() {
         let script = generate_init_script(&base_params(&Context::Interactive, &[]));
         assert!(script.contains("LYNX_INITIALIZED"));
+    }
+
+    #[test]
+    fn zle_hook_plugin_emits_direct_source_not_eval_bridge() {
+        let plugins = vec!["syntax-highlight".to_string(), "git".to_string()];
+        let mut params = base_params(&Context::Interactive, &plugins);
+        params.zle_hook_plugins = HashSet::from(["syntax-highlight".to_string()]);
+        let script = generate_init_script(&params);
+        // ZLE plugin must use direct source, not lynx_eval_plugin
+        assert!(!script.contains("lynx_eval_plugin 'syntax-highlight'"));
+        assert!(script.contains("source \"$LYNX_PLUGIN_DIR/shell/init.zsh\""));
+        // Non-ZLE plugin still uses eval bridge
+        assert!(script.contains("lynx_eval_plugin 'git'"));
     }
 
     #[test]
