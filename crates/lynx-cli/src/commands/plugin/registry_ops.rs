@@ -117,7 +117,7 @@ pub(super) async fn cmd_update(name: Option<&str>, all: bool) -> Result<()> {
         for plugin_name in &registry_names {
             match update_one(plugin_name).await {
                 Ok(_) => {}
-                Err(e) => eprintln!("warning: failed to update '{}': {e}", plugin_name),
+                Err(e) => println!("warning: failed to update '{}': {e}", plugin_name),
             }
         }
         return Ok(());

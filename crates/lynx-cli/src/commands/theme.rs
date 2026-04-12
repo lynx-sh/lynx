@@ -127,14 +127,15 @@ async fn cmd_set(name: &str) -> Result<()> {
 
     // Check if theme uses powerline/nerd font glyphs.
     if super::nerd_font::theme_needs_nerd_font(&theme) && !super::nerd_font::nerd_font_installed() {
-        eprintln!("⚠ Theme '{name}' uses powerline glyphs that require a Nerd Font.");
-        eprintln!("  Without one, separator characters will render as □ or ?.");
-        eprintln!();
-        eprintln!("  Download a Nerd Font from: https://www.nerdfonts.com/font-downloads");
-        eprintln!("  Popular choices: FiraCode Nerd Font, JetBrainsMono Nerd Font, Hack Nerd Font");
-        eprintln!();
+        println!("⚠ Theme '{name}' uses powerline glyphs that require a Nerd Font.");
+        println!("  Without one, separator characters will render as □ or ?.");
+        println!();
+        println!("  Download a Nerd Font from: https://www.nerdfonts.com/font-downloads");
+        println!("  Popular choices: FiraCode Nerd Font, JetBrainsMono Nerd Font, Hack Nerd Font");
+        println!();
 
-        eprint!("  Install font and continue? [y]es / [n]o / [s]kip font check: ");
+        print!("  Install font and continue? [y]es / [n]o / [s]kip font check: ");
+        std::io::Write::flush(&mut std::io::stdout())?;
 
         let mut input = String::new();
         std::io::stdin().read_line(&mut input)?;
@@ -143,14 +144,15 @@ async fn cmd_set(name: &str) -> Result<()> {
         match choice.as_str() {
             "y" | "yes" => {
                 if let Err(e) = super::nerd_font::install_nerd_font() {
-                    eprintln!("  ⚠ Font install failed: {e}");
-                    eprintln!("  Download manually from https://www.nerdfonts.com/font-downloads");
-                    eprintln!("  Then set your terminal font to the installed Nerd Font.");
-                    eprint!("  Continue setting theme anyway? [y/n]: ");
+                    println!("  ⚠ Font install failed: {e}");
+                    println!("  Download manually from https://www.nerdfonts.com/font-downloads");
+                    println!("  Then set your terminal font to the installed Nerd Font.");
+                    print!("  Continue setting theme anyway? [y/n]: ");
+                    std::io::Write::flush(&mut std::io::stdout())?;
                     input.clear();
                     std::io::stdin().read_line(&mut input)?;
                     if !input.trim().to_lowercase().starts_with('y') {
-                        eprintln!("theme not changed");
+                        println!("theme not changed");
                         return Ok(());
                     }
                 }
@@ -159,7 +161,7 @@ async fn cmd_set(name: &str) -> Result<()> {
                 // Continue without font — user knows what they're doing.
             }
             _ => {
-                eprintln!("theme not changed");
+                println!("theme not changed");
                 return Ok(());
             }
         }
@@ -174,7 +176,7 @@ async fn cmd_set(name: &str) -> Result<()> {
     // Emit theme:changed in-process so plugin handlers fire.
     emit_theme_changed(name).await;
 
-    eprintln!("theme set to '{name}'");
+    println!("theme set to '{name}'");
     Ok(())
 }
 
@@ -272,7 +274,7 @@ async fn cmd_patch(dot_path: &str, value: &str) -> Result<()> {
     match load_from_path(&path) {
         Ok(_) => {
             emit_theme_changed(theme_name).await;
-            eprintln!("theme '{theme_name}': {dot_path} = {value}");
+            println!("theme '{theme_name}': {dot_path} = {value}");
         }
         Err(e) => {
             std::fs::write(&path, &snapshot)
@@ -324,7 +326,7 @@ async fn cmd_segment(cmd: SegmentCommand) -> Result<()> {
                 SegmentCommand::Remove { name } => format!("removed '{name}'"),
                 SegmentCommand::Move { name, side, .. } => format!("moved '{name}' to {side}"),
             };
-            eprintln!("theme '{theme_name}': {desc}");
+            println!("theme '{theme_name}': {desc}");
         }
         Err(e) => {
             std::fs::write(&path, &snapshot)

@@ -75,7 +75,7 @@ fn cmd_on() -> Result<()> {
         Ok(())
     })
     .context("failed to save config")?;
-    eprintln!("intro enabled — use `lx intro set <slug>` to choose one");
+    println!("intro enabled — use `lx intro set <slug>` to choose one");
     Ok(())
 }
 
@@ -85,7 +85,7 @@ fn cmd_off() -> Result<()> {
         Ok(())
     })
     .context("failed to save config")?;
-    eprintln!("intro disabled");
+    println!("intro disabled");
     Ok(())
 }
 
@@ -99,7 +99,7 @@ fn cmd_set(slug: &str) -> Result<()> {
     })
     .context("failed to save config")?;
 
-    eprintln!("active intro set to '{slug}'");
+    println!("active intro set to '{slug}'");
     Ok(())
 }
 
@@ -185,7 +185,7 @@ fn cmd_delete(slug: &str) -> Result<()> {
         .ok();
     }
 
-    eprintln!("intro '{slug}' deleted");
+    println!("intro '{slug}' deleted");
     Ok(())
 }
 
@@ -280,7 +280,7 @@ fn cmd_logo(text: &str, font: &str, list_fonts: bool, append: bool) -> Result<()
 
     if append {
         append_logo_to_active_intro(font, text)?;
-        eprintln!("logo appended to active intro");
+        println!("logo appended to active intro");
     } else {
         print!("{}", ascii);
     }

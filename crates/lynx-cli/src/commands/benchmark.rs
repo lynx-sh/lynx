@@ -22,18 +22,18 @@ struct BenchResult {
 
 pub async fn run(args: BenchmarkArgs) -> Result<()> {
     let runs = args.runs.max(1);
-    eprintln!("Running {} benchmark run(s)...", runs);
+    println!("Running {} benchmark run(s)...", runs);
 
     // Collect timings across runs.
     let mut all_runs: Vec<Vec<(String, Duration)>> = Vec::new();
     for i in 0..runs {
         if runs > 1 {
-            eprint!("  run {}/{}... ", i + 1, runs);
+            print!("  run {}/{}... ", i + 1, runs);
         }
         let timings = measure_startup()?;
         if runs > 1 {
             let total: Duration = timings.iter().map(|(_, d)| *d).sum();
-            eprintln!("{}ms", total.as_millis());
+            println!("{}ms", total.as_millis());
         }
         all_runs.push(timings);
     }

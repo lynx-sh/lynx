@@ -53,7 +53,8 @@ pub async fn run(args: UpdateArgs) -> Result<()> {
 
 async fn do_update(version: &str, yes: bool) -> Result<()> {
     if !yes {
-        eprint!("Update lx to {version}? [y/N] ");
+        print!("Update lx to {version}? [y/N] ");
+        std::io::Write::flush(&mut std::io::stdout())?;
         let mut input = String::new();
         std::io::stdin().read_line(&mut input)?;
         if !input.trim().eq_ignore_ascii_case("y") {

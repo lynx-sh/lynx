@@ -44,7 +44,7 @@ pub async fn run(args: UninstallArgs) -> Result<()> {
     let config_dir = home.join(brand::CONFIG_DIR);
     if args.purge && config_dir.exists() {
         if !args.yes {
-            eprint!(
+            print!(
                 "Remove {} (including your themes, plugins, and snapshots)? [y/N] ",
                 config_dir.display()
             );
@@ -136,7 +136,7 @@ fn remove_binary(home: &Path) {
     for path in candidates {
         if path.exists() {
             if let Err(e) = std::fs::remove_file(&path) {
-                eprintln!("  warn: could not remove {path:?}: {e}");
+                println!("  warn: could not remove {path:?}: {e}");
             } else {
                 println!("  removed binary: {path:?}");
             }

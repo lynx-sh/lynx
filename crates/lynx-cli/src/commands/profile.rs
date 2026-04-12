@@ -128,7 +128,7 @@ fn cmd_edit(name: &str) -> Result<()> {
     match profile::load_from(&path) {
         Ok((_, warns)) => {
             for w in &warns {
-                eprintln!("warning: {}", w.message);
+                println!("warning: {}", w.message);
             }
             println!("profile '{name}' is valid");
         }
@@ -145,7 +145,7 @@ async fn cmd_switch(name: &str) -> Result<()> {
     // Validate profile exists and resolves cleanly.
     let (resolved, warns) = profile::resolve(name)?;
     for w in &warns {
-        eprintln!("warning: {}", w.message);
+        println!("warning: {}", w.message);
     }
 
     // Check plugin deps are satisfied.
@@ -172,7 +172,7 @@ async fn cmd_switch(name: &str) -> Result<()> {
         Ok(())
     })?;
 
-    eprintln!("switched to profile '{name}'");
+    println!("switched to profile '{name}'");
     Ok(())
 }
 
@@ -188,7 +188,7 @@ fn check_plugin_deps(profile: &Profile) -> Result<()> {
         }
     }
     if !missing.is_empty() {
-        eprintln!(
+        println!(
             "warning: profile references plugins not installed: {} — run: lx plugin add ./plugins/<name>",
             missing.join(", ")
         );
@@ -260,7 +260,7 @@ fn cmd_show() -> Result<()> {
         Some(name) => {
             let (resolved, warns) = profile::resolve(name)?;
             for w in &warns {
-                eprintln!("warning: {}", w.message);
+                println!("warning: {}", w.message);
             }
             println!("active profile: {name}");
             if let Some(ref ext) = resolved.extends {

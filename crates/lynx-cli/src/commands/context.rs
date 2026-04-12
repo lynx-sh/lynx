@@ -42,7 +42,7 @@ async fn cmd_set(name: &str) -> Result<()> {
 
     // Print the eval-bridge export statement for the shell to evaluate.
     println!("export LYNX_CONTEXT={name}");
-    eprintln!("context switched to '{name}'");
+    println!("context switched to '{name}'");
     Ok(())
 }
 

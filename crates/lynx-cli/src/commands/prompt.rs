@@ -64,7 +64,7 @@ async fn cmd_render(transient: bool) -> Result<()> {
     let theme = match load_theme(&theme_name) {
         Ok(t) => t,
         Err(e) => {
-            eprintln!(
+            println!(
                 "lx: theme '{}' failed to load ({e}); falling back to '{}' — run `lx doctor` for details",
                 theme_name,
                 brand::DEFAULT_THEME

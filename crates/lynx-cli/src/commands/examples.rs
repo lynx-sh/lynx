@@ -18,7 +18,7 @@ pub async fn run(args: ExamplesArgs) -> Result<()> {
         Some("context") => print_context_examples(),
         Some("daemon") => print_daemon_examples(),
         Some(other) => {
-            eprintln!(
+            println!(
                 "lx: unknown command '{other}' — try: plugin, theme, task, event, config, doctor"
             );
         }

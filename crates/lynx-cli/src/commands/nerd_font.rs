@@ -75,7 +75,7 @@ pub fn install_nerd_font() -> Result<()> {
         "https://github.com/ryanoasis/nerd-fonts/releases/latest/download/{font_name}.zip"
     );
 
-    eprintln!("  downloading {font_name} Nerd Font...");
+    println!("  downloading {font_name} Nerd Font...");
 
     let resp = ureq::get(&url).call()
         .with_context(|| format!("failed to download font from {url}"))?;
@@ -121,7 +121,7 @@ pub fn install_nerd_font() -> Result<()> {
         let _ = std::process::Command::new("fc-cache").arg("-f").status();
     }
 
-    eprintln!("  ✓ installed {installed} font files to {}", font_dir.display());
-    eprintln!("  → Set your terminal font to \"{font_name} Nerd Font\" in terminal preferences.");
+    println!("  ✓ installed {installed} font files to {}", font_dir.display());
+    println!("  → Set your terminal font to \"{font_name} Nerd Font\" in terminal preferences.");
     Ok(())
 }
