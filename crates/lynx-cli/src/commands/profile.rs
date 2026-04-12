@@ -25,11 +25,6 @@ pub enum ProfileCommand {
         #[arg(long)]
         force: bool,
     },
-    /// Open profile in $EDITOR and validate after save
-    Edit {
-        /// Profile name
-        name: String,
-    },
     /// Switch to a profile
     Switch {
         /// Profile name
@@ -49,7 +44,6 @@ pub enum ProfileCommand {
 pub async fn run(args: ProfileArgs) -> Result<()> {
     match args.command {
         ProfileCommand::Create { name, force } => cmd_create(&name, force),
-        ProfileCommand::Edit { name } => cmd_edit(&name),
         ProfileCommand::Switch { name } => cmd_switch(&name).await,
         ProfileCommand::List => cmd_list(),
         ProfileCommand::Delete { name } => cmd_delete(&name),
@@ -78,14 +72,13 @@ fn cmd_create(name: &str, force: bool) -> Result<()> {
     std::fs::create_dir_all(profiles_dir())?;
     std::fs::write(&path, profile_template(name))?;
     println!("created: {}", path.display());
-    println!("edit with: lx profile edit {name}");
+    println!("add plugins: lx plugin enable <name>   remove: lx plugin disable <name>");
     Ok(())
 }
 
 fn profile_template(name: &str) -> String {
     format!(
         r#"# Lynx profile: {name}
-# Uncomment and edit the fields you want to use.
 
 name    = "{name}"
 # extends = "default"      # inherit from another profile (single level)
@@ -95,7 +88,6 @@ plugins = ["git", "fzf"]
 # context_override = "interactive"   # suggested context — not enforced
 
 [env]
-# EDITOR    = "nvim"
 # KUBECONFIG = "~/.kube/{name}-config"
 # DO NOT store secrets here — use a secrets manager instead.
 
@@ -104,39 +96,6 @@ plugins = ["git", "fzf"]
 # ll = "ls -la"
 "#
     )
-}
-
-// ── edit ─────────────────────────────────────────────────────────────────────
-
-fn cmd_edit(name: &str) -> Result<()> {
-    let path = profile_path(name);
-    if !path.exists() {
-        bail!("profile '{name}' does not exist — create it with: lx profile create {name}");
-    }
-
-    let editor = std::env::var("EDITOR")
-        .or_else(|_| std::env::var("VISUAL"))
-        .unwrap_or_else(|_| "vi".into());
-
-    let status = std::process::Command::new(&editor).arg(&path).status()?;
-
-    if !status.success() {
-        bail!("editor exited with non-zero status");
-    }
-
-    // Validate after save.
-    match profile::load_from(&path) {
-        Ok((_, warns)) => {
-            for w in &warns {
-                println!("warning: {}", w.message);
-            }
-            println!("profile '{name}' is valid");
-        }
-        Err(e) => {
-            bail!("profile '{name}' has errors after edit: {e}");
-        }
-    }
-    Ok(())
 }
 
 // ── switch ───────────────────────────────────────────────────────────────────

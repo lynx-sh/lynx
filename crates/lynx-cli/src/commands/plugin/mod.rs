@@ -129,9 +129,18 @@ pub async fn run(args: PluginArgs) -> Result<()> {
 }
 
 async fn cmd_add(path: &str) -> Result<()> {
-    // Registry install: no path separators means it's a registry name, not a local path.
+    // Registry install: no path separators means it's a name, not a local path.
+    // Check installed dir and in-repo plugins/ first (bundled plugins) before hitting registry.
     if !path.contains('/') && !path.contains('\\') {
-        return registry_ops::cmd_add_from_registry(path, false).await;
+        let name = path;
+        let installed = lynx_core::paths::installed_plugins_dir().join(name);
+        let in_repo = std::path::PathBuf::from("plugins").join(name);
+        if installed.join(lynx_core::brand::PLUGIN_MANIFEST).exists()
+            || in_repo.join(lynx_core::brand::PLUGIN_MANIFEST).exists()
+        {
+            return cmd_enable(name).await;
+        }
+        return registry_ops::cmd_add_from_registry(name, false).await;
     }
 
     let plugin_path = std::path::PathBuf::from(path);
