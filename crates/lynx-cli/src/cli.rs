@@ -63,4 +63,6 @@ pub enum Command {
     RefreshState(crate::commands::refresh_state::RefreshStateArgs),
     /// Developer utilities — sync source assets to installed LYNX_DIR
     Dev(crate::commands::dev::DevArgs),
+    /// View and manage the Lynx diagnostic log
+    Diag(crate::commands::diag::DiagArgs),
 }

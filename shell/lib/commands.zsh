@@ -4,7 +4,7 @@
 # shell. All other invocations pass through directly to the lx binary.
 lx() {
   case "$1 $2" in
-    "context set") eval "$(command lx "$@" 2>/dev/null)" ;;
+    "context set") eval "$(command lx "$@")" ;;
     *) command lx "$@" ;;
   esac
 }

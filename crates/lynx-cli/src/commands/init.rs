@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::Args;
 use lynx_config::load as load_config;
-use lynx_core::{brand, env_vars, types::Context};
+use lynx_core::{brand, diag, env_vars, types::Context};
 use lynx_theme::loader::load as load_theme;
 use lynx_manifest::schema::PluginManifest;
 use lynx_shell::{
@@ -22,6 +22,7 @@ pub async fn run(args: InitArgs) -> Result<()> {
     let config = match load_config() {
         Ok(cfg) => cfg,
         Err(e) => {
+            diag::error("init", &format!("config load failed: {e}"));
             let script = generate_safemode_script(&e.to_string());
             print!("{}", script);
             return Ok(());
@@ -34,10 +35,8 @@ pub async fn run(args: InitArgs) -> Result<()> {
         Some("minimal") => Context::Minimal,
         Some("interactive") => Context::Interactive,
         Some(other) => {
-            eprintln!(
-                "lx: unknown context '{}', falling back to auto-detect",
-                other
-            );
+            let msg = format!("unknown context '{}', falling back to auto-detect", other);
+            diag::warn("init", &msg);
             detected
         }
         None => detected,
@@ -53,13 +52,29 @@ pub async fn run(args: InitArgs) -> Result<()> {
     let enabled_plugins: Vec<String> = match lynx_depgraph::depgraph::resolve(&manifests) {
         Ok(order) => {
             for (name, bin) in &order.excluded {
-                eprintln!("lx: plugin '{}' excluded — missing binary '{}'", name, bin);
+                let msg = format!("plugin '{}' excluded — missing binary '{}'", name, bin);
+                diag::warn("init", &msg);
             }
             order.eager.into_iter().chain(order.lazy).collect()
         }
         Err(e) => {
-            eprintln!("lx: plugin dependency error: {}", e);
+            diag::error("init", &format!("plugin dependency error: {e}"));
             config.enabled_plugins.clone()
+        }
+    };
+
+    // Load theme colors to embed inside the init script (inside the LYNX_INITIALIZED guard).
+    let theme_name = std::env::var(env_vars::LYNX_THEME)
+        .unwrap_or_else(|_| config.active_theme.clone());
+    let theme_result = load_theme(&theme_name).or_else(|_| load_theme(brand::DEFAULT_THEME));
+    let (ls_colors_str, eza_colors_str) = match &theme_result {
+        Ok(theme) => (
+            theme.ls_colors.to_ls_colors_string(),
+            theme.ls_colors.to_eza_colors_string(),
+        ),
+        Err(e) => {
+            diag::warn("init", &format!("theme '{}' failed to load: {e}", theme_name));
+            (None, None)
         }
     };
 
@@ -68,33 +83,16 @@ pub async fn run(args: InitArgs) -> Result<()> {
         lynx_dir: &lynx_dir,
         plugin_dir: &plugin_dir,
         enabled_plugins: &enabled_plugins,
+        ls_colors: ls_colors_str.as_deref(),
+        eza_colors: eza_colors_str.as_deref(),
     });
-
-    // Emit LS_COLORS / EZA_COLORS from the active theme so file listings are
-    // colored from first shell startup without any manual eval.
-    let theme_name = std::env::var(env_vars::LYNX_THEME)
-        .unwrap_or_else(|_| config.active_theme.clone());
-    if let Ok(theme) = load_theme(&theme_name).or_else(|_| load_theme(brand::DEFAULT_THEME)) {
-        if let Some(ls) = theme.ls_colors.to_ls_colors_string() {
-            print!("export LS_COLORS={ls:?}\n");
-        }
-        if let Some(eza) = theme.ls_colors.to_eza_colors_string() {
-            print!("export EZA_COLORS={eza:?}\n");
-        }
-    }
-
-    // Export HOSTNAME so child processes (lx prompt render) can read it.
-    // On macOS, HOSTNAME is a zsh special parameter that is NOT exported to
-    // the environment by default — std::env::var("HOSTNAME") would fail in lx.
-    // Using ${HOSTNAME:-$(hostname -s)} respects any existing exported value.
-    print!("export HOSTNAME=\"${{HOSTNAME:-$(hostname -s)}}\"\n");
 
     print!("{}", script);
     Ok(())
 }
 
 /// Load plugin.toml manifests for the given plugin names from plugin_dir.
-/// Plugins with missing or invalid manifests are skipped with a diagnostic.
+/// Plugins with missing or invalid manifests are skipped; errors go to the diag log.
 fn load_plugin_manifests(plugin_dir: &str, enabled: &[String]) -> Vec<PluginManifest> {
     let mut manifests = Vec::new();
     for name in enabled {
@@ -102,9 +100,9 @@ fn load_plugin_manifests(plugin_dir: &str, enabled: &[String]) -> Vec<PluginMani
         if let Ok(content) = std::fs::read_to_string(&toml_path) {
             match lynx_manifest::parse_and_validate(&content) {
                 Ok(m) => manifests.push(m),
-                Err(e) => eprintln!("lx: skipping plugin '{}': invalid manifest: {}", name, e),
+                Err(e) => diag::warn("init", &format!("skipping plugin '{}': invalid manifest: {}", name, e)),
             }
-        } // plugin dir missing or no manifest — silently skip
+        } // plugin dir missing or no manifest — silently skip (expected for optional plugins)
     }
     manifests
 }

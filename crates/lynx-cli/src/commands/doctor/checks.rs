@@ -6,6 +6,7 @@
 
 use super::{Check, Status};
 use lynx_config::load;
+use lynx_core::diag;
 use lynx_theme::loader::load as load_theme;
 
 /// Run every check and return results in display order.
@@ -17,6 +18,7 @@ pub(super) fn run_all() -> Vec<Check> {
         check_plugin_binary_deps(),
         check_shell_integration(),
         check_active_theme_valid(),
+        check_diag_log(),
     ]
 }
 
@@ -222,6 +224,42 @@ fn check_shell_integration() -> Check {
                 lynx_core::brand::ZSHRC_INIT_LINE
             )),
         },
+    }
+}
+
+fn check_diag_log() -> Check {
+    let lines = diag::tail(20);
+    let errors: Vec<&String> = lines.iter().filter(|l| l.contains("[ERROR]")).collect();
+    let warns: Vec<&String> = lines.iter().filter(|l| l.contains("[WARN]")).collect();
+
+    if errors.is_empty() && warns.is_empty() {
+        Check {
+            name: "diagnostic log",
+            status: Status::Pass,
+            detail: "no errors or warnings logged".to_string(),
+            fix: None,
+        }
+    } else if !errors.is_empty() {
+        Check {
+            name: "diagnostic log",
+            status: Status::Fail,
+            detail: format!(
+                "{} error(s), {} warning(s) in log — run `lx diag` for details",
+                errors.len(),
+                warns.len()
+            ),
+            fix: Some("lx diag".to_string()),
+        }
+    } else {
+        Check {
+            name: "diagnostic log",
+            status: Status::Warn,
+            detail: format!(
+                "{} warning(s) in log — run `lx diag` for details",
+                warns.len()
+            ),
+            fix: Some("lx diag".to_string()),
+        }
     }
 }
 
