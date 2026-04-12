@@ -476,6 +476,7 @@ pub const KNOWN_SEGMENTS: &[&str] = &[
     "git_status",
     "git_action",
     "git_ahead_behind",
+    "git_sha",
     "git_stash",
     "cmd_duration",
     "context_badge",
