@@ -1213,6 +1213,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "lynx-workflow"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "lynx-core",
+ "serde",
+ "tempfile",
+ "toml",
+]
+
+[[package]]
 name = "matchers"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

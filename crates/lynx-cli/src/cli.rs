@@ -24,8 +24,8 @@ pub enum Command {
     Plugin(crate::commands::plugin::PluginArgs),
     /// Manage themes
     Theme(crate::commands::theme::ThemeArgs),
-    /// Manage task scheduler
-    Task(crate::commands::task::TaskArgs),
+    /// Manage scheduled cron tasks
+    Cron(crate::commands::cron::CronArgs),
     /// Manage the Lynx background daemon
     Daemon(crate::commands::daemon::DaemonArgs),
     /// Switch or show context (interactive, agent, minimal)

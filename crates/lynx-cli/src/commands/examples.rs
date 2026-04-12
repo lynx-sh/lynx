@@ -11,7 +11,7 @@ pub async fn run(args: ExamplesArgs) -> Result<()> {
     match args.command.as_deref() {
         Some("plugin") => print_plugin_examples(),
         Some("theme") => print_theme_examples(),
-        Some("task") => print_task_examples(),
+        Some("cron") | Some("task") => print_task_examples(),
         Some("event") => print_event_examples(),
         Some("config") => print_config_examples(),
         Some("doctor") => print_doctor_examples(),
@@ -44,10 +44,10 @@ fn print_quickstart() {
   lx plugin add ./plugins/my-tools # install it
   lx plugin list                   # see what's loaded
 
-  # Tasks (scheduled commands)
-  lx task add cleanup              # add a task (opens editor)
-  lx task list                     # see all tasks
-  lx task run cleanup              # run a task now
+  # Cron (scheduled commands)
+  lx cron add cleanup              # add a task (opens editor)
+  lx cron list                     # see all tasks
+  lx cron run cleanup              # run a task now
 
   # Configuration
   lx config show                   # view current config
@@ -119,29 +119,29 @@ fn print_theme_examples() {
 fn print_task_examples() {
     println!(
         r#"
-  lx task — examples
+  lx cron — examples
   ───────────────────
 
   # Schedule a daily backup (add task to tasks.toml)
-  lx task add backup
+  lx cron add backup
 
   # List all scheduled tasks and their last run status
-  lx task list
+  lx cron list
 
   # Run a task immediately (outside its schedule)
-  lx task run backup
+  lx cron run backup
 
   # Pause a task without removing it
-  lx task pause backup
+  lx cron pause backup
 
   # Resume a paused task
-  lx task resume backup
+  lx cron resume backup
 
   # View recent logs for a task
-  lx task logs backup
+  lx cron logs backup
 
   # Remove a task
-  lx task remove backup
+  lx cron remove backup
 
   # tasks.toml format example:
   #   [[task]]

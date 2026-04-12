@@ -9,13 +9,13 @@ use std::io::{BufRead, BufReader};
 
 #[derive(Args)]
 #[command(arg_required_else_help = true)]
-pub struct TaskArgs {
+pub struct CronArgs {
     #[command(subcommand)]
-    pub command: TaskCommand,
+    pub command: CronCommand,
 }
 
 #[derive(Subcommand)]
-pub enum TaskCommand {
+pub enum CronCommand {
     /// Add a scheduled task to tasks.toml
     Add {
         /// Task name (unique)
@@ -76,9 +76,9 @@ pub enum TaskCommand {
     Examples,
 }
 
-pub async fn run(args: TaskArgs) -> Result<()> {
+pub async fn run(args: CronArgs) -> Result<()> {
     match args.command {
-        TaskCommand::Add {
+        CronCommand::Add {
             name,
             run,
             cron,
@@ -87,15 +87,15 @@ pub async fn run(args: TaskArgs) -> Result<()> {
             timeout,
             log,
         } => cmd_add(name, run, cron, description, on_fail, timeout, log).await,
-        TaskCommand::List => cmd_list().await,
-        TaskCommand::Logs { name, tail, follow } => cmd_logs(name, tail, follow).await,
-        TaskCommand::Pause { name } => cmd_set_enabled(name, false).await,
-        TaskCommand::Resume { name } => cmd_set_enabled(name, true).await,
-        TaskCommand::Run { name } => cmd_run(name).await,
-        TaskCommand::Remove { name } => cmd_remove(name).await,
-        TaskCommand::Examples => {
+        CronCommand::List => cmd_list().await,
+        CronCommand::Logs { name, tail, follow } => cmd_logs(name, tail, follow).await,
+        CronCommand::Pause { name } => cmd_set_enabled(name, false).await,
+        CronCommand::Resume { name } => cmd_set_enabled(name, true).await,
+        CronCommand::Run { name } => cmd_run(name).await,
+        CronCommand::Remove { name } => cmd_remove(name).await,
+        CronCommand::Examples => {
             crate::commands::examples::run(crate::commands::examples::ExamplesArgs {
-                command: Some("task".into()),
+                command: Some("cron".into()),
             })
             .await
         }
@@ -175,7 +175,7 @@ async fn cmd_add(
     let mut file = parse_tasks_file(&content)?;
 
     if file.tasks.iter().any(|t| t.name == name) {
-        bail!("task '{name}' already exists — use 'lx task remove {name}' first");
+        bail!("task '{name}' already exists — use 'lx cron remove {name}' first");
     }
 
     file.tasks.push(task);
@@ -192,7 +192,7 @@ async fn cmd_list() -> Result<()> {
     let file = parse_tasks_file(&content)?;
 
     if file.tasks.is_empty() {
-        println!("No tasks configured. Use 'lx task add' to create one.");
+        println!("No tasks configured. Use 'lx cron add' to create one.");
         return Ok(());
     }
 

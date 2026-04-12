@@ -24,7 +24,7 @@ pub mod audit;
 pub mod browse;
 pub mod install;
 pub mod tap;
-pub mod task;
+pub mod cron;
 pub mod nerd_font;
 pub mod theme;
 pub mod uninstall;
@@ -40,7 +40,7 @@ pub async fn dispatch(cli: Cli) -> Result<()> {
         Command::Event(args) => event::run(args).await,
         Command::Plugin(args) => plugin::run(args).await,
         Command::Theme(args) => theme::run(args).await,
-        Command::Task(args) => task::run(args).await,
+        Command::Cron(args) => cron::run(args).await,
         Command::Daemon(args) => daemon::run(args).await,
         Command::Context(args) => context::run(args).await,
         Command::Doctor(args) => doctor::run(args).await,
