@@ -19,6 +19,7 @@ pub mod profile;
 pub mod prompt;
 pub mod rollback;
 pub mod sync;
+pub mod audit;
 pub mod browse;
 pub mod install;
 pub mod tap;
@@ -62,5 +63,6 @@ pub async fn dispatch(cli: Cli) -> Result<()> {
         Command::Install(args) => install::run_install(args).await,
         Command::Remove(args) => install::run_uninstall(args).await,
         Command::Browse(args) => browse::run(args).await,
+        Command::Audit(args) => audit::run(args).await,
     }
 }
