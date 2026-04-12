@@ -27,15 +27,26 @@ pub fn render_prompt(
     let sep = &theme.separators;
 
     // Build the input-line part of PROMPT (left segments).
-    let left_str = assemble(left, theme, sep, true);
+    // When a top line exists, the bottom (input) line should render plain —
+    // no powerline edge glyphs, no adaptive separators.
+    let left_str = if !top.is_empty() {
+        let mut plain_sep = Separators::default();
+        plain_sep.mode = SeparatorMode::Static;
+        assemble(left, theme, &plain_sep, true)
+    } else {
+        assemble(left, theme, sep, true)
+    };
     let rprompt = assemble(right, theme, sep, false);
 
+    // Optional blank line before the prompt for visual breathing room.
+    let spacer = if theme.segments.spacing { "$'\\n'" } else { "" };
+
     let mut out = if top.is_empty() {
-        format!("PROMPT=\"{left_str}\"\nRPROMPT=\"{rprompt}\"\n")
+        format!("PROMPT={spacer}\"{left_str}\"\nRPROMPT=\"{rprompt}\"\n")
     } else {
         let top_str = assemble(top, theme, sep, true);
         let top_line = if !top_right.is_empty() {
-            let top_right_str = assemble_no_trail(top_right, theme, sep, true);
+            let top_right_str = assemble_no_trail(top_right, theme, sep, false);
             let top_visible = visible_len(&top_str);
             let right_visible = visible_len(&top_right_str);
             let padding = columns
@@ -51,7 +62,7 @@ pub fn render_prompt(
         // Use ANSI-C quoting ($'\n') to embed a real newline between the two
         // prompt lines. A literal \n inside PROMPT="..." is NOT a newline in
         // zsh — it renders as the two characters '\' and 'n'.
-        format!("PROMPT=\"{top_line}\"$'\\n'\"{left_str}\"\nRPROMPT=\"{rprompt}\"\n")
+        format!("PROMPT={spacer}\"{top_line}\"$'\\n'\"{left_str}\"\nRPROMPT=\"{rprompt}\"\n")
     };
 
     if !continuation.is_empty() {
@@ -185,12 +196,21 @@ fn assemble(segs: &[RenderedSegment], theme: &Theme, sep: &Separators, is_left: 
     let sep_str = glyph.char.as_deref().unwrap_or(" ");
 
     // Render left_edge before first segment if configured.
+    // In adaptive mode, auto-derive edge fg from first segment's bg when no
+    // explicit edge color is set — this creates a smooth "fade-in" cap.
     let edge_glyph = if is_left { &sep.left_edge } else { &sep.right_edge };
     let edge_str = edge_glyph.char.as_deref().unwrap_or("");
     let edge_rendered = if !edge_str.is_empty() && cap != TermCapability::None {
-        if let Some(ref col) = edge_glyph.color {
+        let edge_fg = edge_glyph.color.clone().or_else(|| {
+            if sep.mode == SeparatorMode::Adaptive {
+                resolve_seg_bg(&segs[0], theme)
+            } else {
+                None
+            }
+        });
+        if let Some(col) = edge_fg {
             let color = SegmentColor {
-                fg: Some(col.clone()),
+                fg: Some(col),
                 bold: false,
                 bg: None,
             };

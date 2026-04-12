@@ -6,12 +6,13 @@ use crate::segment::{apply_format, RenderContext, RenderedSegment, Segment};
 
 #[derive(Deserialize, Default)]
 struct DirConfig {
+    icon: Option<String>,
     max_depth: Option<u32>,
     truncate_to_repo: Option<bool>,
     /// Replace the home directory prefix with `~`. Default: `true`.
     tilde_home: Option<bool>,
-    /// Format template. Available vars: `$path`.
-    /// Default: `"$path"`.
+    /// Format template. Available vars: `$icon`, `$path`.
+    /// Default: `"$icon$path"`.
     format: Option<String>,
 }
 
@@ -47,9 +48,11 @@ impl Segment for DirSegment {
             shorten(&effective_cwd, max_depth, truncate_to_repo, &ctx.cache)
         };
 
+        let icon = cfg.icon.as_deref().unwrap_or("");
         let text = match cfg.format.as_deref() {
-            Some(tmpl) => apply_format(tmpl, &[("path", &display)]),
-            None => display,
+            Some(tmpl) => apply_format(tmpl, &[("icon", icon), ("path", &display)]),
+            None if icon.is_empty() => display,
+            None => format!("{icon}{display}"),
         };
         Some(RenderedSegment::new(text))
     }

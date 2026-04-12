@@ -7,21 +7,34 @@ author = "proxikal"
 mode = "adaptive"
 
 [separators.left]
-char = "\ue0b0"
+char = "\ue0b4"
+
+[separators.left_edge]
+char = "\ue0b6"
 
 [separators.right]
-char = "\ue0b2"
+char = "\ue0b6"
+
+[segments]
+spacing = true
+
+[segments.top]
+order = ["dir", "git_branch", "git_status"]
+
+[segments.top_right]
+order = ["cmd_duration", "git_sha", "time"]
 
 [segments.left]
-order = ["username", "dir", "git_branch", "git_status", "prompt_char"]
+order = ["prompt_char"]
 
 [segments.right]
-order = ["cmd_duration", "git_sha", "time"]
+order = []
 
 [segment.username]
 color = { fg = "#c0caf5", bg = "#1a1b26" }
 
 [segment.dir]
+icon = " "
 max_depth = 3
 truncate_to_repo = true
 color = { fg = "#c0caf5", bg = "#3d59a1", bold = true }
@@ -57,6 +70,23 @@ color = { fg = "#9ece6a" }
 show_in = ["agent"]
 label = { agent = "AI", minimal = "MIN" }
 color = { fg = "#bb9af7", bold = true }
+
+[syntax_highlight]
+command   = "#9ece6a"
+unknown   = "#f7768e"
+builtin   = "#bb9af7"
+alias     = "#7aa2f7"
+function  = "#7dcfff"
+path      = "#c0caf5"
+string    = "#e0af68"
+argument  = "#c0caf5"
+option    = "#7aa2f7"
+comment   = "#565f89"
+globbing  = "#ff9e64"
+variable  = "#bb9af7"
+
+[autosuggestions]
+color = "#565f89"
 
 [colors]
 accent  = "#7aa2f7"
