@@ -93,7 +93,31 @@ pub async fn run_install(args: InstallPkgArgs) -> Result<()> {
                 }
             }
             PackageType::Bundle => {
-                println!("  bundle install for '{name}' — coming in a future update");
+                // Resolve bundle to its package list and install each.
+                let all_entries: Vec<_> = merged.iter().map(|t| t.entry.clone()).collect();
+                let idx = lynx_registry::schema::RegistryIndex { plugins: all_entries };
+                let resolved = lynx_registry::bundle::resolve_bundle(entry, &idx)?;
+                println!("  bundle '{name}' contains {} packages:", resolved.len());
+                for pkg in &resolved {
+                    println!("    - {}", pkg.name);
+                }
+                print!("  install all? [y/N] ");
+                std::io::Write::flush(&mut std::io::stdout())?;
+                let mut input = String::new();
+                std::io::stdin().read_line(&mut input)?;
+                if !input.trim().eq_ignore_ascii_case("y") {
+                    println!("  skipped bundle '{name}'");
+                    continue;
+                }
+                for pkg in &resolved {
+                    println!();
+                    match pkg.package_type {
+                        PackageType::Tool => install_tool(&pkg.name, pkg, args.force)?,
+                        PackageType::Plugin => install_plugin(&pkg.name, pkg, args.force).await?,
+                        _ => println!("  skipping {} (type {:?})", pkg.name, pkg.package_type),
+                    }
+                }
+                println!("  ✓ bundle '{name}' complete");
             }
         }
     }
