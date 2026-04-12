@@ -73,4 +73,6 @@ pub enum Command {
     Install(crate::commands::install::InstallPkgArgs),
     /// Remove a package's Lynx integration (preserves system binaries)
     Remove(crate::commands::install::UninstallPkgArgs),
+    /// Browse available packages by category
+    Browse(crate::commands::browse::BrowseArgs),
 }
