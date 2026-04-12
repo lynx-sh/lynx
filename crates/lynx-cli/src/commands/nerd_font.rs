@@ -26,7 +26,9 @@ pub fn theme_needs_nerd_font(theme: &lynx_theme::Theme) -> bool {
         || check_glyph(&theme.separators.right_edge.char)
 }
 
-/// Find installed Nerd Font names on disk. Returns the font family name (e.g. "JetBrainsMonoNerdFont").
+/// Find installed Nerd Font PostScript base names (e.g. "JetBrainsMonoNLNF").
+/// On macOS, queries the font system for real PostScript names.
+/// Falls back to filename-based extraction on other platforms.
 pub fn find_installed_nerd_fonts() -> Vec<String> {
     let home = std::env::var_os("HOME").map(PathBuf::from);
     let font_dirs: Vec<PathBuf> = {
@@ -45,30 +47,111 @@ pub fn find_installed_nerd_fonts() -> Vec<String> {
         dirs
     };
 
-    let mut families = std::collections::HashSet::new();
+    // Collect Nerd Font file paths first.
+    let mut nerd_font_files = Vec::new();
     for dir in &font_dirs {
-        scan_dir_for_nerd_fonts(dir, &mut families);
+        scan_dir_for_nerd_font_files(dir, &mut nerd_font_files);
     }
-    let mut result: Vec<String> = families.into_iter().collect();
-    result.sort();
-    result
-}
 
-fn scan_dir_for_nerd_fonts(dir: &PathBuf, families: &mut std::collections::HashSet<String>) {
-    let Ok(entries) = std::fs::read_dir(dir) else { return };
-    for entry in entries.flatten() {
-        let name = entry.file_name().to_string_lossy().to_string();
-        if entry.path().is_dir() {
-            scan_dir_for_nerd_fonts(&entry.path(), families);
-        } else if name.to_lowercase().contains("nerd") {
-            // Extract family name from filename: "JetBrainsMonoNerdFont-Regular.ttf" → "JetBrainsMonoNerdFont"
-            if let Some(stem) = name.strip_suffix(".ttf").or_else(|| name.strip_suffix(".otf")) {
+    // Resolve PostScript names from font files.
+    let mut families = std::collections::HashSet::new();
+    for path in &nerd_font_files {
+        if let Some(ps_base) = postscript_base_name(path) {
+            families.insert(ps_base);
+        }
+    }
+
+    // Fallback: if we found font files but couldn't resolve any PostScript names,
+    // extract from filenames (less reliable but better than nothing).
+    if families.is_empty() && !nerd_font_files.is_empty() {
+        for path in &nerd_font_files {
+            if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                // "JetBrainsMonoNerdFont-Regular" → "JetBrainsMonoNerdFont"
                 if let Some(family) = stem.split('-').next() {
                     families.insert(family.to_string());
                 }
             }
         }
     }
+
+    let mut result: Vec<String> = families.into_iter().collect();
+    result.sort();
+    result
+}
+
+/// Collect paths of Nerd Font files (*.ttf, *.otf with "nerd" in the name).
+fn scan_dir_for_nerd_font_files(dir: &PathBuf, files: &mut Vec<PathBuf>) {
+    let Ok(entries) = std::fs::read_dir(dir) else { return };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            scan_dir_for_nerd_font_files(&path, files);
+        } else {
+            let name = entry.file_name().to_string_lossy().to_lowercase();
+            if name.contains("nerd") && (name.ends_with(".ttf") || name.ends_with(".otf")) {
+                // Only collect Regular weight to avoid duplicates per family.
+                if name.contains("regular") {
+                    files.push(path);
+                }
+            }
+        }
+    }
+}
+
+/// Get the PostScript base name (without style suffix) for a font file.
+/// e.g. "JetBrainsMonoNLNF" from a file whose PostScript name is "JetBrainsMonoNLNF-Regular".
+fn postscript_base_name(font_path: &PathBuf) -> Option<String> {
+    if cfg!(target_os = "macos") {
+        postscript_name_macos(font_path)
+    } else {
+        postscript_name_fc(font_path)
+    }
+}
+
+/// macOS: use mdls to query the font's PostScript name.
+fn postscript_name_macos(font_path: &PathBuf) -> Option<String> {
+    let output = Command::new("mdls")
+        .args(["-name", "com_apple_ats_name_postscript", "-raw"])
+        .arg(font_path)
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let text = String::from_utf8_lossy(&output.stdout);
+    // mdls -raw can return "(null)", a bare string, or a plist array like:
+    //   (\n    "JetBrainsMonoNLNF-Regular"\n)
+    // Extract the first quoted string, or use the whole trimmed value.
+    let raw = text
+        .lines()
+        .filter_map(|l| {
+            let t = l.trim().trim_matches('"');
+            if t.is_empty() || t == "(" || t == ")" || t == "(null)" {
+                None
+            } else {
+                Some(t.to_string())
+            }
+        })
+        .next()?;
+    // PostScript name is e.g. "JetBrainsMonoNLNF-Regular" — strip the style suffix.
+    Some(raw.split('-').next().unwrap_or(&raw).to_string())
+}
+
+/// Linux: use fc-query to get the PostScript name.
+fn postscript_name_fc(font_path: &PathBuf) -> Option<String> {
+    let output = Command::new("fc-query")
+        .args(["--format", "%{postscriptname}"])
+        .arg(font_path)
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let raw = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if raw.is_empty() {
+        return None;
+    }
+    Some(raw.split('-').next().unwrap_or(&raw).to_string())
 }
 
 /// Detect the current terminal emulator.
@@ -120,7 +203,14 @@ fn iterm2_current_font_is_nerd() -> bool {
     iterm2_current_font()
         .map(|f| {
             let lower = f.to_lowercase();
-            lower.contains("nerd") || lower.contains("powerline")
+            // Check for Nerd Font indicators in both filename-style
+            // names (e.g. "JetBrainsMonoNerdFont") and PostScript-style
+            // names (e.g. "JetBrainsMonoNLNF-Regular" where NF/NFM/NFP = Nerd Font).
+            lower.contains("nerd")
+                || lower.contains("powerline")
+                || lower.contains("nf-")
+                || lower.contains("nfm-")
+                || lower.contains("nfp-")
         })
         .unwrap_or(false)
 }
@@ -164,7 +254,7 @@ pub fn configure_iterm2_font(font_family: &str, size: u32) -> Result<()> {
 /// Download and install a Nerd Font (FiraCode by default).
 pub fn install_nerd_font() -> Result<String> {
     let font_name = "FiraCode";
-    let family = "FiraCodeNerdFont";
+    let filename_family = "FiraCodeNerdFont";
     let url = format!(
         "https://github.com/ryanoasis/nerd-fonts/releases/latest/download/{font_name}.zip"
     );
@@ -213,5 +303,10 @@ pub fn install_nerd_font() -> Result<String> {
     }
 
     println!("  ✓ installed {installed} font files to {}", font_dir.display());
-    Ok(family.to_string())
+
+    // Resolve the real PostScript base name from the installed Regular font file.
+    let regular_file = font_dir.join(format!("{filename_family}-Regular.ttf"));
+    let family = postscript_base_name(&regular_file)
+        .unwrap_or_else(|| filename_family.to_string());
+    Ok(family)
 }
