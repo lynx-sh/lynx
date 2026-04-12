@@ -1,6 +1,6 @@
-use std::process::Command;
-
 use anyhow::{bail, Result};
+
+use super::open_in_vscode;
 use clap::{Args, Subcommand};
 
 use lynx_config::snapshot::{create as snapshot, mutate_config_transaction};
@@ -59,16 +59,12 @@ fn cmd_edit() -> Result<()> {
     let _ = snapshot_dir;
 
     let snapshot_content = std::fs::read_to_string(&path).unwrap_or_default();
-    let editor = std::env::var("EDITOR").unwrap_or_else(|_| "vi".to_string());
-
-    let status = Command::new(&editor)
-        .arg(&path)
-        .status()
-        .map_err(|e| anyhow::anyhow!("failed to launch editor '{editor}': {e}"))?;
-
-    if !status.success() {
-        std::fs::write(&path, &snapshot_content).ok();
-        bail!("editor exited with error — config unchanged");
+    open_in_vscode(&path)?;
+    // VS Code edits in place; re-read to check for changes.
+    let after = std::fs::read_to_string(&path).unwrap_or_default();
+    if after == snapshot_content {
+        println!("no changes made");
+        return Ok(());
     }
 
     // Validate.

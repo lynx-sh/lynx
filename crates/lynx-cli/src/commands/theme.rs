@@ -1,7 +1,8 @@
 use std::path::PathBuf;
-use std::process::Command;
 
 use anyhow::{bail, Context as _, Result};
+
+use super::open_in_vscode;
 use clap::{Args, Subcommand};
 
 use lynx_config::{load, snapshot::mutate_config_transaction};
@@ -290,20 +291,10 @@ async fn cmd_edit() -> Result<()> {
     }
     let path = user_path;
 
-    let editor = std::env::var("EDITOR").unwrap_or_else(|_| "vi".to_string());
     let snapshot = std::fs::read_to_string(&path)
         .with_context(|| format!("failed to read theme file {path:?}"))?;
 
-    let status = Command::new(&editor)
-        .arg(&path)
-        .status()
-        .with_context(|| format!("failed to launch editor '{editor}'"))?;
-
-    if !status.success() {
-        // Editor exited non-zero — restore snapshot.
-        std::fs::write(&path, &snapshot).ok();
-        bail!("editor exited with error — theme unchanged");
-    }
+    open_in_vscode(&path)?;
 
     // Validate the saved file.
     match lynx_theme::loader::load_from_path(&path) {
