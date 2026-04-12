@@ -27,9 +27,7 @@ _lynx_async_done() {
 }
 
 _lynx_hook_precmd() {
-  export LYNX_LAST_EXIT_CODE=$?
-  export LYNX_BG_JOBS=${#jobstates}
-  export LYNX_NOW_SECS=$(date +%s)
+  export LYNX_LAST_EXIT_CODE=$? LYNX_BG_JOBS=${#jobstates} LYNX_NOW_SECS=$(date +%s) LYNX_HIST_NUMBER=$HISTCMD
 
   # Cancel any in-flight async refresh from the previous cycle.
   if [[ -n ${_lynx_async_fd:-} ]]; then

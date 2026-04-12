@@ -480,6 +480,7 @@ pub const KNOWN_SEGMENTS: &[&str] = &[
     "git_sha",
     "git_stash",
     "git_time_since_commit",
+    "hist_number",
     "cmd_duration",
     "context_badge",
     "kubectl_context",

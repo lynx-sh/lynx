@@ -11,7 +11,7 @@ pub use segments::{
     AwsProfileSegment, BackgroundJobsSegment, CmdDurationSegment, CondaEnvSegment, ContextBadgeSegment, DirSegment,
     ExitCodeSegment, GitActionSegment, GitAheadBehindSegment, GitBranchSegment, GitShaSegment,
     GitStashSegment, GitStatusSegment, GitTimeSinceCommitSegment, GolangVersionSegment,
-    HostnameSegment, KubectlContextSegment, NewlineSegment,
+    HistNumberSegment, HostnameSegment, KubectlContextSegment, NewlineSegment,
     NodeVersionSegment, ProfileBadgeSegment, PromptCharSegment, RubyVersionSegment,
     RustVersionSegment, SshIndicatorSegment, TaskStatusSegment, TimeSegment, UsernameSegment,
     VenvSegment, ViModeSegment, CustomSegment,
