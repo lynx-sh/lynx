@@ -65,9 +65,8 @@ depends_on = ["build"]      # wait for build to complete
 
 [[step]]
 name = "deploy"
-run = "scripts/deploy.sh --env ${{params.env}}"
+run = "scripts/deploy.sh --env $env"
 confirm = true              # ask before running
-# confirm = "params.env == 'production'"  # conditional confirm
 ```
 
 ## Built-in Runners
@@ -83,7 +82,6 @@ confirm = true              # ask before running
 | cargo | cargo | `run = "build --release"` |
 | curl | curl | `run = "-X POST https://api.example.com"` |
 | docker | docker | `run = "compose up -d"` |
-| workflow | lx run | `run = "other-workflow"` (composability) |
 
 Custom runners can be registered via plugin.toml `[runners.*]` tables.
 

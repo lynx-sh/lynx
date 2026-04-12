@@ -153,6 +153,11 @@ pub struct RegistryIndex {
 }
 
 impl RegistryIndex {
+    /// Build a name→index HashMap for O(1) lookups.
+    pub fn name_index(&self) -> std::collections::HashMap<&str, usize> {
+        self.plugins.iter().enumerate().map(|(i, e)| (e.name.as_str(), i)).collect()
+    }
+
     /// Look up a plugin by exact name.
     pub fn find(&self, name: &str) -> Option<&RegistryEntry> {
         self.plugins.iter().find(|e| e.name == name)
@@ -185,61 +190,6 @@ impl RegistryIndex {
             .iter()
             .filter(|e| e.category.to_lowercase() == cat)
             .collect()
-    }
-}
-
-/// A single entry in lynx.lock — pins an installed plugin to an exact version
-/// and checksum so future installs are reproducible.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct LockEntry {
-    /// Plugin name.
-    pub name: String,
-    /// Exact version installed.
-    pub version: String,
-    /// SHA-256 hex digest of the installed archive (verified at install time).
-    pub checksum_sha256: String,
-    /// SHA-256 hex digest of the installed plugin directory contents.
-    /// Used by `lx plugin checksum <name>` for post-install tamper checks.
-    #[serde(default)]
-    pub installed_checksum_sha256: Option<String>,
-    /// Source URL the archive was downloaded from.
-    pub url: String,
-    /// Install method: "registry" or "local".
-    #[serde(default = "default_source")]
-    pub source: String,
-}
-
-fn default_source() -> String {
-    "registry".to_string()
-}
-
-/// The full lynx.lock file.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
-pub struct LockFile {
-    #[serde(rename = "locked", default)]
-    pub entries: Vec<LockEntry>,
-}
-
-impl LockFile {
-    /// Find a locked entry by plugin name.
-    pub fn find(&self, name: &str) -> Option<&LockEntry> {
-        self.entries.iter().find(|e| e.name == name)
-    }
-
-    /// Upsert: replace an existing entry or append a new one.
-    pub fn upsert(&mut self, entry: LockEntry) {
-        if let Some(existing) = self.entries.iter_mut().find(|e| e.name == entry.name) {
-            *existing = entry;
-        } else {
-            self.entries.push(entry);
-        }
-    }
-
-    /// Remove an entry by name. Returns true if it was present.
-    pub fn remove(&mut self, name: &str) -> bool {
-        let before = self.entries.len();
-        self.entries.retain(|e| e.name != name);
-        self.entries.len() < before
     }
 }
 
@@ -373,76 +323,6 @@ url = "https://example.com/broken.tar.gz"
 "#;
         let result = toml::from_str::<RegistryIndex>(bad);
         assert!(result.is_err(), "expected parse error for missing checksum");
-    }
-
-    #[test]
-    fn lockfile_upsert_and_find() {
-        let mut lock = LockFile::default();
-        lock.upsert(LockEntry {
-            name: "git".into(),
-            version: "1.0.0".into(),
-            checksum_sha256: "abc".into(),
-            installed_checksum_sha256: Some("abc".into()),
-            url: "https://example.com/git.tar.gz".into(),
-            source: "registry".into(),
-        });
-        assert!(lock.find("git").is_some());
-        assert_eq!(lock.entries.len(), 1);
-    }
-
-    #[test]
-    fn lockfile_upsert_replaces_existing() {
-        let mut lock = LockFile::default();
-        lock.upsert(LockEntry {
-            name: "git".into(),
-            version: "1.0.0".into(),
-            checksum_sha256: "old".into(),
-            installed_checksum_sha256: Some("old".into()),
-            url: "u".into(),
-            source: "registry".into(),
-        });
-        lock.upsert(LockEntry {
-            name: "git".into(),
-            version: "1.1.0".into(),
-            checksum_sha256: "new".into(),
-            installed_checksum_sha256: Some("new".into()),
-            url: "u2".into(),
-            source: "registry".into(),
-        });
-        assert_eq!(lock.entries.len(), 1);
-        assert_eq!(lock.find("git").unwrap().version, "1.1.0");
-    }
-
-    #[test]
-    fn lockfile_remove() {
-        let mut lock = LockFile::default();
-        lock.upsert(LockEntry {
-            name: "git".into(),
-            version: "1.0.0".into(),
-            checksum_sha256: "x".into(),
-            installed_checksum_sha256: Some("x".into()),
-            url: "u".into(),
-            source: "registry".into(),
-        });
-        assert!(lock.remove("git"));
-        assert!(lock.find("git").is_none());
-        assert!(!lock.remove("git")); // already gone
-    }
-
-    #[test]
-    fn lockfile_roundtrips_toml() {
-        let mut lock = LockFile::default();
-        lock.upsert(LockEntry {
-            name: "git".into(),
-            version: "1.0.0".into(),
-            checksum_sha256: "abc".into(),
-            installed_checksum_sha256: Some("abc".into()),
-            url: "https://x.com/git.tar.gz".into(),
-            source: "registry".into(),
-        });
-        let serialized = toml::to_string_pretty(&lock).unwrap();
-        let parsed: LockFile = toml::from_str(&serialized).unwrap();
-        assert_eq!(lock, parsed);
     }
 
     // ── B18-P02: expanded schema tests ──────────────────────────────────────

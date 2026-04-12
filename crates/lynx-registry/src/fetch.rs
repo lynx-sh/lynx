@@ -8,7 +8,7 @@ use tracing::{debug, info};
 use crate::index::{
     get_index, load_lock_from, lock_path, plugins_install_dir, save_lock_to, validate_index,
 };
-use crate::schema::LockEntry;
+use crate::lock::{LockEntry, PluginSource};
 
 /// Options for a fetch operation.
 #[derive(Debug, Default)]
@@ -96,7 +96,7 @@ pub fn fetch_plugin(name: &str, opts: &FetchOptions) -> Result<PathBuf> {
         checksum_sha256: pv.checksum_sha256.clone(),
         installed_checksum_sha256: Some(installed_checksum),
         url: pv.url.clone(),
-        source: "registry".to_string(),
+        source: PluginSource::Registry,
     });
     save_lock_to(&lock, &lock_file).context("failed to update lynx.lock")?;
 
@@ -118,7 +118,7 @@ pub fn check_for_update(
     let lock_file = lock_path();
     let lock = load_lock_from(&lock_file).unwrap_or_default();
     let locked = match lock.find(name) {
-        Some(e) if e.source == "registry" => e,
+        Some(e) if e.source == PluginSource::Registry => e,
         _ => return Ok(None), // locally installed — skip
     };
 

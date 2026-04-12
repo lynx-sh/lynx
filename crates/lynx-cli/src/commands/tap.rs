@@ -98,24 +98,50 @@ fn cmd_update() -> Result<()> {
     let path = taps_config_path();
     let list = load_taps(&path)?;
 
+    let mut failures = 0u32;
+    let total = list.taps.len();
+
     for tap in &list.taps {
         print!("{} {} ... ", tap.trust.badge(), tap.name);
         match ureq::get(&tap.url).call() {
             Ok(resp) if resp.status() < 400 => {
-                // Cache per-tap index.
                 let cache_dir = lynx_core::paths::registry_cache_dir();
-                std::fs::create_dir_all(&cache_dir).ok();
+                if let Err(e) = std::fs::create_dir_all(&cache_dir) {
+                    println!("failed (cannot create cache dir: {e})");
+                    failures += 1;
+                    continue;
+                }
                 let cache_file = cache_dir.join(format!("{}.toml", tap.name.replace('/', "_")));
-                if let Ok(body) = resp.into_string() {
-                    std::fs::write(&cache_file, &body).ok();
-                    println!("ok");
-                } else {
-                    println!("failed to read response");
+                match resp.into_string() {
+                    Ok(body) => {
+                        if let Err(e) = std::fs::write(&cache_file, &body) {
+                            println!("failed (cannot write cache: {e})");
+                            failures += 1;
+                        } else {
+                            println!("ok");
+                        }
+                    }
+                    Err(e) => {
+                        println!("failed (cannot read response: {e})");
+                        failures += 1;
+                    }
                 }
             }
-            Ok(resp) => println!("error (status {})", resp.status()),
-            Err(e) => println!("failed ({e})"),
+            Ok(resp) => {
+                println!("error (status {})", resp.status());
+                failures += 1;
+            }
+            Err(e) => {
+                println!("failed ({e})");
+                failures += 1;
+            }
         }
+    }
+
+    if failures > 0 && failures == total as u32 {
+        anyhow::bail!("all {total} tap(s) failed to update");
+    } else if failures > 0 {
+        eprintln!("warning: {failures}/{total} tap(s) failed to update");
     }
     Ok(())
 }

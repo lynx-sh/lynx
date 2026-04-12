@@ -110,7 +110,7 @@ broken     = { fg = "$error" }
 
 Switch to your theme with:
 ```bash
-lx theme switch my-theme
+lx theme my-theme
 lx theme list        # shows all available themes
 ```
 
@@ -631,11 +631,190 @@ in_git_repo_symbol = "±"
 
 ---
 
+### `time` — Current Time
+
+Shows the current time. Always visible.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `format` | string | `"24h"` | `"24h"` (%H:%M), `"12h"` (%I:%M %p), or custom strftime pattern |
+| `icon` | string | none | Prefix icon |
+| `color` | color | none | Text color |
+
+---
+
+### `newline` — Line Break
+
+Inserts a newline for two-line prompt layouts. No config fields.
+
+```toml
+[segments.left]
+order = ["dir", "git_branch", "newline", "prompt_char"]
+```
+
+---
+
+### `exit_code` — Last Exit Code
+
+Shows the exit code when non-zero. Hidden on success.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `symbol` | string | `"✘"` | Prefix symbol |
+| `color` | color | none | Text color |
+
+---
+
+### `username` — Current User
+
+Shows the current username. Bold red when root.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `color` | color | none | Text color |
+
+---
+
+### `hostname` — Hostname
+
+Shows the system hostname, typically only over SSH.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `show_when_ssh` | bool | `true` | Only show when connected via SSH |
+| `color` | color | none | Text color |
+
+---
+
+### `ssh_indicator` — SSH Connection Badge
+
+Shows a badge when connected via SSH. Hidden otherwise.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `symbol` | string | `"ssh"` | Text to display |
+| `color` | color | none | Text color |
+
+---
+
+### `venv` — Python Virtual Environment
+
+Shows active Python venv name. Hidden when no venv active.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `symbol` | string | none | Prefix symbol |
+| `color` | color | none | Text color |
+
+---
+
+### `conda_env` — Conda Environment
+
+Shows active Conda environment. Hidden when inactive.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `hide_base` | bool | `true` | Hide when env is "base" |
+| `symbol` | string | none | Prefix symbol |
+| `color` | color | none | Text color |
+
+---
+
+### `background_jobs` — Background Job Count
+
+Shows background job count. Hidden when zero.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `symbol` | string | `"⚙"` | Prefix symbol |
+| `color` | color | none | Text color |
+
+---
+
+### `vi_mode` — Vi Mode Indicator
+
+Shows vi editing mode. Hidden when vi mode inactive.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `insert_label` | string | `"INSERT"` | Label for insert mode |
+| `normal_label` | string | `"NORMAL"` | Label for normal mode |
+| `color` | color | none | Text color |
+
+---
+
+### `git_action` — Git Action in Progress
+
+Shows active git action (merge, rebase, cherry-pick, bisect). Hidden otherwise.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `label` | map | none | Custom labels per action (e.g., `{merge = "MERGING"}`) |
+| `color` | color | none | Text color |
+
+---
+
+### `lang_version` — Auto-Detected Language Version
+
+Auto-detects project language from marker files and shows version with icon.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `icon` | string | auto | Override auto-detected language icon |
+| `color` | color | none | Text color |
+
+Detected markers: `Cargo.toml` (Rust), `go.mod` (Go), `package.json` (Node), `pyproject.toml` (Python), `Gemfile` (Ruby), `composer.json` (PHP), `pom.xml` (Java).
+
+---
+
+### `node_version` / `rust_version` / `golang_version` — Language Versions
+
+Show language version from the corresponding plugin cache.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `icon` | string | none | Prefix icon |
+| `color` | color | none | Text color |
+
+---
+
+## Syntax Highlighting
+
+The `[syntax_highlight]` table controls zsh-syntax-highlighting colors.
+
+```toml
+[syntax_highlight]
+command  = "$success"     # valid external commands
+unknown  = "$error"       # unknown/invalid commands
+builtin  = "cyan"         # shell builtins (cd, echo)
+alias    = "green"        # aliases
+function = "green"        # functions
+path     = "underline"    # file paths
+string   = "yellow"       # quoted strings
+argument = "$fg"          # command arguments
+option   = "cyan"         # flags (--flag, -x)
+comment  = "$muted"       # comments
+globbing = "magenta"      # glob patterns
+variable = "blue"         # variable references ($VAR)
+```
+
+---
+
+## Auto-Suggestions
+
+The `[auto_suggestions]` table controls fish-style auto-suggestion text color.
+
+```toml
+[auto_suggestions]
+color = "$muted"
+```
+
+---
+
 ## File Listing Colors
 
-> **Status:** Planned — tracked in H-054. The schema below is the target design.
-> Once implemented, `lx theme switch` will emit `LS_COLORS` and `EZA_COLORS`
-> automatically.
+> **Status:** Implemented. `lx theme set` emits `LS_COLORS` and `EZA_COLORS`
+> automatically from the active theme.
 
 The `[ls_colors]` table lets a theme own `ls`, `eza`, and `lsd` output — the same
 palette variables available to segments apply here.
@@ -821,7 +1000,7 @@ muted   = "#565f89"
 
 Activate it:
 ```bash
-lx theme switch powerline
+lx theme powerline
 ```
 
 ---
@@ -895,7 +1074,7 @@ lx theme list    # will error if your theme TOML is malformed
 
 Preview without switching:
 ```bash
-lx theme switch powerline
+lx theme powerline
 # Open a new terminal to see it
 ```
 

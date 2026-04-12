@@ -35,7 +35,13 @@ pub async fn run(args: BrowseArgs) -> Result<()> {
     let list = load_taps(&taps_path)?;
     let merged = merge_tap_indexes(&list)?;
 
-    let config = load_config().ok();
+    let config = match load_config() {
+        Ok(c) => Some(c),
+        Err(e) => {
+            lynx_core::diag::warn("browse", &format!("failed to load config — installed filter may be incomplete: {e}"));
+            None
+        }
+    };
     let enabled: Vec<String> = config
         .map(|c| c.enabled_plugins)
         .unwrap_or_default();

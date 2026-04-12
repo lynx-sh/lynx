@@ -99,6 +99,6 @@ lx browse                          # all packages by category
 lx browse security                 # filter by category
 lx browse --type tool              # filter by type
 lx browse --installed              # show only installed
-lx search "git"                    # search across all taps
-lx info eza                        # detailed package info
+lx plugin search "git"             # search across all taps
+lx plugin info eza                 # detailed package info
 ```

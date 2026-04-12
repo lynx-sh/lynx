@@ -63,6 +63,9 @@ pub enum ThemeCommand {
     },
     /// Open the WYSIWYG theme studio in your browser (local web UI, no npm)
     Studio,
+    /// Smart dispatch: treat unknown subcommand as theme name for `set`
+    #[command(external_subcommand)]
+    Other(Vec<String>),
 }
 
 #[derive(Subcommand)]
@@ -121,6 +124,13 @@ pub async fn run(args: ThemeArgs) -> Result<()> {
         ThemeCommand::Studio => {
             eprintln!("Note: `lx theme studio` is deprecated. Use `lx dashboard` instead.");
             lynx_dashboard::run().await
+        }
+        ThemeCommand::Other(args) => {
+            if args.len() == 1 {
+                cmd_set(&args[0]).await
+            } else {
+                bail!("unknown theme command '{}' — run `lx theme` for help", args.first().map(|s| s.as_str()).unwrap_or(""))
+            }
         }
     }
 }

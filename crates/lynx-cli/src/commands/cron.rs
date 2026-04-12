@@ -53,12 +53,14 @@ pub enum CronCommand {
         follow: bool,
     },
     /// Disable a task (set enabled=false)
-    Pause {
+    #[command(alias = "pause")]
+    Disable {
         /// Task name
         name: String,
     },
-    /// Enable a paused task (set enabled=true)
-    Resume {
+    /// Enable a disabled task (set enabled=true)
+    #[command(alias = "resume")]
+    Enable {
         /// Task name
         name: String,
     },
@@ -89,8 +91,8 @@ pub async fn run(args: CronArgs) -> Result<()> {
         } => cmd_add(name, run, cron, description, on_fail, timeout, log).await,
         CronCommand::List => cmd_list().await,
         CronCommand::Logs { name, tail, follow } => cmd_logs(name, tail, follow).await,
-        CronCommand::Pause { name } => cmd_set_enabled(name, false).await,
-        CronCommand::Resume { name } => cmd_set_enabled(name, true).await,
+        CronCommand::Disable { name } => cmd_set_enabled(name, false).await,
+        CronCommand::Enable { name } => cmd_set_enabled(name, true).await,
         CronCommand::Run { name } => cmd_run(name).await,
         CronCommand::Remove { name } => cmd_remove(name).await,
         CronCommand::Examples => {

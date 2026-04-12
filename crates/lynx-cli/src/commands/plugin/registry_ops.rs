@@ -10,7 +10,7 @@ use lynx_registry::fetch::{
 use lynx_registry::index::{
     get_index, load_index_from, load_lock, plugins_install_dir, validate_index,
 };
-use lynx_registry::schema::LockFile;
+use lynx_registry::lock::{LockFile, PluginSource};
 use std::path::{Path, PathBuf};
 
 pub(super) async fn cmd_add_from_registry(name: &str, force: bool) -> Result<()> {
@@ -105,7 +105,7 @@ pub(super) async fn cmd_update(name: Option<&str>, all: bool) -> Result<()> {
         let registry_names: Vec<String> = lock
             .entries
             .iter()
-            .filter(|e| e.source == "registry")
+            .filter(|e| e.source == PluginSource::Registry)
             .map(|e| e.name.clone())
             .collect();
 
@@ -273,13 +273,13 @@ mod tests {
         let checksum = checksum_plugin_dir(&install_root).expect("checksum");
 
         let lock = LockFile {
-            entries: vec![lynx_registry::schema::LockEntry {
+            entries: vec![lynx_registry::lock::LockEntry {
                 name: "git".into(),
                 version: "1.0.0".into(),
                 checksum_sha256: "archive-hash".into(),
                 installed_checksum_sha256: Some(checksum.clone()),
                 url: "https://example.com/git.tar.gz".into(),
-                source: "registry".into(),
+                source: PluginSource::Registry,
             }],
         };
 
@@ -303,13 +303,13 @@ mod tests {
         std::fs::write(install_root.join("shell/init.zsh"), "y").expect("write init");
 
         let lock = LockFile {
-            entries: vec![lynx_registry::schema::LockEntry {
+            entries: vec![lynx_registry::lock::LockEntry {
                 name: "git".into(),
                 version: "1.0.0".into(),
                 checksum_sha256: "archive-hash".into(),
                 installed_checksum_sha256: Some("not-the-real-hash".into()),
                 url: "https://example.com/git.tar.gz".into(),
-                source: "registry".into(),
+                source: PluginSource::Registry,
             }],
         };
 

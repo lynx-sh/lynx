@@ -5,7 +5,8 @@ use tracing::debug;
 
 use lynx_core::brand;
 
-use crate::schema::{LockFile, RegistryIndex};
+use crate::lock::LockFile;
+use crate::schema::RegistryIndex;
 
 /// Default registry index URL — official Lynx plugin index.
 pub const DEFAULT_INDEX_URL: &str =
@@ -164,7 +165,8 @@ pub fn validate_index(idx: &RegistryIndex) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::schema::{LockEntry, PluginVersion, RegistryEntry};
+    use crate::lock::LockEntry;
+    use crate::schema::{PluginVersion, RegistryEntry};
 
     fn sample_index() -> RegistryIndex {
         RegistryIndex {
@@ -230,7 +232,7 @@ mod tests {
             checksum_sha256: "abc".into(),
             installed_checksum_sha256: Some("abc".into()),
             url: "https://x.com/git.tar.gz".into(),
-            source: "registry".into(),
+            source: crate::lock::PluginSource::Registry,
         });
         save_lock_to(&lock, &path).unwrap();
         let loaded = load_lock_from(&path).unwrap();

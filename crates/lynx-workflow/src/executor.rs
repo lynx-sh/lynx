@@ -83,6 +83,8 @@ pub async fn execute_workflow(
             }
             step_results.push(result);
         } else {
+            // Cap concurrent tasks to prevent unbounded spawning on large batches.
+            let semaphore = std::sync::Arc::new(tokio::sync::Semaphore::new(16));
             let handles: Vec<_> = batch
                 .iter()
                 .map(|step| {
@@ -90,7 +92,9 @@ pub async fn execute_workflow(
                     let params = params.clone();
                     let mode = mode.clone();
                     let ld = log_dir.clone();
+                    let sem = semaphore.clone();
                     tokio::spawn(async move {
+                        let _permit = sem.acquire().await.expect("semaphore closed");
                         execute_step(&step, &params, &mode, ld.as_deref()).await
                     })
                 })

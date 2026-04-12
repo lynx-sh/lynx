@@ -37,6 +37,9 @@ pub enum IntroCommand {
         /// Slug to preview (defaults to the active intro)
         slug: Option<String>,
     },
+    /// Smart dispatch: treat unknown subcommand as slug for `set`
+    #[command(external_subcommand)]
+    Other(Vec<String>),
     /// Generate ASCII art from a bundled figlet font and print to stdout
     Logo {
         /// Text to render
@@ -63,6 +66,13 @@ pub async fn run(args: IntroArgs) -> Result<()> {
         IntroCommand::Delete { slug } => cmd_delete(&slug),
         IntroCommand::New { slug } => cmd_new(&slug),
         IntroCommand::Preview { slug } => cmd_preview(slug.as_deref()),
+        IntroCommand::Other(args) => {
+            if args.len() == 1 {
+                cmd_set(&args[0])
+            } else {
+                bail!("unknown intro command '{}' — run `lx intro` for help", args.first().map(|s| s.as_str()).unwrap_or(""))
+            }
+        }
         IntroCommand::Logo { text, font, list_fonts, append } => {
             cmd_logo(&text, &font, list_fonts, append)
         }
@@ -169,11 +179,13 @@ fn cmd_delete(slug: &str) -> Result<()> {
     // If this was the active intro, clear it from config.
     let cfg = load().context("failed to load config")?;
     if cfg.intro.active.as_deref() == Some(slug) {
-        mutate_config_transaction("intro-clear-active", |cfg| {
+        if let Err(e) = mutate_config_transaction("intro-clear-active", |cfg| {
             cfg.intro.active = None;
             Ok(())
-        })
-        .ok();
+        }) {
+            lynx_core::diag::warn("intro", &format!("failed to clear active intro from config: {e}"));
+            eprintln!("warning: could not clear active intro from config: {e}");
+        }
     }
 
     println!("intro '{slug}' deleted");
@@ -229,7 +241,10 @@ color = "muted"
     match lynx_intro::loader::load_user(slug) {
         Ok(_) => println!("intro '{slug}' created"),
         Err(e) => {
-            std::fs::remove_file(&path).ok();
+            if let Err(rm_err) = std::fs::remove_file(&path) {
+                lynx_core::diag::warn("intro", &format!("failed to clean up invalid intro file {path:?}: {rm_err}"));
+                eprintln!("warning: could not remove invalid intro file: {rm_err}");
+            }
             bail!("intro validation failed — file removed: {e}");
         }
     }

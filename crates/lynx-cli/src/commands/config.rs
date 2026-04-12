@@ -58,11 +58,12 @@ fn cmd_edit() -> Result<()> {
     let snapshot_dir = snapshot(path.parent().unwrap_or(&path), "config-edit")?;
     let _ = snapshot_dir;
 
+    let file_existed = path.exists();
     let snapshot_content = std::fs::read_to_string(&path).unwrap_or_default();
     open_in_vscode(&path)?;
     // VS Code edits in place; re-read to check for changes.
     let after = std::fs::read_to_string(&path).unwrap_or_default();
-    if after == snapshot_content {
+    if after == snapshot_content && (file_existed || after.is_empty()) {
         println!("no changes made");
         return Ok(());
     }
