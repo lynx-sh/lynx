@@ -110,6 +110,24 @@ impl<'de> serde::Deserialize<'de> for SegmentColor {
     }
 }
 
+/// Per-segment separator overrides — read by the renderer from `[segment.<name>]`.
+/// When set, these replace the global `[separators]` glyph for this segment.
+///
+/// TOML example:
+/// ```toml
+/// [segment.shell]
+/// leading_char = "\ue0b6"    # diamond cap before segment
+/// trailing_char = "\ue0b4"   # diamond cap after segment
+/// ```
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+pub struct SegmentSeparators {
+    /// Character(s) rendered before this segment's content (e.g. diamond leading edge).
+    pub leading_char: Option<String>,
+    /// Character(s) rendered after this segment's content, replacing the normal
+    /// gap separator between this segment and the next.
+    pub trailing_char: Option<String>,
+}
+
 /// Shared status icon type — used by git segment config.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct StatusIcon {
