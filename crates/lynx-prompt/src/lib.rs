@@ -13,6 +13,7 @@ pub use segments::{
     GitStashSegment, GitStatusSegment, GitTimeSinceCommitSegment, GolangVersionSegment,
     HistNumberSegment, HostnameSegment, KubectlContextSegment, NewlineSegment,
     NodeVersionSegment, PromptCharSegment, RubyVersionSegment,
-    RustVersionSegment, LangVersionSegment, SshIndicatorSegment, TaskStatusSegment, TimeSegment, UsernameSegment,
+    RustVersionSegment, LangVersionSegment, OsSegment, ShellSegment, SshIndicatorSegment,
+    TaskStatusSegment, TextSegment, TimeSegment, UsernameSegment,
     VenvSegment, ViModeSegment, CustomSegment,
 };

@@ -108,7 +108,69 @@ fn detect(cwd: &Path) -> Option<Detection> {
             version: String::new(),
         });
     }
+    if cwd.join("build.gradle.kts").exists() {
+        return Some(Detection {
+            icon: " \u{e634} ",  // Nerd Fonts Kotlin
+            name: "kotlin",
+            version: String::new(),
+        });
+    }
+    if cwd.join("pubspec.yaml").exists() {
+        return Some(Detection {
+            icon: " \u{e798} ",  // Nerd Fonts Dart
+            name: "dart",
+            version: dart_version(cwd).unwrap_or_default(),
+        });
+    }
+    if cwd.join("Package.swift").exists() {
+        return Some(Detection {
+            icon: " \u{e755} ",  // Nerd Fonts Swift
+            name: "swift",
+            version: swift_version(cwd).unwrap_or_default(),
+        });
+    }
+    if cwd.join("mix.exs").exists() {
+        return Some(Detection {
+            icon: " \u{e62d} ",  // Nerd Fonts Elixir
+            name: "elixir",
+            version: elixir_version(cwd).unwrap_or_default(),
+        });
+    }
+    if cwd.join("build.zig").exists() {
+        return Some(Detection {
+            icon: " \u{e6a9} ",  // Nerd Fonts Zig
+            name: "zig",
+            version: String::new(),
+        });
+    }
+    if cwd.join("init.lua").exists() || cwd.join(".luarocks").exists() || cwd.join(".luacheckrc").exists() {
+        return Some(Detection {
+            icon: " \u{e620} ",  // Nerd Fonts Lua
+            name: "lua",
+            version: String::new(),
+        });
+    }
+    // .NET — check for *.csproj or *.fsproj
+    if has_extension(cwd, "csproj") || has_extension(cwd, "fsproj") {
+        return Some(Detection {
+            icon: " \u{e77f} ",  // Nerd Fonts .NET
+            name: "dotnet",
+            version: dotnet_version(cwd).unwrap_or_default(),
+        });
+    }
     None
+}
+
+/// Check if any file in cwd has the given extension.
+fn has_extension(cwd: &Path, ext: &str) -> bool {
+    std::fs::read_dir(cwd)
+        .ok()
+        .map(|entries| {
+            entries
+                .filter_map(|e| e.ok())
+                .any(|e| e.path().extension().and_then(|x| x.to_str()) == Some(ext))
+        })
+        .unwrap_or(false)
 }
 
 /// Read Rust version from rust-toolchain.toml or rust-toolchain file.
@@ -216,6 +278,64 @@ fn ruby_version(cwd: &Path) -> Option<String> {
     None
 }
 
+/// Read Dart SDK version from pubspec.yaml environment.sdk constraint.
+fn dart_version(cwd: &Path) -> Option<String> {
+    let content = std::fs::read_to_string(cwd.join("pubspec.yaml")).ok()?;
+    for line in content.lines() {
+        let line = line.trim();
+        if line.starts_with("sdk:") {
+            return line.split(':').nth(1).map(|s| s.trim().trim_matches('"').trim_matches('\'').to_string());
+        }
+    }
+    None
+}
+
+/// Read Swift tools version from Package.swift.
+fn swift_version(cwd: &Path) -> Option<String> {
+    let content = std::fs::read_to_string(cwd.join("Package.swift")).ok()?;
+    // First line: // swift-tools-version:5.9
+    let first = content.lines().next()?;
+    if first.contains("swift-tools-version") {
+        return first.split(':').last().map(|s| s.trim().to_string());
+    }
+    None
+}
+
+/// Read Elixir version from mix.exs elixir constraint.
+fn elixir_version(cwd: &Path) -> Option<String> {
+    let content = std::fs::read_to_string(cwd.join("mix.exs")).ok()?;
+    for line in content.lines() {
+        let line = line.trim();
+        if line.starts_with("elixir:") {
+            return line.split('"').nth(1).map(str::to_string);
+        }
+    }
+    None
+}
+
+/// Read .NET target framework from *.csproj TargetFramework element.
+fn dotnet_version(cwd: &Path) -> Option<String> {
+    let entry = std::fs::read_dir(cwd).ok()?
+        .filter_map(|e| e.ok())
+        .find(|e| {
+            let ext = e.path().extension().and_then(|x| x.to_str()).unwrap_or("").to_string();
+            ext == "csproj" || ext == "fsproj"
+        })?;
+    let content = std::fs::read_to_string(entry.path()).ok()?;
+    for line in content.lines() {
+        let line = line.trim();
+        if line.starts_with("<TargetFramework>") {
+            return line
+                .trim_start_matches("<TargetFramework>")
+                .trim_end_matches("</TargetFramework>")
+                .split('-')
+                .last()
+                .map(str::to_string);
+        }
+    }
+    None
+}
+
 /// Read PHP version from composer.json require.php.
 fn php_version(cwd: &Path) -> Option<String> {
     let content = std::fs::read_to_string(cwd.join("composer.json")).ok()?;
@@ -256,8 +376,8 @@ mod tests {
         let seg = LangVersionSegment;
         let cfg = toml::Value::Table(toml::map::Map::new());
         let r = seg.render(&cfg, &ctx(dir.path().to_str().unwrap())).unwrap();
-        // Icon contains Rust nerd font char \u{e7a8}
-        assert!(r.text.contains('\u{e7a8}'), "expected rust icon in: {:?}", r.text);
+        // Icon contains Font Awesome gear \u{f013}
+        assert!(r.text.contains('\u{f013}'), "expected rust icon in: {:?}", r.text);
     }
 
     #[test]
@@ -304,5 +424,65 @@ mod tests {
         let cfg: toml::Value = toml::from_str(r#"icon = "RS ""#).unwrap();
         let r = seg.render(&cfg, &ctx(dir.path().to_str().unwrap())).unwrap();
         assert!(r.text.starts_with("RS "), "text: {}", r.text);
+    }
+
+    #[test]
+    fn detects_dart_project() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("pubspec.yaml"), "name: myapp\nenvironment:\n  sdk: ^3.0.0\n").unwrap();
+        let r = detect(dir.path()).unwrap();
+        assert_eq!(r.name, "dart");
+        assert!(r.icon.contains('\u{e798}'));
+    }
+
+    #[test]
+    fn detects_swift_project() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("Package.swift"), "// swift-tools-version:5.9\nimport PackageDescription\n").unwrap();
+        let r = detect(dir.path()).unwrap();
+        assert_eq!(r.name, "swift");
+        assert_eq!(r.version, "5.9");
+    }
+
+    #[test]
+    fn detects_kotlin_project() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("build.gradle.kts"), "plugins { kotlin(\"jvm\") }").unwrap();
+        let r = detect(dir.path()).unwrap();
+        assert_eq!(r.name, "kotlin");
+    }
+
+    #[test]
+    fn detects_elixir_project() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("mix.exs"), "defmodule MyApp do\n  elixir: \"~> 1.14\"\nend").unwrap();
+        let r = detect(dir.path()).unwrap();
+        assert_eq!(r.name, "elixir");
+        assert_eq!(r.version, "~> 1.14");
+    }
+
+    #[test]
+    fn detects_zig_project() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("build.zig"), "const std = @import(\"std\");").unwrap();
+        let r = detect(dir.path()).unwrap();
+        assert_eq!(r.name, "zig");
+    }
+
+    #[test]
+    fn detects_lua_project() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("init.lua"), "print('hello')").unwrap();
+        let r = detect(dir.path()).unwrap();
+        assert_eq!(r.name, "lua");
+    }
+
+    #[test]
+    fn detects_dotnet_project() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("MyApp.csproj"), "<Project>\n  <PropertyGroup>\n    <TargetFramework>net8.0</TargetFramework>\n  </PropertyGroup>\n</Project>").unwrap();
+        let r = detect(dir.path()).unwrap();
+        assert_eq!(r.name, "dotnet");
+        assert_eq!(r.version, "net8.0");
     }
 }

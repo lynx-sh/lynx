@@ -12,7 +12,8 @@ use lynx_prompt::{
     GitStashSegment, GitStatusSegment, GitTimeSinceCommitSegment, GolangVersionSegment,
     HistNumberSegment, HostnameSegment, KubectlContextSegment, NewlineSegment,
     NodeVersionSegment, PromptCharSegment, RubyVersionSegment,
-    RustVersionSegment, LangVersionSegment, SshIndicatorSegment, TaskStatusSegment, TimeSegment, UsernameSegment,
+    RustVersionSegment, LangVersionSegment, OsSegment, ShellSegment, SshIndicatorSegment,
+    TaskStatusSegment, TextSegment, TimeSegment, UsernameSegment,
     VenvSegment, ViModeSegment, CustomSegment,
 };
 use lynx_theme::loader::load as load_theme;
@@ -105,7 +106,10 @@ async fn cmd_render(transient: bool) -> Result<()> {
         Box::new(TimeSegment),
         Box::new(ContextBadgeSegment),
         Box::new(NewlineSegment),
+        Box::new(OsSegment),
         Box::new(PromptCharSegment),
+        Box::new(ShellSegment),
+        Box::new(TextSegment),
     ];
 
     // --- Evaluate and render ---
