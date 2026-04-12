@@ -67,6 +67,25 @@ pub fn generate_init_script(params: &InitParams<'_>) -> String {
         out.push_str(&format!("  export LSCOLORS={}\n", shell_quote(bsd)));
     }
 
+    // Smart ls alias — macOS /bin/ls can't use LS_COLORS (truecolor, per-extension).
+    // Alias to eza or gls if available so theme colors actually render.
+    if params.ls_colors.is_some() {
+        out.push_str(concat!(
+            "  if (( ! ${+aliases[ls]} )); then\n",
+            "    if (( $+commands[eza] )); then\n",
+            "      alias ls='eza'\n",
+            "      alias ll='eza -la'\n",
+            "      alias la='eza -a'\n",
+            "      alias lt='eza --tree'\n",
+            "    elif (( $+commands[gls] )); then\n",
+            "      alias ls='gls --color=auto'\n",
+            "      alias ll='gls --color=auto -la'\n",
+            "      alias la='gls --color=auto -a'\n",
+            "    fi\n",
+            "  fi\n",
+        ));
+    }
+
     // Syntax highlighting styles from the active theme.
     // Emitted as individual ZSH_HIGHLIGHT_STYLES assignments that plugins source.
     if let Some(styles) = params.syntax_highlight_styles {
