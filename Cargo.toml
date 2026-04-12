@@ -64,9 +64,6 @@ hex = "0.4"
 axum = "0.7"
 tower-http = { version = "0.5", features = ["cors"] }
 
-# HTTP client (registry fetch)
-reqwest = { version = "0.12", features = ["blocking", "rustls-tls"], default-features = false }
-
 # HTTP client (sync, lightweight — D-026)
 ureq = "2"
 
