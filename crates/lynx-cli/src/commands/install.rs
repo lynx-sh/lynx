@@ -234,7 +234,7 @@ fn patch_zshrc(home: &Path) -> Result<()> {
 
 /// Minimal default config.toml for a fresh install.
 fn default_config() -> &'static str {
-    r#"# Lynx configuration — https://github.com/proxikal/lynx
+    r#"# Lynx configuration — https://github.com/lynx-sh/lynx
 
 enabled_plugins = ["git", "kubectl"]
 

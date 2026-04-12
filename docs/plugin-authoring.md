@@ -641,7 +641,7 @@ To submit your plugin:
 
 1. Publish your plugin to a public git repo
 2. Ensure `plugin.toml` passes `lx plugin add ./your-plugin` validation
-3. Open a PR to [lynx-plugins](https://github.com/proxikal/lynx-plugins)
+3. Open a PR to [lynx-plugins](https://github.com/lynx-sh/registry)
    adding an entry to `index.toml`
 4. The registry maintainers will review for: manifest completeness, namespace
    safety, binary dep declarations, and context gating correctness
