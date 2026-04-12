@@ -181,6 +181,67 @@ fn install_tool_via_url(url: &str, name: &str) -> Result<String> {
     Ok(name.to_string())
 }
 
+// ── Theme and intro installation ────────────────────────────────────────────
+
+/// Download a theme TOML from a URL to ~/.config/lynx/themes/<name>.toml.
+/// Validates the theme before writing (fails if invalid).
+pub fn install_theme(name: &str, url: &str, force: bool) -> Result<PathBuf> {
+    let dest = lynx_core::paths::themes_dir().join(format!("{name}.toml"));
+    if dest.exists() && !force {
+        bail!("theme '{name}' already exists at {} — use --force to overwrite", dest.display());
+    }
+
+    let body = download_text(url)
+        .with_context(|| format!("failed to download theme '{name}' from {url}"))?;
+
+    // Validate before writing.
+    if let Err(e) = toml::from_str::<toml::Value>(&body) {
+        bail!("downloaded theme '{name}' is invalid TOML: {e}");
+    }
+
+    if let Some(parent) = dest.parent() {
+        std::fs::create_dir_all(parent).context("create themes dir")?;
+    }
+    std::fs::write(&dest, &body)
+        .with_context(|| format!("write theme to {}", dest.display()))?;
+
+    info!("installed theme '{}' to {}", name, dest.display());
+    Ok(dest)
+}
+
+/// Download an intro TOML from a URL to ~/.config/lynx/intros/<name>.toml.
+pub fn install_intro(name: &str, url: &str, force: bool) -> Result<PathBuf> {
+    let intros_dir = lynx_core::paths::lynx_dir().join("intros");
+    let dest = intros_dir.join(format!("{name}.toml"));
+    if dest.exists() && !force {
+        bail!("intro '{name}' already exists at {} — use --force to overwrite", dest.display());
+    }
+
+    let body = download_text(url)
+        .with_context(|| format!("failed to download intro '{name}' from {url}"))?;
+
+    if let Err(e) = toml::from_str::<toml::Value>(&body) {
+        bail!("downloaded intro '{name}' is invalid TOML: {e}");
+    }
+
+    std::fs::create_dir_all(&intros_dir).context("create intros dir")?;
+    std::fs::write(&dest, &body)
+        .with_context(|| format!("write intro to {}", dest.display()))?;
+
+    info!("installed intro '{}' to {}", name, dest.display());
+    Ok(dest)
+}
+
+fn download_text(url: &str) -> Result<String> {
+    let resp = ureq::get(url)
+        .call()
+        .with_context(|| format!("GET {url}"))?;
+    if resp.status() >= 400 {
+        bail!("server returned status {} for {url}", resp.status());
+    }
+    resp.into_string().context("read response body")
+}
+
 // ── Uninstall ───────────────────────────────────────────────────────────────
 
 /// Remove the auto-generated Lynx plugin for a tool.

@@ -67,10 +67,30 @@ pub async fn run_install(args: InstallPkgArgs) -> Result<()> {
             PackageType::Tool => install_tool(name, entry, args.force)?,
             PackageType::Plugin => install_plugin(name, entry, args.force).await?,
             PackageType::Theme => {
-                println!("  theme install for '{name}' — coming in a future update");
+                if entry.bundled {
+                    println!("  ✓ theme '{name}' is bundled — use `lx theme set {name}`");
+                } else {
+                    let version = entry.resolve_version(None);
+                    if let Some(v) = version {
+                        lynx_registry::installer::install_theme(name, &v.url, args.force)?;
+                        println!("  ✓ installed theme '{name}' — activate with `lx theme set {name}`");
+                    } else {
+                        println!("  no version found for theme '{name}'");
+                    }
+                }
             }
             PackageType::Intro => {
-                println!("  intro install for '{name}' — coming in a future update");
+                if entry.bundled {
+                    println!("  ✓ intro '{name}' is bundled — use `lx intro set {name}`");
+                } else {
+                    let version = entry.resolve_version(None);
+                    if let Some(v) = version {
+                        lynx_registry::installer::install_intro(name, &v.url, args.force)?;
+                        println!("  ✓ installed intro '{name}'");
+                    } else {
+                        println!("  no version found for intro '{name}'");
+                    }
+                }
             }
             PackageType::Bundle => {
                 println!("  bundle install for '{name}' — coming in a future update");
