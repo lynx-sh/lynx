@@ -93,6 +93,7 @@ pub async fn run(args: BrowseArgs) -> Result<()> {
                 PackageType::Theme => "theme",
                 PackageType::Intro => "intro",
                 PackageType::Bundle => "bundle",
+                PackageType::Workflow => "workflow",
             };
             println!(
                 "  {}{} {:<20} {:<8} {} {}",

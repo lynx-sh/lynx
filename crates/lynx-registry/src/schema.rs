@@ -25,6 +25,7 @@ pub enum PackageType {
     Theme,
     Intro,
     Bundle,
+    Workflow,
 }
 
 /// Install commands for tools — one field per package manager.

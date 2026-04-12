@@ -13,6 +13,7 @@ lynx-doctor   = { path = "../lynx-doctor" }
 lynx-registry = { path = "../lynx-registry" }
 lynx-task     = { path = "../lynx-task" }
 lynx-intro    = { path = "../lynx-intro" }
+lynx-workflow = { path = "../lynx-workflow" }
 axum.workspace = true
 tower-http.workspace = true
 tokio.workspace = true

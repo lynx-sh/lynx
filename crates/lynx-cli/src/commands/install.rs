@@ -92,6 +92,20 @@ pub async fn run_install(args: InstallPkgArgs) -> Result<()> {
                     }
                 }
             }
+            PackageType::Workflow => {
+                let version = entry.resolve_version(None);
+                if let Some(v) = version {
+                    let dest = lynx_core::paths::workflows_dir().join(format!("{name}.toml"));
+                    std::fs::create_dir_all(lynx_core::paths::workflows_dir())?;
+                    let content = ureq::get(&v.url).call()?.into_string()?;
+                    // Validate before writing
+                    lynx_workflow::parse(&content)?;
+                    std::fs::write(&dest, &content)?;
+                    println!("  \u{2713} installed workflow '{name}' — run with `lx run {name}`");
+                } else {
+                    println!("  no version found for workflow '{name}'");
+                }
+            }
             PackageType::Bundle => {
                 // Resolve bundle to its package list and install each.
                 let all_entries: Vec<_> = merged.iter().map(|t| t.entry.clone()).collect();

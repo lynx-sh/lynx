@@ -13,12 +13,14 @@ pub mod refresh_state;
 pub mod event;
 pub mod examples;
 pub mod init;
+pub mod jobs;
 pub mod setup;
 pub mod migrate;
 pub mod plugin;
 pub mod profile;
 pub mod prompt;
 pub mod rollback;
+pub mod run;
 pub mod sync;
 pub mod audit;
 pub mod browse;
@@ -66,5 +68,7 @@ pub async fn dispatch(cli: Cli) -> Result<()> {
         Command::Browse(args) => browse::run(args).await,
         Command::Audit(args) => audit::run(args).await,
         Command::Dashboard(args) => dashboard::run(args).await,
+        Command::Jobs(args) => jobs::run(args).await,
+        Command::Run(args) => run::run(args).await,
     }
 }

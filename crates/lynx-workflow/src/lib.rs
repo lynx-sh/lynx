@@ -5,6 +5,8 @@
 
 pub mod executor;
 pub mod job;
+pub mod jobs;
+pub mod params;
 pub mod runner;
 pub mod schema;
 pub mod store;

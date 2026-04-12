@@ -84,6 +84,11 @@ pub fn workflows_dir() -> PathBuf {
     lynx_dir().join("workflows")
 }
 
+/// `~/.config/lynx/jobs/`
+pub fn jobs_dir() -> PathBuf {
+    lynx_dir().join("jobs")
+}
+
 /// `~/.config/lynx/profiles/`
 pub fn profiles_dir() -> PathBuf {
     lynx_dir().join("profiles")

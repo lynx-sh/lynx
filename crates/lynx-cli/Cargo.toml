@@ -15,6 +15,7 @@ lynx-config   = { path = "../lynx-config" }
 lynx-convert  = { path = "../lynx-convert" }
 lynx-doctor   = { path = "../lynx-doctor" }
 lynx-dashboard = { path = "../lynx-dashboard" }
+lynx-workflow  = { path = "../lynx-workflow" }
 lynx-events   = { path = "../lynx-events" }
 lynx-manifest = { path = "../lynx-manifest" }
 lynx-plugin   = { path = "../lynx-plugin" }

@@ -79,4 +79,8 @@ pub enum Command {
     Audit(crate::commands::audit::AuditArgs),
     /// Open the Lynx Dashboard — full management web UI
     Dashboard(crate::commands::dashboard::DashboardArgs),
+    /// View and manage workflow jobs
+    Jobs(crate::commands::jobs::JobsArgs),
+    /// Execute a workflow
+    Run(crate::commands::run::RunArgs),
 }
