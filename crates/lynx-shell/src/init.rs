@@ -7,6 +7,10 @@ pub struct InitParams<'a> {
     pub lynx_dir: &'a str,
     pub plugin_dir: &'a str,
     pub enabled_plugins: &'a [String],
+    /// LS_COLORS value from the active theme. Emitted inside the init guard.
+    pub ls_colors: Option<&'a str>,
+    /// EZA_COLORS value from the active theme. Emitted inside the init guard.
+    pub eza_colors: Option<&'a str>,
 }
 
 /// Generate the zsh init script that the shell evals on startup.
@@ -37,6 +41,18 @@ pub fn generate_init_script(params: &InitParams<'_>) -> String {
         plugin_dir_var = env_vars::LYNX_PLUGIN_DIR,
         pdir = shell_quote(params.plugin_dir),
     ));
+
+    // File-listing colors from the active theme (LS_COLORS / EZA_COLORS).
+    // Emitted inside the init guard so they are set exactly once per session.
+    if let Some(ls) = params.ls_colors {
+        out.push_str(&format!("  export LS_COLORS={}\n", shell_quote(ls)));
+    }
+    if let Some(eza) = params.eza_colors {
+        out.push_str(&format!("  export EZA_COLORS={}\n", shell_quote(eza)));
+    }
+
+    // HOSTNAME: macOS zsh special param — not exported by default.
+    out.push_str("  export HOSTNAME=\"${HOSTNAME:-$(hostname -s)}\"\n");
 
     // Source hook bridge (registered once per session)
     out.push_str(&format!(
@@ -97,6 +113,8 @@ mod tests {
             lynx_dir: "/home/user/.local/share/lynx",
             plugin_dir: "/home/user/.local/share/lynx/plugins",
             enabled_plugins: plugins,
+            ls_colors: None,
+            eza_colors: None,
         }
     }
 
@@ -160,5 +178,34 @@ mod tests {
         let script = generate_init_script(&base_params(&Context::Minimal, &[]));
         assert!(script.contains("LYNX_CONTEXT=minimal"));
         assert!(!script.contains("lynx_eval_plugin"));
+    }
+
+    #[test]
+    fn ls_colors_emitted_inside_guard_when_provided() {
+        let plugins = vec![];
+        let mut params = base_params(&Context::Interactive, &plugins);
+        params.ls_colors = Some("di=1;34");
+        params.eza_colors = Some("di=1;34");
+        let script = generate_init_script(&params);
+        // Both must be inside the if-guard, not before it
+        let guard_pos = script.find("if [[").unwrap();
+        let ls_pos = script.find("LS_COLORS='di=1;34'").unwrap();
+        let eza_pos = script.find("EZA_COLORS='di=1;34'").unwrap();
+        assert!(ls_pos > guard_pos, "LS_COLORS must be inside the init guard");
+        assert!(eza_pos > guard_pos, "EZA_COLORS must be inside the init guard");
+    }
+
+    #[test]
+    fn ls_colors_absent_when_not_provided() {
+        let script = generate_init_script(&base_params(&Context::Interactive, &[]));
+        assert!(!script.contains("LS_COLORS="), "LS_COLORS must not appear when not provided");
+    }
+
+    #[test]
+    fn hostname_inside_guard() {
+        let script = generate_init_script(&base_params(&Context::Interactive, &[]));
+        let guard_pos = script.find("if [[").unwrap();
+        let hostname_pos = script.find("HOSTNAME").unwrap();
+        assert!(hostname_pos > guard_pos, "HOSTNAME must be inside the init guard");
     }
 }
