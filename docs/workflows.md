@@ -6,11 +6,9 @@ Workflows are TOML-defined multi-step pipelines executed by `lx run`.
 Each step declares a runner (sh, python, cargo, etc.) and Lynx orchestrates
 execution order, concurrency, signals, and logging.
 
-## Decisions
+## Related Decisions
 
-- **D-031**: Workflows are TOML data, not code — runners execute, Lynx orchestrates
-- **D-032**: Foreground-first with Ctrl+B background migration
-- **D-033**: `lx task` renamed to `lx cron`, `lx jobs` manages workflow runs
+Run `pt decisions arch` and `pt decisions cli` for workflow-related decisions.
 
 ## Quick Start
 

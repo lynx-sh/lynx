@@ -2,21 +2,55 @@
 
 Fast, Rust-powered zsh shell framework. Context-aware, plugin-isolated, theme-driven.
 
-## Guides
+## Core Architecture
 
 | Document | Audience | What it covers |
 |---|---|---|
-| [Architecture](architecture.md) | Contributors, advanced users | Crate map, shell integration flow, plugin lifecycle, event system |
+| [Architecture](architecture.md) | Contributors, agents | Crate map, shell integration flow, plugin lifecycle, event system |
 | [Plugin Authoring](plugin-authoring.md) | Plugin developers | Building, testing, and publishing plugins |
-| [Theme Vision](theme-vision.md) | Contributors, agents | Full theme system design, roadmap, decisions summary — read this first |
-| [Theme Authoring](theme-authoring.md) | Theme developers | Theme TOML, all segments, CLI customization, custom segments in Rust |
-| [Registry Index Spec](registry-index-spec.md) | Registry maintainers | Static index format for the plugin registry |
+| [Plugin API](plugin-api.md) | Plugin developers | Plugin manifest, exports, hooks, ZLE widgets |
+
+## Theme System
+
+| Document | Audience | What it covers |
+|---|---|---|
+| [Theme Vision](theme-vision.md) | Contributors, agents | Full theme system design, decisions summary |
+| [Theme Authoring](theme-authoring.md) | Theme developers | Theme TOML schema, segments, separators, colors |
+
+## Ecosystem & Registry
+
+| Document | Audience | What it covers |
+|---|---|---|
+| [Ecosystem](ecosystem.md) | Everyone | Taps, package types, trust tiers, `lx install`, community taps |
+| [Registry Index Spec](registry-index-spec.md) | Registry maintainers | Index TOML format for taps and the official registry |
+
+## Workflow Engine
+
+| Document | Audience | What it covers |
+|---|---|---|
+| [Workflows](workflows.md) | Users, contributors | Workflow TOML schema, runners, `lx run`, jobs, cron |
+
+## Dashboard
+
+| Document | Audience | What it covers |
+|---|---|---|
+| [Dashboard](dashboard.md) | Contributors, agents | Web UI architecture, API surface, frontend design |
 
 ## Decisions
 
-Architecture decisions are tracked in `pt` (the project tracker). Run `pt decisions` to list all active decisions.
+Architecture decisions are tracked in `pt` (the project tracker):
 
-## Quick links
+```bash
+pt decisions              # list all active decisions
+pt decisions arch         # architecture decisions
+pt decisions themes       # theme decisions
+pt decisions registry     # ecosystem/registry decisions
+pt decisions cli          # CLI decisions
+```
+
+## Quick Links
 
 - [README](../README.md) — install and quickstart
 - [CONTRIBUTING](../CONTRIBUTING.md) — how to contribute
+- [GitHub](https://github.com/lynx-sh/lynx) — source code
+- [Registry](https://github.com/lynx-sh/registry) — official package registry

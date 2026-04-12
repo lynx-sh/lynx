@@ -15,7 +15,7 @@ The index file contains one or more `[[plugin]]` tables, each describing a singl
 [[plugin]]
 name            = "git"                          # required — must match plugin.toml [plugin].name
 description     = "Git integration for Lynx"    # required — shown in lx plugin search
-author          = "proxikal"                     # required
+author          = "lynx-sh"                     # required
 latest_version  = "1.2.0"                       # required — must match one entry in versions[]
 
 [[plugin.versions]]

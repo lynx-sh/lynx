@@ -6,12 +6,9 @@ Lynx is a shell platform with a package ecosystem. Users install tools, plugins,
 intros, and bundles through a unified interface (`lx install`). Packages are distributed
 via **taps** — Git repositories containing a registry index.
 
-## Decisions
+## Related Decisions
 
-- **D-027**: Tap model for distribution (Homebrew-style multi-registry)
-- **D-028**: `lx install` is the unified package interface
-- **D-029**: GitHub org is `lynx-sh`
-- **D-030**: Single registry repo for all package types
+Run `pt decisions registry` and `pt decisions distribution` for the full list.
 
 ## Package Types
 
