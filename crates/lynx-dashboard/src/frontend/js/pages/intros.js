@@ -22,7 +22,7 @@ const IntrosPage = {
     const el = document.getElementById('intro-list');
     if (!el) return;
     try {
-      const data = await Api.get('/api/intros');
+      const data = await Api.intros();
       const intros = data.intros || [];
       const enabled = data.enabled;
 
@@ -45,7 +45,7 @@ const IntrosPage = {
           await this.previewIntro(slug);
           // Set as active
           try {
-            await Api.post('/api/intro/set', { slug });
+            await Api.introSet(slug);
             App.toast(`Switched to '${slug}'`, 'success');
             this.loadIntros();
           } catch (err) {
@@ -62,7 +62,7 @@ const IntrosPage = {
     const el = document.getElementById('intro-preview');
     if (!el) return;
     try {
-      const data = await Api.get(`/api/intro/preview?slug=${encodeURIComponent(slug)}`);
+      const data = await Api.introPreview(slug);
       el.textContent = data.rendered || '(empty)';
     } catch (_) {
       el.textContent = 'Failed to load preview.';

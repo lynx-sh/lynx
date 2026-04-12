@@ -154,7 +154,7 @@ _hdr "Docs-command mismatch"
 README="$REPO_ROOT/README.md"
 CLI_RS="$REPO_ROOT/crates/lynx-cli/src/cli.rs"
 
-for cmd in "lx doctor" "lx plugin" "lx theme" "lx context" "lx init"; do
+for cmd in "lx doctor" "lx plugin" "lx theme" "lx context" "lx init" "lx dashboard" "lx run" "lx jobs" "lx cron"; do
   if rg -q "$cmd" "$README" 2>/dev/null; then
     _ok "README documents: $cmd"
     PASS=$((PASS + 1))
@@ -163,7 +163,7 @@ for cmd in "lx doctor" "lx plugin" "lx theme" "lx context" "lx init"; do
   fi
 done
 
-for subcmd in Init Plugin Theme Context Doctor Daemon Config Migrate Update Rollback Sync; do
+for subcmd in Init Plugin Theme Context Doctor Daemon Config Migrate Update Rollback Sync Dashboard Jobs Run Cron; do
   if rg -q "\\b${subcmd}\\b" "$CLI_RS" 2>/dev/null; then
     _ok "cli.rs declares: $subcmd"
     PASS=$((PASS + 1))

@@ -26,6 +26,11 @@ lynx-plugin        (exec script gen, lazy wrappers, namespace lint, context filt
 lynx-task          (task parser + scheduler runtime primitives)
 lynx-daemon        (background process hosting event dispatch + task scheduler loops)
 lynx-registry      (plugin index fetch, checksum verify, version lock)
+lynx-convert       (OMZ theme converter)
+lynx-intro         (startup intro renderer — ASCII art, system info)
+lynx-doctor        (health check library — environment diagnostics)
+lynx-workflow      (TOML workflow schema, runners, step executor, job manager)
+lynx-dashboard     (local web UI — Axum server, embedded HTML/CSS/JS frontend)
 lynx-test-utils    (dev-dependency only — fixtures, temp HOME, zsh validators)
 
 lynx-cli           (lx binary — assembles all crates, dispatches subcommands)

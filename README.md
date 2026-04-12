@@ -17,7 +17,8 @@ $
 | Plugin isolation | Manifest-declared exports | None | N/A | None |
 | Agent-context aware | Automatic | No | No | No |
 | Config format | TOML | zsh code | TOML | zsh code |
-| Task scheduler | Built-in | No | No | No |
+| Workflow engine + cron | Built-in | No | No | No |
+| Web dashboard | Built-in | No | No | No |
 | Prompt segments | Concurrent (tokio) | Sequential | Concurrent | Sequential |
 | Config sync | Git-backed | Manual | Manual | Manual |
 
@@ -94,11 +95,25 @@ lx context set agent     # simulate agent context (aliases unloaded)
 lx context set interactive
 ```
 
-### 5. Run a background task
+### 5. Run a workflow
 
 ```bash
-lx task add backup --run "tar czf ~/backup.tar.gz ~/code" --cron "0 2 * * *"
-lx task list
+lx run deploy env=staging     # execute a workflow with params
+lx run list                   # see available workflows
+lx jobs list                  # check job status
+```
+
+### 6. Schedule a cron task
+
+```bash
+lx cron add backup --run "tar czf ~/backup.tar.gz ~/code" --cron "0 2 * * *"
+lx cron list
+```
+
+### 7. Open the dashboard
+
+```bash
+lx dashboard                  # full web UI for managing everything
 ```
 
 ---
@@ -143,13 +158,34 @@ instantly without restarting your shell:
 lx theme set powerline
 ```
 
-### Task scheduler
+### Workflow engine
+
+Define multi-step workflows as TOML files with typed params, concurrent groups,
+9 built-in runners (sh, bash, python, node, go, cargo, curl, docker, zsh), and
+retry/timeout/condition logic:
+
+```bash
+lx run deploy env=production  # execute with params
+lx run deploy --dry-run       # preview steps without running
+lx jobs list                  # view running and completed jobs
+```
+
+### Cron scheduler
 
 Run commands on a schedule, in the background, with persistent logs:
 
 ```bash
-lx task add sync --run "lx sync push" --cron "*/30 * * * *"
-lx task logs sync
+lx cron add sync --run "lx sync push" --cron "*/30 * * * *"
+lx cron logs sync
+```
+
+### Dashboard
+
+Full web UI for managing themes, plugins, registry, workflows, cron, intros,
+and system config. Starts a local server, opens your browser:
+
+```bash
+lx dashboard
 ```
 
 ### Config sync
@@ -214,6 +250,8 @@ plugin lifecycle, and event system.
 ## Documentation
 
 - [Architecture](docs/architecture.md) — crate map, shell flow, event system
+- [Workflows](docs/workflows.md) — TOML workflow schema, runners, `lx run`
+- [Dashboard](docs/dashboard.md) — web UI architecture and endpoints
 - [Plugin Authoring](docs/plugin-authoring.md) — build your own plugin
 - [Theme Authoring](docs/theme-authoring.md) — build your own theme
 - [Contributing](CONTRIBUTING.md) — dev setup, PR process, plugin submission
@@ -232,12 +270,13 @@ Lynx is in active development. Core features are working:
 | Context detection | ✓ Stable |
 | Plugin registry (fetch/verify) | ✓ Stable |
 | Profile system | ✓ Stable |
-| Task scheduler | ✓ Stable |
+| Cron scheduler | ✓ Stable |
+| Workflow engine | ✓ Stable |
+| Dashboard (web UI) | ✓ Stable |
 | Config sync | ✓ Stable |
 | Prompt rendering (concurrent) | ✓ Stable |
 | Custom segment API | ✓ Stable (Rust contributors) |
 | Plugin hot-reload | Planned |
-| Web-based theme editor | Planned |
 | Windows (WSL only) | Planned |
 
 ---

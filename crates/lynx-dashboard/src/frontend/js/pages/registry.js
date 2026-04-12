@@ -113,7 +113,7 @@ const RegistryPage = {
     const el = document.getElementById('reg-taps');
     if (!el) return;
     try {
-      const data = await Api.get('/api/taps');
+      const data = await Api.taps();
       const taps = data.taps || [];
       el.innerHTML = `<table class="table">
         <thead><tr><th>Name</th><th>URL</th><th>Trust</th><th></th></tr></thead>
@@ -128,7 +128,7 @@ const RegistryPage = {
       el.querySelectorAll('[data-remove-tap]').forEach(btn => {
         btn.addEventListener('click', async () => {
           try {
-            await Api.post('/api/tap/remove', { name: btn.dataset.removeTap });
+            await Api.tapRemove(btn.dataset.removeTap);
             App.toast('Tap removed');
             this.loadTaps();
             this.loadEntries();
@@ -146,7 +146,7 @@ const RegistryPage = {
     if (!url) return;
     try {
       const name = url.split('/').pop() || url;
-      await Api.post('/api/tap/add', { name, url });
+      await Api.tapAdd(name, url);
       App.toast('Tap added', 'success');
       input.value = '';
       this.loadTaps();

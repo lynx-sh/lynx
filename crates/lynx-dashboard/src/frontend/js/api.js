@@ -33,6 +33,8 @@ const Api = {
   cron:      () => Api.get('/api/cron'),
   doctor:    () => Api.get('/api/doctor'),
   diag:      () => Api.get('/api/diag'),
+  taps:      () => Api.get('/api/taps'),
+  introPreview: (slug) => Api.get(`/api/intro/preview?slug=${encodeURIComponent(slug)}`),
 
   // Mutations
   themePatch:        (path, value) => Api.post('/api/theme/patch', { path, value }),
@@ -48,4 +50,6 @@ const Api = {
   workflowRun:       (name, params) => Api.post('/api/workflow/run', { name, params }),
   cronAdd:           (task) => Api.post('/api/cron/add', task),
   cronRemove:        (id) => Api.post('/api/cron/remove', { id }),
+  tapAdd:            (name, url) => Api.post('/api/tap/add', { name, url }),
+  tapRemove:         (name) => Api.post('/api/tap/remove', { name }),
 };
