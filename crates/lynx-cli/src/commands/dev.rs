@@ -1,4 +1,5 @@
 use std::path::Path;
+use std::process::Command;
 
 use anyhow::{bail, Context as _, Result};
 use clap::{Args, Subcommand};
@@ -49,28 +50,47 @@ fn cmd_sync(source: &str) -> Result<()> {
         );
     }
 
-    let mut synced = 0usize;
-
-    // Sync themes/
-    let themes_src = src.join("themes");
-    let themes_dst = themes_dir();
-    synced += sync_dir(&themes_src, &themes_dst, "themes")
-        .with_context(|| "failed to sync themes/")?;
-
-    // Sync shell/
-    let shell_src = src.join("shell");
-    let shell_dst = lynx_dir.join("shell");
-    if shell_src.exists() {
-        synced += sync_dir(&shell_src, &shell_dst, "shell")
-            .with_context(|| "failed to sync shell/")?;
+    // Step 1: Rebuild the binary.
+    println!("building lx (release)...");
+    let build = Command::new("cargo")
+        .args(["build", "--release", "-p", "lynx-cli"])
+        .current_dir(&src)
+        .status()
+        .context("failed to run cargo build")?;
+    if !build.success() {
+        bail!("cargo build failed — fix errors and retry");
     }
 
-    // Sync plugins/
-    let plugins_src = src.join("plugins");
-    let plugins_dst = lynx_dir.join("plugins");
-    if plugins_src.exists() {
-        synced += sync_dir(&plugins_src, &plugins_dst, "plugins")
-            .with_context(|| "failed to sync plugins/")?;
+    // Step 2: Install the binary.
+    let built_bin = src.join("target/release/lx");
+    if built_bin.exists() {
+        let current_bin = std::env::current_exe()
+            .context("cannot determine current binary path")?;
+        std::fs::copy(&built_bin, &current_bin)
+            .with_context(|| format!(
+                "failed to copy binary to {}",
+                current_bin.display()
+            ))?;
+        println!("  updated: {} (binary)", current_bin.display());
+    }
+
+    // Step 3: Sync asset directories.
+    let mut synced = 0usize;
+
+    let sync_pairs: &[(&str, std::path::PathBuf)] = &[
+        ("themes",   themes_dir()),
+        ("shell",    lynx_dir.join("shell")),
+        ("plugins",  lynx_dir.join("plugins")),
+        ("contexts", lynx_dir.join("contexts")),
+        ("profiles", lynx_dir.join("profiles")),
+    ];
+
+    for (dir_name, dst) in sync_pairs {
+        let dir_src = src.join(dir_name);
+        if dir_src.exists() {
+            synced += sync_dir(&dir_src, dst, dir_name)
+                .with_context(|| format!("failed to sync {dir_name}/"))?;
+        }
     }
 
     println!("dev sync: {synced} file(s) updated from {}", src.display());
