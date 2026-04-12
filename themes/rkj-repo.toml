@@ -152,3 +152,17 @@ image          = { fg = "magenta"              }
 audio          = { fg = "cyan"                 }
 broken         = { fg = "red",     bold = true }
 other_writable = { fg = "blue",    bg = "dark-green" }
+
+[ls_colors.columns]
+date         = "#6272a4"   # muted — timestamps recede
+size_number  = "#ffb86c"   # orange/yellow — matches time segment color
+size_unit    = "#6272a4"   # muted — unit is secondary
+user_you     = "#50fa7b"   # green — matches executable color
+user_other   = "#ff5555"   # red — other owners draw attention
+group_you    = "#8be9fd"   # cyan — matches hostname segment color
+group_other  = "#6272a4"   # muted — groups you're not in
+perm_read    = "#50fa7b"   # green — readable
+perm_write   = "#ffb86c"   # orange — writable
+perm_exec    = "#ff5555"   # red — executable
+header       = "#7aa2f7"   # blue — column headers match prompt brackets
+symlink_path = "#8be9fd"   # cyan — matches symlink file color

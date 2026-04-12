@@ -1,0 +1,23 @@
+[plugin]
+name        = "eza"
+version     = "0.1.0"
+description = "Modern ls replacement — rich colors for files, permissions, dates, sizes. Theme-integrated via EZA_COLORS."
+authors     = ["proxikal"]
+
+[load]
+lazy  = false
+hooks = []
+
+[deps]
+binaries = ["eza"]
+plugins  = []
+
+[exports]
+functions = []
+aliases   = ["ls", "ll", "la", "lt", "tree"]
+
+[contexts]
+disabled_in = ["agent", "minimal"]
+
+[shell]
+zle_hook = false
