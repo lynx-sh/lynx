@@ -47,6 +47,23 @@ warning = "#e0af68"
 error   = "#f7768e"
 muted   = "#565f89"
 
+[syntax_highlight]
+command   = "#50fa7b"   # known commands — green
+unknown   = "#ff5555"   # unknown/invalid commands — red
+builtin   = "#8be9fd"   # builtins (cd, echo, export) — cyan
+alias     = "#ffb86c"   # aliases — orange
+function  = "#bd93f9"   # functions — purple
+path      = "#f8f8f2"   # existing paths — foreground
+string    = "#f1fa8c"   # quoted strings — yellow
+argument  = "#f8f8f2"   # plain args — foreground
+option    = "#8be9fd"   # --flags and -x — cyan
+comment   = "#6272a4"   # comments — muted blue-grey
+globbing  = "#ffb86c"   # * ** ? globs — orange
+variable  = "#bd93f9"   # VAR= assignments — purple
+
+[autosuggestions]
+color = "#6272a4"
+
 [ls_colors]
 dir           = { fg = "blue",    bold = true  }
 symlink       = { fg = "cyan"                  }
