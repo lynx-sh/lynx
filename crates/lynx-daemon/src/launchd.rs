@@ -36,7 +36,7 @@ impl LaunchdBackend {
                 }
             }
         }
-        PathBuf::from("/usr/local/bin/").join(brand::DAEMON_NAME)
+        paths::bin_dir().join(brand::DAEMON_NAME)
     }
 
     fn plist_content(&self) -> String {
