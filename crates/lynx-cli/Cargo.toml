@@ -12,6 +12,7 @@ path = "src/main.rs"
 [dependencies]
 lynx-core     = { path = "../lynx-core" }
 lynx-config   = { path = "../lynx-config" }
+lynx-convert  = { path = "../lynx-convert" }
 lynx-events   = { path = "../lynx-events" }
 lynx-manifest = { path = "../lynx-manifest" }
 lynx-plugin   = { path = "../lynx-plugin" }

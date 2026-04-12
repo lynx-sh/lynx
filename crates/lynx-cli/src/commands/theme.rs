@@ -50,6 +50,16 @@ pub enum ThemeCommand {
     /// Add, remove, or move segments in the prompt order
     #[command(subcommand)]
     Segment(SegmentCommand),
+    /// Convert an OMZ .zsh-theme file to Lynx TOML format
+    Convert {
+        /// Source: local file path, GitHub URL, or raw URL
+        source: String,
+        /// Output theme name (defaults to source filename stem)
+        name: Option<String>,
+        /// Overwrite existing theme file
+        #[arg(long)]
+        force: bool,
+    },
     /// Open the WYSIWYG theme studio in your browser (local web UI, no npm)
     Studio,
 }
@@ -106,6 +116,7 @@ pub async fn run(args: ThemeArgs) -> Result<()> {
             cmd_patch("segment.prompt_char.color.fg", &color).await
         }
         ThemeCommand::Segment(seg) => cmd_segment(seg).await,
+        ThemeCommand::Convert { source, name, force } => cmd_convert(&source, name.as_deref(), force).await,
         ThemeCommand::Studio => lynx_studio::run().await,
     }
 }
@@ -324,6 +335,65 @@ async fn emit_theme_changed(name: &str) {
     let bus = crate::bus::build_active_bus(&config.active_context, &plugins_dir);
     let data = serde_json::json!({ "theme": name }).to_string();
     bus.emit(Event::new(THEME_CHANGED, data)).await;
+}
+
+async fn cmd_convert(source: &str, name: Option<&str>, force: bool) -> Result<()> {
+    // Resolve source.
+    let resolved = lynx_convert::fetch::resolve_source(source)
+        .context("failed to resolve theme source")?;
+
+    // Derive theme name from source or use provided name.
+    let theme_name = name
+        .map(|n| n.to_string())
+        .unwrap_or_else(|| {
+            std::path::Path::new(source)
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("converted")
+                .to_string()
+        });
+
+    // Check for existing file.
+    let out_path = user_theme_dir().join(format!("{theme_name}.toml"));
+    if out_path.exists() && !force {
+        bail!(
+            "theme '{}' already exists at {}. Use --force to overwrite.",
+            theme_name,
+            out_path.display()
+        );
+    }
+
+    // Fetch content.
+    let content = lynx_convert::fetch::fetch_content(&resolved)
+        .context("failed to fetch theme content")?;
+
+    // Parse.
+    let ir = lynx_convert::omz::parse(&content);
+
+    // Emit TOML.
+    let toml_str = lynx_convert::emit::to_lynx_toml(&ir, &theme_name);
+
+    // Write.
+    std::fs::create_dir_all(user_theme_dir())?;
+    std::fs::write(&out_path, &toml_str)?;
+
+    // Print summary.
+    println!("Converted OMZ theme → {}", out_path.display());
+    println!("  Segments (left):  {}", ir.left.join(", "));
+    if !ir.right.is_empty() {
+        println!("  Segments (right): {}", ir.right.join(", "));
+    }
+    if ir.two_line {
+        println!("  Two-line layout detected");
+    }
+    if !ir.notes.is_empty() {
+        for note in &ir.notes {
+            println!("  ⚠ {note}");
+        }
+    }
+    println!("\nActivate with: lx theme set {theme_name}");
+
+    Ok(())
 }
 
 #[cfg(test)]
