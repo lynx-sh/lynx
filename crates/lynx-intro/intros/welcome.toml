@@ -1,0 +1,26 @@
+[meta]
+name        = "welcome"
+description = "Friendly greeting with date and time in soft colors"
+author      = "lynx"
+
+[display]
+on_startup   = true
+on_new_tab   = false
+on_ssh       = true
+cooldown_sec = 0
+
+[[blocks]]
+type    = "text"
+content = "  Welcome back, {{username}}!"
+color   = "yellow"
+bold    = true
+
+[[blocks]]
+type    = "text"
+content = "  {{date}}  ·  {{time}}  ·  {{hostname}}"
+color   = "muted"
+
+[[blocks]]
+type  = "separator"
+char  = " "
+width = 1

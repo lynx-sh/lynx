@@ -31,6 +31,7 @@ tokio.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 which = "6"
+lynx-intro = { version = "0.1.0", path = "../lynx-intro" }
 
 [dev-dependencies]
 lynx-test-utils = { path = "../lynx-test-utils" }

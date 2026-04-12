@@ -1,0 +1,32 @@
+[meta]
+name        = "poweruser"
+description = "Dense system info grid with compact logo — maximum signal, minimum noise"
+author      = "lynx"
+
+[display]
+on_startup   = true
+on_new_tab   = false
+on_ssh       = true
+cooldown_sec = 0
+
+[[blocks]]
+type  = "ascii_logo"
+font  = "small"
+text  = "LYNX"
+color = "blue"
+
+[[blocks]]
+type      = "keyval"
+color_key = "muted"
+color_val = "white"
+items = [
+  ["user",    "{{username}}"],
+  ["host",    "{{hostname}}"],
+  ["os",      "{{os}}"],
+  ["shell",   "{{shell}}"],
+  ["cpu",     "{{cpu_model}}  ×{{cpu_cores}}  {{cpu_usage}}"],
+  ["ram",     "{{mem_used}} / {{mem_total}}  {{mem_pct}}"],
+  ["uptime",  "{{uptime}}"],
+  ["time",    "{{datetime}}"],
+  ["lynx",    "v{{lynx_version}}"],
+]

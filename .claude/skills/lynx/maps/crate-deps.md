@@ -12,6 +12,7 @@ lynx-core          ← NO internal deps. Foundation only.
 │   └── lynx-depgraph    ← lynx-core, lynx-manifest, lynx-events, lynx-shell
 │       └── lynx-prompt    ← lynx-core, lynx-config, lynx-events, lynx-template, lynx-theme
 lynx-theme         ← lynx-core, lynx-config
+lynx-intro         ← lynx-core, lynx-config, lynx-template
 lynx-plugin        ← lynx-core, lynx-manifest, lynx-events, lynx-shell
 lynx-task          ← lynx-core, lynx-config
 lynx-daemon        ← lynx-core, lynx-events, lynx-task

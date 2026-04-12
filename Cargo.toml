@@ -17,6 +17,7 @@ members = [
     "crates/lynx-cli",
     "crates/lynx-studio",
     "crates/lynx-test-utils",
+    "crates/lynx-intro",
 ]
 
 [workspace.package]

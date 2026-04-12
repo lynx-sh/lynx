@@ -1,4 +1,4 @@
-use crate::schema::{LynxConfig, SyncConfig, CURRENT_SCHEMA_VERSION};
+use crate::schema::{IntroConfig, LynxConfig, SyncConfig, CURRENT_SCHEMA_VERSION};
 use lynx_core::types::Context;
 
 impl Default for LynxConfig {
@@ -10,6 +10,7 @@ impl Default for LynxConfig {
             enabled_plugins: vec![],
             sync: SyncConfig { remote: None },
             active_profile: None,
+            intro: IntroConfig::default(),
         }
     }
 }

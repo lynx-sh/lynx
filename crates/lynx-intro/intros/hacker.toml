@@ -1,0 +1,42 @@
+[meta]
+name        = "hacker"
+description = "Green-on-black terminal aesthetic with system stats"
+author      = "lynx"
+
+[display]
+on_startup   = true
+on_new_tab   = false
+on_ssh       = true
+cooldown_sec = 0
+
+[[blocks]]
+type  = "ascii_logo"
+font  = "slant"
+text  = "LYNX"
+color = "green"
+
+[[blocks]]
+type  = "separator"
+char  = "─"
+width = 48
+color = "muted"
+
+[[blocks]]
+type      = "keyval"
+color_key = "muted"
+color_val = "green"
+items = [
+  ["user",   "{{username}}@{{hostname}}"],
+  ["os",     "{{os}}"],
+  ["shell",  "{{shell}}"],
+  ["cpu",    "{{cpu_model}}"],
+  ["ram",    "{{mem_used}} / {{mem_total}} ({{mem_pct}})"],
+  ["uptime", "{{uptime}}"],
+  ["time",   "{{datetime}}"],
+]
+
+[[blocks]]
+type  = "separator"
+char  = "─"
+width = 48
+color = "muted"

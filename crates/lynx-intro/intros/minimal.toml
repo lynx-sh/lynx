@@ -1,0 +1,15 @@
+[meta]
+name        = "minimal"
+description = "One-liner: user, host, and time — nothing more"
+author      = "lynx"
+
+[display]
+on_startup   = true
+on_new_tab   = false
+on_ssh       = true
+cooldown_sec = 0
+
+[[blocks]]
+type    = "text"
+content = "  {{username}}@{{hostname}}  ·  {{datetime}}"
+color   = "muted"

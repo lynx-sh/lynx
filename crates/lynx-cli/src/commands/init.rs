@@ -10,6 +10,9 @@ use lynx_shell::{
     safemode::generate_safemode_script,
 };
 
+/// Cooldown timestamp filename in the runtime dir.
+const INTRO_LAST_SHOWN_FILE: &str = "intro_last_shown";
+
 #[derive(Args)]
 pub struct InitArgs {
     /// Override the detected context (interactive | agent | minimal)
@@ -78,6 +81,10 @@ pub async fn run(args: InitArgs) -> Result<()> {
         }
     };
 
+    // Display intro if enabled and in interactive context.
+    // Must print BEFORE the eval script so it appears above the first prompt.
+    maybe_show_intro(&config, context.clone());
+
     let script = generate_init_script(&InitParams {
         context: &context,
         lynx_dir: &lynx_dir,
@@ -89,6 +96,48 @@ pub async fn run(args: InitArgs) -> Result<()> {
 
     print!("{}", script);
     Ok(())
+}
+
+/// Display the active intro if intro is enabled and we're in interactive context.
+/// All errors are caught and logged — this must never crash the shell init.
+fn maybe_show_intro(config: &lynx_config::schema::LynxConfig, context: Context) {
+    if !config.intro.enabled || context != Context::Interactive {
+        return;
+    }
+    let slug = match config.intro.active.as_deref() {
+        Some(s) => s,
+        None => return, // enabled but no intro selected — silent no-op
+    };
+
+    // Check cooldown.
+    if let Ok(intro) = lynx_intro::loader::load(slug) {
+        let cooldown = intro.display.cooldown_sec;
+        if cooldown > 0 {
+            if let Ok(rt_dir) = lynx_core::runtime::runtime_dir() {
+                let stamp_path = rt_dir.join(INTRO_LAST_SHOWN_FILE);
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0);
+                if let Ok(content) = std::fs::read_to_string(&stamp_path) {
+                    if let Ok(last) = content.trim().parse::<u64>() {
+                        if now.saturating_sub(last) < cooldown {
+                            return; // within cooldown window — skip
+                        }
+                    }
+                }
+                // Update timestamp (best-effort).
+                std::fs::write(&stamp_path, now.to_string()).ok();
+            }
+        }
+
+        let env: std::collections::HashMap<String, String> = std::env::vars().collect();
+        let tokens = lynx_intro::build_token_map(&env);
+        let rendered = lynx_intro::render_intro(&intro, &tokens);
+        print!("{}", rendered);
+    } else {
+        diag::warn("init", &format!("intro '{}' failed to load — skipping", slug));
+    }
 }
 
 /// Load plugin.toml manifests for the given plugin names from plugin_dir.

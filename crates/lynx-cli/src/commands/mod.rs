@@ -1,5 +1,6 @@
 pub mod benchmark;
 pub mod dev;
+pub mod intro;
 pub mod diag;
 pub mod config;
 pub mod context;
@@ -52,5 +53,6 @@ pub async fn dispatch(cli: Cli) -> Result<()> {
         Command::RefreshState(args) => refresh_state::run(args).await,
         Command::Dev(args) => dev::run(args).await,
         Command::Diag(args) => diag::run(args).await,
+        Command::Intro(args) => intro::run(args).await,
     }
 }

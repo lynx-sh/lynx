@@ -65,4 +65,6 @@ pub enum Command {
     Dev(crate::commands::dev::DevArgs),
     /// View and manage the Lynx diagnostic log
     Diag(crate::commands::diag::DiagArgs),
+    /// Manage shell startup intros — ASCII art, system info, welcome messages
+    Intro(crate::commands::intro::IntroArgs),
 }

@@ -1,0 +1,39 @@
+[meta]
+name        = "neofetch"
+description = "Classic neofetch-style: logo + full system info table"
+author      = "lynx"
+
+[display]
+on_startup   = true
+on_new_tab   = false
+on_ssh       = true
+cooldown_sec = 0
+
+[[blocks]]
+type  = "ascii_logo"
+font  = "standard"
+text  = "LYNX"
+color = "cyan"
+
+[[blocks]]
+type      = "keyval"
+color_key = "cyan"
+color_val = "white"
+items = [
+  ["OS",     "{{os}}"],
+  ["Host",   "{{hostname}}"],
+  ["User",   "{{username}}"],
+  ["Shell",  "{{shell}}"],
+  ["CPU",    "{{cpu_model}}"],
+  ["Cores",  "{{cpu_cores}}"],
+  ["Load",   "{{cpu_usage}}"],
+  ["RAM",    "{{mem_used}} / {{mem_total}}"],
+  ["Uptime", "{{uptime}}"],
+  ["Lynx",   "v{{lynx_version}}"],
+]
+
+[[blocks]]
+type  = "separator"
+char  = "─"
+width = 40
+color = "muted"
