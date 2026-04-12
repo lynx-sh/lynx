@@ -42,8 +42,30 @@ fn read_enabled_plugins() -> Vec<String> {
 
 /// Gather state for all enabled plugins. Failures are silently skipped.
 /// Returns concatenated zsh output ready for eval.
+/// Check if the current user is root (uid 0) via `id -u`.
+fn is_root() -> bool {
+    Command::new("id")
+        .arg("-u")
+        .stderr(Stdio::null())
+        .output()
+        .ok()
+        .and_then(|o| {
+            if o.status.success() {
+                Some(String::from_utf8_lossy(&o.stdout).trim().to_string())
+            } else {
+                None
+            }
+        })
+        .map(|uid| uid == "0")
+        .unwrap_or(false)
+}
+
 fn gather_all(enabled: &[String]) -> String {
     let mut out = String::new();
+
+    // Emit LYNX_USER_IS_ROOT — computed in Rust, not in shell (D-001).
+    let root_val = if is_root() { "1" } else { "0" };
+    out.push_str(&format!("export LYNX_USER_IS_ROOT={root_val}\n"));
 
     for plugin_name in enabled {
         match plugin_name.as_str() {
@@ -94,16 +116,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn empty_plugin_list_emits_nothing() {
+    fn empty_plugin_list_emits_root_status_only() {
         let out = gather_all(&[]);
-        assert!(out.is_empty());
+        assert!(out.contains("LYNX_USER_IS_ROOT="), "expected root status: {out}");
+        // Should not contain any plugin state.
+        assert!(!out.contains("_lynx_git_state"), "should have no git state: {out}");
     }
 
     #[test]
     fn unknown_community_plugin_without_manifest_is_silently_skipped() {
         // Plugin has no installed directory — should not panic or error.
         let out = gather_all(&["nonexistent-plugin".to_string()]);
-        assert!(out.is_empty());
+        // Only root status, no plugin state.
+        assert!(out.contains("LYNX_USER_IS_ROOT="), "expected root status: {out}");
+        assert!(!out.contains("_lynx_git_state"), "should have no git state: {out}");
     }
 
     #[test]
