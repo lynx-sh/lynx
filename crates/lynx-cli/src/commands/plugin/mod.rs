@@ -91,6 +91,16 @@ pub enum PluginCommand {
         /// Path to index.toml
         path: String,
     },
+    /// Enable an installed plugin (add to enabled_plugins without reinstalling)
+    Enable {
+        /// Plugin name to enable
+        name: String,
+    },
+    /// Disable a plugin without removing its files
+    Disable {
+        /// Plugin name to disable
+        name: String,
+    },
 }
 
 pub async fn run(args: PluginArgs) -> Result<()> {
@@ -107,6 +117,8 @@ pub async fn run(args: PluginArgs) -> Result<()> {
         PluginCommand::Update { name, all } => registry_ops::cmd_update(name.as_deref(), all).await,
         PluginCommand::Checksum { target } => registry_ops::cmd_checksum(&target).await,
         PluginCommand::IndexValidate { path } => registry_ops::cmd_index_validate(&path).await,
+        PluginCommand::Enable { name } => cmd_enable(&name).await,
+        PluginCommand::Disable { name } => cmd_disable(&name).await,
         PluginCommand::Examples => {
             crate::commands::examples::run(crate::commands::examples::ExamplesArgs {
                 command: Some("plugin".into()),
@@ -162,6 +174,33 @@ async fn cmd_remove(name: &str) -> Result<()> {
         Ok(())
     })?;
     println!("Removed plugin '{}'.", name);
+    Ok(())
+}
+
+async fn cmd_enable(name: &str) -> Result<()> {
+    let config = load_config()?;
+    if config.enabled_plugins.iter().any(|p| p == name) {
+        println!("Plugin '{name}' is already enabled.");
+        return Ok(());
+    }
+    mutate_config_transaction(&format!("plugin-enable-{name}"), |cfg| {
+        cfg.enabled_plugins.push(name.to_string());
+        Ok(())
+    })?;
+    println!("Enabled plugin '{name}'. Restart your shell to activate.");
+    Ok(())
+}
+
+async fn cmd_disable(name: &str) -> Result<()> {
+    let config = load_config()?;
+    if !config.enabled_plugins.iter().any(|p| p == name) {
+        bail!("plugin '{name}' is not enabled.");
+    }
+    mutate_config_transaction(&format!("plugin-disable-{name}"), |cfg| {
+        cfg.enabled_plugins.retain(|p| p != name);
+        Ok(())
+    })?;
+    println!("Disabled plugin '{name}'. Restart your shell to take effect.");
     Ok(())
 }
 
