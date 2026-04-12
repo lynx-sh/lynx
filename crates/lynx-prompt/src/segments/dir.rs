@@ -158,7 +158,7 @@ mod tests {
     #[test]
     fn tilde_substitution_home_dir() {
         let r = DirSegment
-            .render(&cfg("max_depth = 0\ntruncate_to_repo = false"), &ctx_with_home("/Users/proxikal", "/Users/proxikal"))
+            .render(&cfg("max_depth = 0\ntruncate_to_repo = false"), &ctx_with_home("/home/user", "/home/user"))
             .unwrap();
         assert_eq!(r.text, "~");
     }
@@ -166,7 +166,7 @@ mod tests {
     #[test]
     fn tilde_substitution_subdir() {
         let r = DirSegment
-            .render(&cfg("max_depth = 0\ntruncate_to_repo = false"), &ctx_with_home("/Users/proxikal/dev/projects", "/Users/proxikal"))
+            .render(&cfg("max_depth = 0\ntruncate_to_repo = false"), &ctx_with_home("/home/user/dev/projects", "/home/user"))
             .unwrap();
         assert_eq!(r.text, "~/dev/projects");
     }
@@ -174,7 +174,7 @@ mod tests {
     #[test]
     fn tilde_substitution_with_truncation() {
         let r = DirSegment
-            .render(&cfg("max_depth = 2\ntruncate_to_repo = false"), &ctx_with_home("/Users/proxikal/a/b/c/d", "/Users/proxikal"))
+            .render(&cfg("max_depth = 2\ntruncate_to_repo = false"), &ctx_with_home("/home/user/a/b/c/d", "/home/user"))
             .unwrap();
         assert_eq!(r.text, "…/c/d");
     }
@@ -182,15 +182,15 @@ mod tests {
     #[test]
     fn tilde_substitution_disabled() {
         let r = DirSegment
-            .render(&cfg("max_depth = 0\ntruncate_to_repo = false\ntilde_home = false"), &ctx_with_home("/Users/proxikal", "/Users/proxikal"))
+            .render(&cfg("max_depth = 0\ntruncate_to_repo = false\ntilde_home = false"), &ctx_with_home("/home/user", "/home/user"))
             .unwrap();
-        assert_eq!(r.text, "/Users/proxikal");
+        assert_eq!(r.text, "/home/user");
     }
 
     #[test]
     fn no_tilde_when_not_under_home() {
         let r = DirSegment
-            .render(&cfg("max_depth = 0\ntruncate_to_repo = false"), &ctx_with_home("/tmp/work", "/Users/proxikal"))
+            .render(&cfg("max_depth = 0\ntruncate_to_repo = false"), &ctx_with_home("/tmp/work", "/home/user"))
             .unwrap();
         assert_eq!(r.text, "/tmp/work");
     }
