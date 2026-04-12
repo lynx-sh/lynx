@@ -923,23 +923,36 @@ This requires segments to have `bg` colors set in their `color` config.
 
 ---
 
-## Theme Convert (OMZ Import)
+## Theme Convert (OMZ + OMP Import)
 
-Convert Oh My Zsh themes to Lynx TOML format:
+Convert Oh My Zsh or Oh-My-Posh themes to Lynx TOML format. Format is auto-detected:
+`.omp.json` or valid JSON → OMP parser, otherwise → OMZ parser.
 
 ```bash
-# From a GitHub URL
+# OMZ: from a GitHub URL
 lx theme convert https://github.com/ohmyzsh/ohmyzsh/blob/master/themes/candy.zsh-theme candy
 
-# From a local file
+# OMZ: from a local file
 lx theme convert ./mytheme.zsh-theme mytheme
+
+# OMP: from a local .omp.json file
+lx theme convert ./tokyo.omp.json tokyo
+
+# OMP: from a GitHub URL (auto-converts blob → raw URL)
+lx theme convert https://github.com/JanDeDobbeleer/oh-my-posh/blob/main/themes/atomic.omp.json atomic
 
 # Overwrite existing
 lx theme convert ./mytheme.zsh-theme mytheme --force
 ```
 
-The converter maps OMZ `%` tokens and `$(function)` calls to Lynx segments.
+The OMZ converter maps `%` tokens and `$(function)` calls to Lynx segments.
 Agnoster-style themes produce partial output with notes for manual tuning.
+
+The OMP converter parses JSON v2+ themes, maps segment types to Lynx equivalents,
+extracts colors into a `[colors]` palette (per D-038), and handles two-line layouts,
+diamond/powerline separators, transient prompts, and filler segments. Language segments
+(node, python, go, etc.) map to `lang_version_<lang>` with per-language colors.
+OMP-only features (Go templates, tooltips) are noted as comments.
 
 ---
 

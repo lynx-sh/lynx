@@ -4,26 +4,81 @@ use std::process::Command;
 
 use anyhow::{Context as _, Result};
 
-/// Check if a theme uses Powerline / Nerd Font glyphs in its separators.
+/// Check if a character is a Nerd Font glyph (Powerline, Font Awesome,
+/// Devicons, Seti-UI, Material Design, Weather, Codicons, or any other
+/// icon set bundled in Nerd Fonts). Covers the full Private Use Area
+/// ranges that Nerd Fonts patches into.
+fn is_nerd_font_glyph(ch: char) -> bool {
+    let cp = ch as u32;
+    // BMP Private Use Area icon ranges (all bundled in Nerd Fonts):
+    //   U+E000–U+E00A  Pomicons
+    //   U+E0A0–U+E0D7  Powerline + Powerline Extra
+    //   U+E200–U+E2FF  Seti-UI / Custom
+    //   U+E300–U+E3FF  Seti-UI Extended
+    //   U+E5FA–U+E6AC  Seti-UI + Custom
+    //   U+E600–U+E6FF  Seti-UI Extended (overlaps above)
+    //   U+E700–U+E7FF  Devicons
+    //   U+EA60–U+EBEB  Codicons
+    //   U+F000–U+F2FF  Font Awesome
+    //   U+F300–U+F4FF  Font Awesome Extension
+    //   U+F500–U+F8FF  Material Design Icons
+    // Supplementary Private Use Area (Nerd Font v3+):
+    //   U+F0001–U+F1AF0  Nerd Font Symbols (MDI extended)
+    //
+    // Rather than enumerate every sub-range, cover the full PUA blocks:
+    (0xE000..=0xF8FF).contains(&cp)          // BMP Private Use Area
+        || (0xF0001..=0xF1AF0).contains(&cp) // Supplementary PUA (Nerd Font v3)
+}
+
+/// Check if a string contains any Nerd Font glyphs.
+fn has_nerd_glyphs(s: &str) -> bool {
+    s.chars().any(is_nerd_font_glyph)
+}
+
+/// Check if a theme uses any Nerd Font / icon font glyphs anywhere —
+/// separators, segment icons, leading/trailing chars, text content,
+/// transient prompt, or filler.
 pub fn theme_needs_nerd_font(theme: &lynx_theme::Theme) -> bool {
-    let check_glyph = |s: &Option<String>| -> bool {
-        s.as_ref()
-            .map(|c| {
-                c.chars().any(|ch| {
-                    let cp = ch as u32;
-                    // Powerline glyphs: U+E0A0–U+E0D4
-                    // Nerd Font extras: U+E200–U+E2FF, U+F000–U+F2FF
-                    (0xE0A0..=0xE0D4).contains(&cp)
-                        || (0xE200..=0xE2FF).contains(&cp)
-                        || (0xF000..=0xF2FF).contains(&cp)
-                })
-            })
-            .unwrap_or(false)
-    };
-    check_glyph(&theme.separators.left.char)
-        || check_glyph(&theme.separators.right.char)
-        || check_glyph(&theme.separators.left_edge.char)
-        || check_glyph(&theme.separators.right_edge.char)
+    // 1. Global separators.
+    let sep = &theme.separators;
+    for opt in [&sep.left.char, &sep.right.char, &sep.left_edge.char, &sep.right_edge.char] {
+        if opt.as_ref().is_some_and(|s| has_nerd_glyphs(s)) {
+            return true;
+        }
+    }
+
+    // 2. Transient prompt template.
+    if let Some(ref t) = theme.transient {
+        if has_nerd_glyphs(&t.template) {
+            return true;
+        }
+    }
+
+    // 3. Filler character.
+    if let Some(ref f) = theme.segments.filler {
+        if has_nerd_glyphs(&f.char) {
+            return true;
+        }
+    }
+
+    // 4. Per-segment config — scan all string values recursively.
+    for (_name, value) in &theme.segment {
+        if toml_value_has_nerd_glyphs(value) {
+            return true;
+        }
+    }
+
+    false
+}
+
+/// Recursively scan a TOML value tree for Nerd Font glyphs in any string.
+fn toml_value_has_nerd_glyphs(value: &toml::Value) -> bool {
+    match value {
+        toml::Value::String(s) => has_nerd_glyphs(s),
+        toml::Value::Array(arr) => arr.iter().any(toml_value_has_nerd_glyphs),
+        toml::Value::Table(tbl) => tbl.values().any(toml_value_has_nerd_glyphs),
+        _ => false,
+    }
 }
 
 /// Find installed Nerd Font PostScript base names (e.g. "JetBrainsMonoNLNF").
@@ -309,4 +364,77 @@ pub fn install_nerd_font() -> Result<String> {
     let family = postscript_base_name(&regular_file)
         .unwrap_or_else(|| filename_family.to_string());
     Ok(family)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn detects_powerline_glyphs() {
+        assert!(is_nerd_font_glyph('\u{e0b0}')); // Powerline right arrow
+        assert!(is_nerd_font_glyph('\u{e0b6}')); // Powerline left half-circle
+        assert!(is_nerd_font_glyph('\u{e0d4}')); // Powerline extra
+    }
+
+    #[test]
+    fn detects_font_awesome() {
+        assert!(is_nerd_font_glyph('\u{f044}')); // FA pencil
+        assert!(is_nerd_font_glyph('\u{f07b}')); // FA folder
+        assert!(is_nerd_font_glyph('\u{f295}')); // FA map-pin
+    }
+
+    #[test]
+    fn detects_devicons() {
+        assert!(is_nerd_font_glyph('\u{e718}')); // Node.js
+        assert!(is_nerd_font_glyph('\u{e791}')); // Ruby
+        assert!(is_nerd_font_glyph('\u{e7a8}')); // Rust
+    }
+
+    #[test]
+    fn detects_material_design() {
+        assert!(is_nerd_font_glyph('\u{f500}')); // MDI range start
+        assert!(is_nerd_font_glyph('\u{f8ff}')); // MDI range end
+    }
+
+    #[test]
+    fn detects_codicons() {
+        assert!(is_nerd_font_glyph('\u{ea6c}')); // Codicon
+        assert!(is_nerd_font_glyph('\u{eb99}')); // Codicon
+    }
+
+    #[test]
+    fn detects_supplementary_plane() {
+        assert!(is_nerd_font_glyph('\u{f0001}')); // Nerd Font v3 MDI extended
+        assert!(is_nerd_font_glyph('\u{f10fe}')); // Nerd Font v3 symbol
+    }
+
+    #[test]
+    fn ignores_normal_text() {
+        assert!(!is_nerd_font_glyph('A'));
+        assert!(!is_nerd_font_glyph('❯'));
+        assert!(!is_nerd_font_glyph('─'));
+        assert!(!is_nerd_font_glyph('╰'));
+    }
+
+    #[test]
+    fn has_nerd_glyphs_in_string() {
+        assert!(has_nerd_glyphs("\u{e0b0} hello"));
+        assert!(has_nerd_glyphs("icon: \u{f07b}"));
+        assert!(!has_nerd_glyphs("plain text ❯"));
+        assert!(!has_nerd_glyphs(""));
+    }
+
+    #[test]
+    fn toml_value_scan_finds_nested_glyphs() {
+        let val = toml::Value::Table({
+            let mut t = toml::map::Map::new();
+            t.insert("icon".into(), toml::Value::String("\u{e718}".into()));
+            t
+        });
+        assert!(toml_value_has_nerd_glyphs(&val));
+
+        let plain = toml::Value::String("no icons".into());
+        assert!(!toml_value_has_nerd_glyphs(&plain));
+    }
 }

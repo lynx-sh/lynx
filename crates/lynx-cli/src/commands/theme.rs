@@ -51,7 +51,7 @@ pub enum ThemeCommand {
     /// Add, remove, or move segments in the prompt order
     #[command(subcommand)]
     Segment(SegmentCommand),
-    /// Convert an OMZ .zsh-theme file to Lynx TOML format
+    /// Convert an OMZ .zsh-theme or Oh-My-Posh .omp.json theme to Lynx TOML format
     Convert {
         /// Source: local file path, GitHub URL, or raw URL
         source: String,
