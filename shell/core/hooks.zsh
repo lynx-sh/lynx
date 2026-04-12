@@ -1,6 +1,5 @@
 # Lynx hook bridge — translates zsh lifecycle events into lx calls.
 # Pure forwarders only. No business logic. Failures are always silent.
-
 autoload -Uz add-zsh-hook
 
 _lynx_hook_chpwd() {
@@ -30,6 +29,7 @@ _lynx_async_done() {
 _lynx_hook_precmd() {
   export LYNX_LAST_EXIT_CODE=$?
   export LYNX_BG_JOBS=${#jobstates}
+  export LYNX_NOW_SECS=$(date +%s)
 
   # Cancel any in-flight async refresh from the previous cycle.
   if [[ -n ${_lynx_async_fd:-} ]]; then

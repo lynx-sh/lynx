@@ -478,6 +478,7 @@ pub const KNOWN_SEGMENTS: &[&str] = &[
     "git_ahead_behind",
     "git_sha",
     "git_stash",
+    "git_time_since_commit",
     "cmd_duration",
     "context_badge",
     "kubectl_context",

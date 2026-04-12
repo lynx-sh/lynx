@@ -44,6 +44,8 @@ pub(crate) struct GitState {
     action: Option<String>,
     /// Short commit SHA (from rev-parse --short HEAD).
     sha: Option<String>,
+    /// Unix timestamp of the last commit (from git log --format=%at -1).
+    commit_ts: Option<u64>,
 }
 
 /// Run a git subcommand, capture stdout. Returns `None` on non-zero exit or spawn failure.
@@ -75,6 +77,7 @@ pub(crate) fn gather_git_state() -> GitState {
             behind: 0,
             action: None,
             sha: None,
+            commit_ts: None,
         };
     }
 
@@ -91,6 +94,8 @@ pub(crate) fn gather_git_state() -> GitState {
     let (ahead, behind) = upstream_counts();
     let action = detect_action(root.as_deref().unwrap_or(""));
     let sha = git(&["rev-parse", "HEAD"]);
+    let commit_ts = git(&["log", "--format=%at", "-1"])
+        .and_then(|s| s.parse::<u64>().ok());
 
     GitState {
         root,
@@ -104,6 +109,7 @@ pub(crate) fn gather_git_state() -> GitState {
         behind,
         action,
         sha,
+        commit_ts,
     }
 }
 
@@ -220,8 +226,14 @@ pub(crate) fn render_zsh(state: &GitState) -> String {
         None => "null".to_string(),
     };
 
+    let commit_ts_zsh = state.commit_ts.map(|t| t.to_string()).unwrap_or_default();
+    let commit_ts_json = match state.commit_ts {
+        Some(t) => t.to_string(),
+        None => "null".to_string(),
+    };
+
     let json = format!(
-        r#"{{"branch":"{branch_json}","dirty":{dirty_b},"staged":{staged_b},"modified":{modified_b},"untracked":{untracked_b},"stash":{stash},"ahead":{ahead},"behind":{behind},"action":{action_json},"sha":{sha_json}}}"#,
+        r#"{{"branch":"{branch_json}","dirty":{dirty_b},"staged":{staged_b},"modified":{modified_b},"untracked":{untracked_b},"stash":{stash},"ahead":{ahead},"behind":{behind},"action":{action_json},"sha":{sha_json},"commit_ts":{commit_ts_json}}}"#,
         dirty_b = state.dirty,
         staged_b = state.staged,
         modified_b = state.modified,
@@ -232,7 +244,7 @@ pub(crate) fn render_zsh(state: &GitState) -> String {
     );
 
     format!(
-        "_lynx_git_state=(root '{root}' branch '{branch}' dirty '{dirty}' staged '{staged}' modified '{modified}' untracked '{untracked}' stash '{stash}' ahead '{ahead}' behind '{behind}' action '{action_zsh}' sha '{sha_zsh}')\nexport LYNX_CACHE_GIT_STATE='{json}'\n",
+        "_lynx_git_state=(root '{root}' branch '{branch}' dirty '{dirty}' staged '{staged}' modified '{modified}' untracked '{untracked}' stash '{stash}' ahead '{ahead}' behind '{behind}' action '{action_zsh}' sha '{sha_zsh}' commit_ts '{commit_ts_zsh}')\nexport LYNX_CACHE_GIT_STATE='{json}'\n",
         stash = state.stash_count,
         ahead = state.ahead,
         behind = state.behind,
@@ -257,6 +269,7 @@ mod tests {
             behind: 0,
             action: None,
             sha: None,
+            commit_ts: None,
         };
         let out = render_zsh(&state);
         assert!(out.contains("_lynx_git_state=()"));
@@ -277,6 +290,7 @@ mod tests {
             behind: 3,
             action: None,
             sha: Some("abc1234def5678".into()),
+            commit_ts: Some(1700000000),
         };
         let out = render_zsh(&state);
         assert!(out.contains("root '/home/user/repo'"));
@@ -304,6 +318,7 @@ mod tests {
             behind: 0,
             action: None,
             sha: None,
+            commit_ts: None,
         };
         let out = render_zsh(&state);
         assert!(out.contains("export LYNX_CACHE_GIT_STATE='"));
@@ -327,6 +342,7 @@ mod tests {
             behind: 0,
             action: None,
             sha: None,
+            commit_ts: None,
         };
         let out = render_zsh(&state);
         assert!(out.contains("dirty '0'"));
@@ -388,6 +404,7 @@ mod tests {
             behind: 0,
             action: None,
             sha: None,
+            commit_ts: None,
         };
         let out = render_zsh(&state);
         assert!(out.contains(r#""action":null"#), "action field missing: {out}");
@@ -408,6 +425,7 @@ mod tests {
             behind: 0,
             action: Some("merge".into()),
             sha: None,
+            commit_ts: None,
         };
         let out = render_zsh(&state);
         assert!(out.contains(r#""action":"merge""#), "action json missing: {out}");
