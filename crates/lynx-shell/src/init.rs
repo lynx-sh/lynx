@@ -11,6 +11,12 @@ pub struct InitParams<'a> {
     pub ls_colors: Option<&'a str>,
     /// EZA_COLORS value from the active theme. Emitted inside the init guard.
     pub eza_colors: Option<&'a str>,
+    /// BSD LSCOLORS value for macOS /bin/ls.
+    pub bsd_lscolors: Option<&'a str>,
+    /// ZSH_HIGHLIGHT_STYLES assignments from the active theme.
+    pub syntax_highlight_styles: Option<&'a str>,
+    /// ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE value from the active theme.
+    pub autosuggest_style: Option<&'a str>,
 }
 
 /// Generate the zsh init script that the shell evals on startup.
@@ -49,6 +55,28 @@ pub fn generate_init_script(params: &InitParams<'_>) -> String {
     }
     if let Some(eza) = params.eza_colors {
         out.push_str(&format!("  export EZA_COLORS={}\n", shell_quote(eza)));
+    }
+    // BSD ls colors (macOS) — CLICOLOR enables color, LSCOLORS sets the palette.
+    if let Some(bsd) = params.bsd_lscolors {
+        out.push_str("  export CLICOLOR=1\n");
+        out.push_str(&format!("  export LSCOLORS={}\n", shell_quote(bsd)));
+    }
+
+    // Syntax highlighting styles from the active theme.
+    // Emitted as individual ZSH_HIGHLIGHT_STYLES assignments that plugins source.
+    if let Some(styles) = params.syntax_highlight_styles {
+        // Declare the associative array first (idempotent — typeset -gA is safe to repeat).
+        out.push_str("  typeset -gA ZSH_HIGHLIGHT_STYLES 2>/dev/null\n");
+        for line in styles.lines() {
+            out.push_str(&format!("  {line}\n"));
+        }
+    }
+    // Auto-suggestion highlight style from the active theme.
+    if let Some(style) = params.autosuggest_style {
+        out.push_str(&format!(
+            "  export ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE={}\n",
+            shell_quote(style)
+        ));
     }
 
     // HOSTNAME: macOS zsh special param — not exported by default.
@@ -115,6 +143,9 @@ mod tests {
             enabled_plugins: plugins,
             ls_colors: None,
             eza_colors: None,
+            bsd_lscolors: None,
+            syntax_highlight_styles: None,
+            autosuggest_style: None,
         }
     }
 

@@ -70,14 +70,17 @@ pub async fn run(args: InitArgs) -> Result<()> {
     let theme_name = std::env::var(env_vars::LYNX_THEME)
         .unwrap_or_else(|_| config.active_theme.clone());
     let theme_result = load_theme(&theme_name).or_else(|_| load_theme(brand::DEFAULT_THEME));
-    let (ls_colors_str, eza_colors_str) = match &theme_result {
+    let (ls_colors_str, eza_colors_str, bsd_lscolors_str, syntax_styles_str, autosuggest_str) = match &theme_result {
         Ok(theme) => (
             theme.ls_colors.to_ls_colors_string(),
             theme.ls_colors.to_eza_colors_string(),
+            Some(theme.ls_colors.to_bsd_lscolors()),
+            theme.syntax_highlight.to_zsh_highlight_styles(),
+            theme.autosuggestions.to_autosuggest_style(),
         ),
         Err(e) => {
             diag::warn("init", &format!("theme '{}' failed to load: {e}", theme_name));
-            (None, None)
+            (None, None, None, None, None)
         }
     };
 
@@ -92,6 +95,9 @@ pub async fn run(args: InitArgs) -> Result<()> {
         enabled_plugins: &enabled_plugins,
         ls_colors: ls_colors_str.as_deref(),
         eza_colors: eza_colors_str.as_deref(),
+        bsd_lscolors: bsd_lscolors_str.as_deref(),
+        syntax_highlight_styles: syntax_styles_str.as_deref(),
+        autosuggest_style: autosuggest_str.as_deref(),
     });
 
     print!("{}", script);

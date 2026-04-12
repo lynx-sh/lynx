@@ -42,6 +42,43 @@ pub struct Separators {
     pub right_edge: SeparatorGlyph,
 }
 
+/// Syntax highlighting colors — maps zsh token types to theme colors.
+/// Used to generate `ZSH_HIGHLIGHT_STYLES` associative array entries.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+pub struct SyntaxHighlight {
+    /// Valid external commands
+    pub command: Option<String>,
+    /// Unknown / invalid commands
+    pub unknown: Option<String>,
+    /// Shell builtins (cd, echo, etc.)
+    pub builtin: Option<String>,
+    /// Aliases
+    pub alias: Option<String>,
+    /// Functions
+    pub function: Option<String>,
+    /// File paths
+    pub path: Option<String>,
+    /// Quoted strings
+    pub string: Option<String>,
+    /// Command arguments
+    pub argument: Option<String>,
+    /// Flags and options (--flag, -x)
+    pub option: Option<String>,
+    /// Comments
+    pub comment: Option<String>,
+    /// Globbing patterns
+    pub globbing: Option<String>,
+    /// Variable references ($VAR)
+    pub variable: Option<String>,
+}
+
+/// Auto-suggestion configuration.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+pub struct AutoSuggestions {
+    /// Suggestion text color (typically muted). Supports hex or named colors.
+    pub color: Option<String>,
+}
+
 /// One entry in the `[ls_colors]` table — colors for a single file-type category.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct LsColorsEntry {
@@ -76,6 +113,12 @@ pub struct Theme {
     /// File listing color config — drives LS_COLORS and EZA_COLORS exports.
     #[serde(default)]
     pub ls_colors: LsColors,
+    /// Syntax highlighting colors — drives ZSH_HIGHLIGHT_STYLES.
+    #[serde(default)]
+    pub syntax_highlight: SyntaxHighlight,
+    /// Auto-suggestion style — drives ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE.
+    #[serde(default)]
+    pub autosuggestions: AutoSuggestions,
     /// Per-segment config tables — raw TOML values.
     /// Each segment impl deserializes its own typed config from these.
     /// Universal fields (`show_in`, `hide_in`, `color`, `cache_ttl_ms`) are
@@ -112,6 +155,9 @@ pub struct SegmentLayout {
     /// Segments rendered as PROMPT2 (continuation prompt for multi-line input).
     #[serde(default)]
     pub continuation: SegmentOrder,
+    /// Insert a blank line before the prompt. Default: `false`.
+    #[serde(default)]
+    pub spacing: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
@@ -265,6 +311,86 @@ impl LsColors {
     pub fn to_eza_colors_string(&self) -> Option<String> {
         self.to_ls_colors_string()
     }
+
+    /// Build the BSD `LSCOLORS` string for macOS `/bin/ls`.
+    ///
+    /// BSD format: 11 pairs of characters (fg+bg) for fixed file types:
+    /// directory, symlink, socket, pipe, executable, block-special,
+    /// char-special, setuid, setgid, other-writable+sticky, other-writable.
+    ///
+    /// Character codes: a=black b=red c=green d=brown/yellow e=blue f=magenta
+    /// g=cyan h=white x=default. Uppercase = bold.
+    pub fn to_bsd_lscolors(&self) -> String {
+        let mut s = String::with_capacity(22);
+        // 1: directory
+        s.push_str(&bsd_pair(self.dir.as_ref()));
+        // 2: symlink
+        s.push_str(&bsd_pair(self.symlink.as_ref()));
+        // 3: socket (no theme mapping — default)
+        s.push_str("xx");
+        // 4: pipe (no theme mapping — default)
+        s.push_str("xx");
+        // 5: executable
+        s.push_str(&bsd_pair(self.executable.as_ref()));
+        // 6: block special — default
+        s.push_str("xx");
+        // 7: char special — default
+        s.push_str("xx");
+        // 8: setuid exe — default
+        s.push_str("xx");
+        // 9: setgid exe — default
+        s.push_str("xx");
+        // 10: other-writable+sticky — default
+        s.push_str("xx");
+        // 11: other-writable
+        s.push_str(&bsd_pair(self.other_writable.as_ref()));
+        s
+    }
+}
+
+impl SyntaxHighlight {
+    /// Generate a string of `ZSH_HIGHLIGHT_STYLES[<key>]=fg=<hex>` assignments.
+    /// Returns `None` if no syntax highlight colors are configured.
+    pub fn to_zsh_highlight_styles(&self) -> Option<String> {
+        let mappings: &[(&str, &Option<String>)] = &[
+            ("command", &self.command),
+            ("unknown-token", &self.unknown),
+            ("builtin", &self.builtin),
+            ("alias", &self.alias),
+            ("function", &self.function),
+            ("path", &self.path),
+            ("single-quoted-argument", &self.string),
+            ("double-quoted-argument", &self.string),
+            ("dollar-quoted-argument", &self.string),
+            ("default", &self.argument),
+            ("single-hyphen-option", &self.option),
+            ("double-hyphen-option", &self.option),
+            ("comment", &self.comment),
+            ("globbing", &self.globbing),
+            ("assign", &self.variable),
+        ];
+
+        let mut parts: Vec<String> = Vec::new();
+        for (key, color) in mappings {
+            if let Some(c) = color {
+                parts.push(format!("ZSH_HIGHLIGHT_STYLES[{key}]='fg={c}'"));
+            }
+        }
+
+        if parts.is_empty() {
+            None
+        } else {
+            Some(parts.join("\n"))
+        }
+    }
+}
+
+impl AutoSuggestions {
+    /// Generate `ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE` assignment.
+    /// Returns `None` if no color is configured.
+    pub fn to_autosuggest_style(&self) -> Option<String> {
+        self.color.as_ref().map(|c| format!("fg={c}"))
+    }
 }
 
 /// Convert an `LsColorsEntry` to an ANSI SGR parameter string (e.g. `"1;34"`).
@@ -290,6 +416,62 @@ fn entry_sgr(e: &LsColorsEntry) -> Option<String> {
         None
     } else {
         Some(codes.join(";"))
+    }
+}
+
+/// Map an `LsColorsEntry` to a BSD LSCOLORS fg+bg pair (2 chars).
+/// BSD codes: a=black b=red c=green d=brown e=blue f=magenta g=cyan h=white x=default.
+/// Uppercase = bold variant.
+fn bsd_pair(entry: Option<&LsColorsEntry>) -> String {
+    let Some(e) = entry else {
+        return "xx".to_string();
+    };
+    let fg = e
+        .fg
+        .as_deref()
+        .and_then(|c| resolve_color_rgb(c))
+        .map(|(r, g, b)| rgb_to_bsd_char(r, g, b, e.bold))
+        .unwrap_or('x');
+    let bg = e
+        .bg
+        .as_deref()
+        .and_then(|c| resolve_color_rgb(c))
+        .map(|(r, g, b)| rgb_to_bsd_char(r, g, b, false))
+        .unwrap_or('x');
+    format!("{fg}{bg}")
+}
+
+/// Map an RGB color to the nearest BSD LSCOLORS character.
+fn rgb_to_bsd_char(r: u8, g: u8, b: u8, bold: bool) -> char {
+    // Map to nearest ANSI 8-color by finding closest match.
+    let ansi_colors: [(u8, u8, u8, char); 8] = [
+        (0, 0, 0, 'a'),       // black
+        (205, 0, 0, 'b'),     // red
+        (0, 205, 0, 'c'),     // green
+        (205, 205, 0, 'd'),   // brown/yellow
+        (0, 0, 238, 'e'),     // blue
+        (205, 0, 205, 'f'),   // magenta
+        (0, 205, 205, 'g'),   // cyan
+        (229, 229, 229, 'h'), // white
+    ];
+
+    let mut best = 'x';
+    let mut best_dist = u32::MAX;
+    for (cr, cg, cb, ch) in &ansi_colors {
+        let dr = r as i32 - *cr as i32;
+        let dg = g as i32 - *cg as i32;
+        let db = b as i32 - *cb as i32;
+        let dist = (dr * dr + dg * dg + db * db) as u32;
+        if dist < best_dist {
+            best_dist = dist;
+            best = *ch;
+        }
+    }
+
+    if bold {
+        best.to_ascii_uppercase()
+    } else {
+        best
     }
 }
 
