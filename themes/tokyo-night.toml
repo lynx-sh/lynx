@@ -1,6 +1,6 @@
 [meta]
 name = "tokyo-night"
-description = "Tokyo Night powerline theme with background-colored segments"
+description = "Tokyo Night powerline theme — gradient segments, single line"
 author = "proxikal"
 
 [separators]
@@ -11,43 +11,55 @@ char = "\ue0b4"
 
 [separators.left_edge]
 char = "░▒▓"
-
-[separators.right]
-char = "\ue0b6"
+color = "#a3aed2"
 
 [segments]
-spacing = true
-
-[segments.top]
-order = ["dir", "git_branch", "git_status"]
-
-[segments.top_right]
-order = ["cmd_duration", "git_sha", "time"]
+spacing = false
 
 [segments.left]
-order = ["prompt_char"]
+order = ["custom_apple", "dir", "git_branch", "git_status", "lang_version", "time", "newline", "prompt_char"]
 
 [segments.right]
 order = []
 
-[segment.username]
-color = { fg = "#c0caf5", bg = "#1a1b26" }
+[segment.custom_apple]
+template = "  "
+color = { fg = "#090c0c", bg = "#a3aed2" }
 
 [segment.dir]
-icon = " "
+icon = "  "
 max_depth = 3
 truncate_to_repo = true
-color = { fg = "#c0caf5", bg = "#3d59a1", bold = true }
+color = { fg = "#090c0c", bg = "#769ff0", bold = true }
 
 [segment.git_branch]
-icon = " "
-color = { fg = "#1a1b26", bg = "#9ece6a", bold = true }
+icon = "  "
+color = { fg = "#769ff0", bg = "#394260" }
 
 [segment.git_status]
 staged    = { icon = "+", color = "green" }
 modified  = { icon = "!", color = "red" }
 untracked = { icon = "?", color = "grey" }
-color = { fg = "#1a1b26", bg = "#9ece6a" }
+color = { fg = "#769ff0", bg = "#394260" }
+
+[segment.lang_version]
+color = { fg = "#769ff0", bg = "#212736" }
+
+[segment.time]
+format = "24h"
+icon = "⏱ "
+color = { fg = "#a0a9cb", bg = "#1d2230" }
+
+[segment.prompt_char]
+symbol = "›"
+error_symbol = "›"
+color = { fg = "#769ff0" }
+error_color = { fg = "#f7768e" }
+
+[segment.context_badge]
+show_in = ["agent"]
+label = { agent = "AI", minimal = "MIN" }
+color = { fg = "#bb9af7", bold = true }
 
 [segment.git_sha]
 length = 7
@@ -56,20 +68,6 @@ color = { fg = "#565f89" }
 [segment.cmd_duration]
 min_ms = 500
 color = { fg = "#e0af68" }
-
-[segment.time]
-format = "24h"
-color = { fg = "#565f89" }
-
-[segment.prompt_char]
-symbol = "❯"
-error_symbol = "❯"
-color = { fg = "#9ece6a" }
-
-[segment.context_badge]
-show_in = ["agent"]
-label = { agent = "AI", minimal = "MIN" }
-color = { fg = "#bb9af7", bold = true }
 
 [syntax_highlight]
 command   = "#9ece6a"
@@ -106,15 +104,15 @@ broken         = { fg = "#f7768e", bold = true }
 other_writable = { fg = "#7aa2f7", bg = "#9ece6a" }
 
 [ls_colors.columns]
-date         = "#565f89"   # muted blue-grey — timestamps recede
-size_number  = "#e0af68"   # warning orange — sizes stand out
-size_unit    = "#565f89"   # muted — unit is secondary to the number
-user_you     = "#9ece6a"   # green — your own files are friendly
-user_other   = "#f7768e"   # red — other owners draw attention
-group_you    = "#7aa2f7"   # blue — groups you belong to
-group_other  = "#565f89"   # muted — groups you're not in
-perm_read    = "#9ece6a"   # green — readable
-perm_write   = "#e0af68"   # yellow — writable
-perm_exec    = "#f7768e"   # red — executable
-header       = "#7aa2f7"   # blue — column headers match accent
-symlink_path = "#7dcfff"   # light cyan — matches symlink file color
+date         = "#565f89"
+size_number  = "#e0af68"
+size_unit    = "#565f89"
+user_you     = "#9ece6a"
+user_other   = "#f7768e"
+group_you    = "#7aa2f7"
+group_other  = "#565f89"
+perm_read    = "#9ece6a"
+perm_write   = "#e0af68"
+perm_exec    = "#f7768e"
+header       = "#7aa2f7"
+symlink_path = "#7dcfff"

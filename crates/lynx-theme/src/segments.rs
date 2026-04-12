@@ -53,12 +53,61 @@ pub enum SegmentCondition {
 }
 
 /// Shared color/style type — used by individual segment typed configs.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+///
+/// Supports two TOML forms:
+/// - String shorthand: `color = "#7aa2f7"` (sets fg only)
+/// - Full table: `color = { fg = "#7aa2f7", bg = "#1a1b26", bold = true }`
+#[derive(Debug, Clone, PartialEq, Serialize, Default)]
 pub struct SegmentColor {
     pub fg: Option<String>,
     #[serde(default)]
     pub bold: bool,
     pub bg: Option<String>,
+}
+
+impl<'de> serde::Deserialize<'de> for SegmentColor {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de;
+
+        struct ColorVisitor;
+
+        impl<'de> de::Visitor<'de> for ColorVisitor {
+            type Value = SegmentColor;
+
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                f.write_str("a color string or { fg, bg, bold } table")
+            }
+
+            fn visit_str<E: de::Error>(self, v: &str) -> Result<SegmentColor, E> {
+                Ok(SegmentColor {
+                    fg: Some(v.to_string()),
+                    bold: false,
+                    bg: None,
+                })
+            }
+
+            fn visit_map<M: de::MapAccess<'de>>(self, map: M) -> Result<SegmentColor, M::Error> {
+                #[derive(Deserialize)]
+                struct ColorTable {
+                    fg: Option<String>,
+                    #[serde(default)]
+                    bold: bool,
+                    bg: Option<String>,
+                }
+                let t = ColorTable::deserialize(de::value::MapAccessDeserializer::new(map))?;
+                Ok(SegmentColor {
+                    fg: t.fg,
+                    bold: t.bold,
+                    bg: t.bg,
+                })
+            }
+        }
+
+        deserializer.deserialize_any(ColorVisitor)
+    }
 }
 
 /// Shared status icon type — used by git segment config.

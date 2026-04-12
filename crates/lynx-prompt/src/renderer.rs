@@ -212,7 +212,7 @@ fn assemble(segs: &[RenderedSegment], theme: &Theme, sep: &Separators, is_left: 
             let color = SegmentColor {
                 fg: Some(col),
                 bold: false,
-                bg: None,
+                bg: edge_glyph.bg.clone(),
             };
             apply_color_zsh(edge_str, &color, cap)
         } else {
@@ -226,11 +226,11 @@ fn assemble(segs: &[RenderedSegment], theme: &Theme, sep: &Separators, is_left: 
         SeparatorMode::Static => {
             // Original behavior: one global separator for all gaps.
             let sep_rendered = if cap != TermCapability::None {
-                if let Some(ref col) = glyph.color {
+                if glyph.color.is_some() || glyph.bg.is_some() {
                     let color = SegmentColor {
-                        fg: Some(col.clone()),
+                        fg: glyph.color.clone(),
                         bold: false,
-                        bg: None,
+                        bg: glyph.bg.clone(),
                     };
                     apply_color_zsh(sep_str, &color, cap)
                 } else {

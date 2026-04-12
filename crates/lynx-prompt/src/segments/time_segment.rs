@@ -8,6 +8,8 @@ struct TimeConfig {
     /// Clock format: `"12h"`, `"24h"`, or a custom strftime pattern (e.g. `"%Y-%m-%d %H:%M:%S"`).
     /// Default: `"24h"` → `%H:%M`.
     format: Option<String>,
+    /// Optional prefix icon (e.g. `"⏱ "`).
+    icon: Option<String>,
 }
 
 pub struct TimeSegment;
@@ -24,7 +26,11 @@ impl Segment for TimeSegment {
             Some("24h") | None => "%H:%M",
             Some(custom) => custom,
         };
-        let text = Local::now().format(fmt).to_string();
+        let time_str = Local::now().format(fmt).to_string();
+        let text = match cfg.icon.as_deref() {
+            Some(icon) => format!("{icon}{time_str}"),
+            None => time_str,
+        };
         Some(RenderedSegment::new(text))
     }
 }

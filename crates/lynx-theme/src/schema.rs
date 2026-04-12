@@ -27,6 +27,8 @@ pub struct SeparatorGlyph {
     pub char: Option<String>,
     /// Foreground color of the separator (named or hex).
     pub color: Option<String>,
+    /// Background color of the separator (named or hex). Required for full powerline.
+    pub bg: Option<String>,
 }
 
 /// Powerline / connector separator config — optional [separators] table in theme.

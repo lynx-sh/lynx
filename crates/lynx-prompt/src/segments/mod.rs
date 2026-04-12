@@ -2,6 +2,7 @@ pub mod aws_profile;
 pub mod background_jobs;
 pub mod custom;
 pub mod golang_version;
+pub mod lang_version;
 pub mod node_version;
 pub mod ruby_version;
 pub mod rust_version;
@@ -55,6 +56,7 @@ pub use venv::VenvSegment;
 pub use vi_mode::ViModeSegment;
 
 pub use golang_version::GolangVersionSegment;
+pub use lang_version::LangVersionSegment;
 pub use node_version::NodeVersionSegment;
 pub use ruby_version::RubyVersionSegment;
 pub use rust_version::RustVersionSegment;
