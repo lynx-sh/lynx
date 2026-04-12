@@ -16,6 +16,7 @@ lynx-intro         ← lynx-core, lynx-config, lynx-template
 lynx-plugin        ← lynx-core, lynx-manifest, lynx-events, lynx-shell
 lynx-task          ← lynx-core, lynx-config
 lynx-daemon        ← lynx-core, lynx-events, lynx-task
+lynx-convert       ← lynx-core, lynx-theme
 lynx-registry      ← lynx-core, lynx-manifest
 lynx-test-utils    ← ALL crates (dev-dependency only — never in [dependencies])
 lynx-cli           ← ALL crates (assembles — never implements business logic)

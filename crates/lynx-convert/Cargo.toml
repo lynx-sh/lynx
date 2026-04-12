@@ -1,0 +1,16 @@
+[package]
+name = "lynx-convert"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+lynx-core.path = "../lynx-core"
+lynx-theme.path = "../lynx-theme"
+regex.workspace = true
+toml.workspace = true
+serde.workspace = true
+ureq.workspace = true
+anyhow.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
