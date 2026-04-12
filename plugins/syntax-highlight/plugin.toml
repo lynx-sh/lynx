@@ -1,0 +1,20 @@
+[plugin]
+name        = "syntax-highlight"
+version     = "0.1.0"
+description = "Syntax highlighting for zsh — theme-integrated via Lynx colors"
+authors     = ["proxikal"]
+
+[load]
+lazy  = false
+hooks = []
+
+[deps]
+binaries = []
+plugins  = []
+
+[exports]
+functions = []
+aliases   = []
+
+[contexts]
+disabled_in = ["agent", "minimal"]
