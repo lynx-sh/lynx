@@ -123,7 +123,47 @@ pub async fn run(args: ThemeArgs) -> Result<()> {
 
 async fn cmd_set(name: &str) -> Result<()> {
     // Validate theme exists before mutating config.
-    load_theme(name).with_context(|| format!("theme '{name}' not found"))?;
+    let theme = load_theme(name).with_context(|| format!("theme '{name}' not found"))?;
+
+    // Check if theme uses powerline/nerd font glyphs.
+    if super::nerd_font::theme_needs_nerd_font(&theme) && !super::nerd_font::nerd_font_installed() {
+        eprintln!("⚠ Theme '{name}' uses powerline glyphs that require a Nerd Font.");
+        eprintln!("  Without one, separator characters will render as □ or ?.");
+        eprintln!();
+        eprintln!("  Download a Nerd Font from: https://www.nerdfonts.com/font-downloads");
+        eprintln!("  Popular choices: FiraCode Nerd Font, JetBrainsMono Nerd Font, Hack Nerd Font");
+        eprintln!();
+
+        eprint!("  Install font and continue? [y]es / [n]o / [s]kip font check: ");
+
+        let mut input = String::new();
+        std::io::stdin().read_line(&mut input)?;
+        let choice = input.trim().to_lowercase();
+
+        match choice.as_str() {
+            "y" | "yes" => {
+                if let Err(e) = super::nerd_font::install_nerd_font() {
+                    eprintln!("  ⚠ Font install failed: {e}");
+                    eprintln!("  Download manually from https://www.nerdfonts.com/font-downloads");
+                    eprintln!("  Then set your terminal font to the installed Nerd Font.");
+                    eprint!("  Continue setting theme anyway? [y/n]: ");
+                    input.clear();
+                    std::io::stdin().read_line(&mut input)?;
+                    if !input.trim().to_lowercase().starts_with('y') {
+                        eprintln!("theme not changed");
+                        return Ok(());
+                    }
+                }
+            }
+            "s" | "skip" => {
+                // Continue without font — user knows what they're doing.
+            }
+            _ => {
+                eprintln!("theme not changed");
+                return Ok(());
+            }
+        }
+    }
 
     mutate_config_transaction(&format!("theme-set-{name}"), |cfg| {
         cfg.active_theme = name.to_string();
@@ -137,6 +177,7 @@ async fn cmd_set(name: &str) -> Result<()> {
     eprintln!("theme set to '{name}'");
     Ok(())
 }
+
 
 async fn cmd_random() -> Result<()> {
     let cfg = load().context("failed to load config")?;

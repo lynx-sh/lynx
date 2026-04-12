@@ -20,6 +20,7 @@ pub mod prompt;
 pub mod rollback;
 pub mod sync;
 pub mod task;
+pub mod nerd_font;
 pub mod theme;
 pub mod uninstall;
 pub mod update;
