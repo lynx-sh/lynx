@@ -28,6 +28,19 @@ impl Color {
         }
     }
 
+    /// Render this color as an ANSI background escape sequence, downgrading
+    /// gracefully based on terminal capability.
+    pub fn render_bg(&self, cap: TermCapability) -> String {
+        match self {
+            Color::Hex(hex) => render_hex_bg(hex, cap),
+            Color::Ansi256(n) => render_256_bg(*n, cap),
+            Color::Named(name) => match named_to_rgb(name) {
+                Some((r, g, b)) => render_rgb_bg(r, g, b, cap),
+                None => String::new(),
+            },
+        }
+    }
+
     /// ANSI reset sequence.
     pub fn reset() -> &'static str {
         "\x1b[0m"
@@ -52,6 +65,40 @@ pub fn render_rgb_fg(r: u8, g: u8, b: u8, cap: TermCapability) -> String {
         TermCapability::Basic16 => {
             let idx = rgb_to_16(r, g, b);
             format!("\x1b[{}m", 30 + idx)
+        }
+        TermCapability::None => String::new(),
+    }
+}
+
+fn render_hex_bg(hex: &str, cap: TermCapability) -> String {
+    match parse_hex(hex) {
+        Some((r, g, b)) => render_rgb_bg(r, g, b, cap),
+        None => String::new(),
+    }
+}
+
+/// Render raw RGB values as an ANSI background escape, downgrading by capability.
+pub fn render_rgb_bg(r: u8, g: u8, b: u8, cap: TermCapability) -> String {
+    match cap {
+        TermCapability::TrueColor => format!("\x1b[48;2;{r};{g};{b}m"),
+        TermCapability::Ansi256 => {
+            let idx = rgb_to_256(r, g, b);
+            format!("\x1b[48;5;{idx}m")
+        }
+        TermCapability::Basic16 => {
+            let idx = rgb_to_16(r, g, b);
+            format!("\x1b[{}m", 40 + idx)
+        }
+        TermCapability::None => String::new(),
+    }
+}
+
+fn render_256_bg(idx: u8, cap: TermCapability) -> String {
+    match cap {
+        TermCapability::TrueColor | TermCapability::Ansi256 => format!("\x1b[48;5;{idx}m"),
+        TermCapability::Basic16 => {
+            let basic = if idx < 16 { idx } else { idx % 8 };
+            format!("\x1b[{}m", 40 + basic)
         }
         TermCapability::None => String::new(),
     }
@@ -240,6 +287,53 @@ mod tests {
     fn unknown_named_color_returns_empty() {
         let c = Color::Named("not-a-real-color".into());
         assert_eq!(c.render_fg(TermCapability::TrueColor), "");
+    }
+
+    #[test]
+    fn hex_bg_truecolor() {
+        let c = Color::Hex("#1a1b26".into());
+        let s = c.render_bg(TermCapability::TrueColor);
+        assert_eq!(s, "\x1b[48;2;26;27;38m");
+    }
+
+    #[test]
+    fn hex_bg_downgrades_to_256() {
+        let c = Color::Hex("#1a1b26".into());
+        let s = c.render_bg(TermCapability::Ansi256);
+        assert!(s.starts_with("\x1b[48;5;"));
+    }
+
+    #[test]
+    fn hex_bg_downgrades_to_basic16() {
+        let c = Color::Hex("#0000ff".into());
+        let s = c.render_bg(TermCapability::Basic16);
+        assert!(s.starts_with("\x1b[4"), "expected bg basic16 code, got: {s}");
+    }
+
+    #[test]
+    fn named_blue_bg_truecolor() {
+        let c = Color::Named("blue".into());
+        let s = c.render_bg(TermCapability::TrueColor);
+        assert_eq!(s, "\x1b[48;2;122;162;247m");
+    }
+
+    #[test]
+    fn ansi256_bg() {
+        let c = Color::Ansi256(33);
+        let s = c.render_bg(TermCapability::Ansi256);
+        assert_eq!(s, "\x1b[48;5;33m");
+    }
+
+    #[test]
+    fn bg_none_cap_returns_empty() {
+        let c = Color::Hex("#ffffff".into());
+        assert_eq!(c.render_bg(TermCapability::None), "");
+    }
+
+    #[test]
+    fn unknown_named_bg_returns_empty() {
+        let c = Color::Named("not-a-color".into());
+        assert_eq!(c.render_bg(TermCapability::TrueColor), "");
     }
 
     #[test]

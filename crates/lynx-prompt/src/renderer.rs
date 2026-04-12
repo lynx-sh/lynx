@@ -231,6 +231,18 @@ fn apply_color_zsh(text: &str, color: &SegmentColor, cap: TermCapability) -> Str
         }
     }
 
+    if let Some(bg) = &color.bg {
+        let c = if bg.starts_with('#') {
+            Color::Hex(bg.clone())
+        } else {
+            Color::Named(bg.clone())
+        };
+        let esc = c.render_bg(cap);
+        if !esc.is_empty() {
+            prefix.push_str(&zsh_wrap(&esc));
+        }
+    }
+
     if color.bold {
         prefix.push_str(&zsh_wrap("\x1b[1m"));
     }
@@ -262,6 +274,15 @@ pub fn colorize(text: &str, color: &SegmentColor) -> String {
             Color::Named(fg.clone())
         };
         out.push_str(&c.render_fg(cap));
+    }
+
+    if let Some(bg) = &color.bg {
+        let c = if bg.starts_with('#') {
+            Color::Hex(bg.clone())
+        } else {
+            Color::Named(bg.clone())
+        };
+        out.push_str(&c.render_bg(cap));
     }
 
     if color.bold {
@@ -378,6 +399,35 @@ mod tests {
             !result.contains("\x1b["),
             "expected no ANSI escapes in: {result:?}"
         );
+    }
+
+    #[test]
+    fn segment_with_fg_and_bg_emits_both_codes() {
+        override_capability(TermCapability::TrueColor);
+
+        let color = SegmentColor {
+            fg: Some("white".to_string()),
+            bg: Some("blue".to_string()),
+            bold: false,
+        };
+        let result = apply_color_zsh("test", &color, TermCapability::TrueColor);
+        assert!(result.contains("38;"), "expected fg (38;) code in: {result:?}");
+        assert!(result.contains("48;"), "expected bg (48;) code in: {result:?}");
+        assert!(result.contains("\x1b[0m"), "expected reset in: {result:?}");
+    }
+
+    #[test]
+    fn colorize_emits_bg_when_set() {
+        override_capability(TermCapability::TrueColor);
+
+        let color = SegmentColor {
+            fg: Some("white".to_string()),
+            bg: Some("blue".to_string()),
+            bold: false,
+        };
+        let result = colorize("test", &color);
+        assert!(result.contains("38;"), "expected fg code in colorize: {result:?}");
+        assert!(result.contains("48;"), "expected bg code in colorize: {result:?}");
     }
 
     #[test]
