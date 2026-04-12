@@ -75,4 +75,6 @@ pub enum Command {
     Remove(crate::commands::install::UninstallPkgArgs),
     /// Browse available packages by category
     Browse(crate::commands::browse::BrowseArgs),
+    /// Audit enabled plugins — show exports, hooks, binary deps, checksums
+    Audit(crate::commands::audit::AuditArgs),
 }
