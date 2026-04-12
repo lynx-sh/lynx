@@ -1,3 +1,4 @@
+pub mod aws_profile;
 pub mod background_jobs;
 pub mod custom;
 pub mod golang_version;
@@ -27,6 +28,7 @@ pub mod username;
 pub mod venv;
 pub mod vi_mode;
 
+pub use aws_profile::AwsProfileSegment;
 pub use background_jobs::BackgroundJobsSegment;
 pub use custom::CustomSegment;
 pub use cmd_duration::CmdDurationSegment;

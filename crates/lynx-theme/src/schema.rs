@@ -471,6 +471,7 @@ dir = { fg = "blue", bold = true }
 
 /// The set of segment names that Lynx recognises. Used for validation.
 pub const KNOWN_SEGMENTS: &[&str] = &[
+    "aws_profile",
     "dir",
     "git_branch",
     "git_status",

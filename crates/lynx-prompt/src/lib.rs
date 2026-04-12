@@ -8,7 +8,7 @@ pub mod segments;
 
 pub use segment::{RenderContext, RenderedSegment, Segment};
 pub use segments::{
-    BackgroundJobsSegment, CmdDurationSegment, CondaEnvSegment, ContextBadgeSegment, DirSegment,
+    AwsProfileSegment, BackgroundJobsSegment, CmdDurationSegment, CondaEnvSegment, ContextBadgeSegment, DirSegment,
     ExitCodeSegment, GitActionSegment, GitAheadBehindSegment, GitBranchSegment, GitShaSegment,
     GitStashSegment, GitStatusSegment, GitTimeSinceCommitSegment, GolangVersionSegment,
     HostnameSegment, KubectlContextSegment, NewlineSegment,
