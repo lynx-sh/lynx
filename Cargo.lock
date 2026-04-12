@@ -1217,10 +1217,14 @@ name = "lynx-workflow"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "lynx-core",
  "serde",
+ "serde_json",
  "tempfile",
+ "tokio",
  "toml",
+ "tracing",
 ]
 
 [[package]]

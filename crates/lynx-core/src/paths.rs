@@ -79,6 +79,11 @@ pub fn themes_dir() -> PathBuf {
     lynx_dir().join("themes")
 }
 
+/// `~/.config/lynx/workflows/`
+pub fn workflows_dir() -> PathBuf {
+    lynx_dir().join("workflows")
+}
+
 /// `~/.config/lynx/profiles/`
 pub fn profiles_dir() -> PathBuf {
     lynx_dir().join("profiles")
