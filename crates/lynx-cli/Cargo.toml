@@ -27,6 +27,7 @@ lynx-depgraph = { path = "../lynx-depgraph" }
 lynx-shell    = { path = "../lynx-shell" }
 lynx-registry = { path = "../lynx-registry" }
 clap.workspace = true
+owo-colors.workspace = true
 serde_json.workspace = true
 toml.workspace = true
 anyhow.workspace = true
