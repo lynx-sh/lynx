@@ -1,4 +1,6 @@
 use anyhow::{bail, Result};
+
+use super::open_in_vscode;
 use clap::{Args, Subcommand};
 use lynx_config::{
     load as load_config,
@@ -25,6 +27,11 @@ pub enum ProfileCommand {
         #[arg(long)]
         force: bool,
     },
+    /// Open profile in VS Code and validate after save
+    Edit {
+        /// Profile name
+        name: String,
+    },
     /// Switch to a profile
     Switch {
         /// Profile name
@@ -44,6 +51,7 @@ pub enum ProfileCommand {
 pub async fn run(args: ProfileArgs) -> Result<()> {
     match args.command {
         ProfileCommand::Create { name, force } => cmd_create(&name, force),
+        ProfileCommand::Edit { name } => cmd_edit(&name),
         ProfileCommand::Switch { name } => cmd_switch(&name).await,
         ProfileCommand::List => cmd_list(),
         ProfileCommand::Delete { name } => cmd_delete(&name),
@@ -73,6 +81,31 @@ fn cmd_create(name: &str, force: bool) -> Result<()> {
     std::fs::write(&path, profile_template(name))?;
     println!("created: {}", path.display());
     println!("add plugins: lx plugin enable <name>   remove: lx plugin disable <name>");
+    Ok(())
+}
+
+// ── edit ─────────────────────────────────────────────────────────────────────
+
+fn cmd_edit(name: &str) -> Result<()> {
+    let path = profile_path(name);
+    if !path.exists() {
+        bail!("profile '{name}' does not exist — create it with: lx profile create {name}");
+    }
+    let snapshot = std::fs::read_to_string(&path)?;
+    open_in_vscode(&path)?;
+    // Validate after save; roll back on error.
+    match profile::load_from(&path) {
+        Ok((_, warns)) => {
+            for w in &warns {
+                println!("warning: {}", w.message);
+            }
+            println!("profile '{name}' saved");
+        }
+        Err(e) => {
+            std::fs::write(&path, &snapshot).ok();
+            bail!("profile '{name}' has errors — rolled back: {e}");
+        }
+    }
     Ok(())
 }
 
