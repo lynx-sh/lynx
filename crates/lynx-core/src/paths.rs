@@ -15,6 +15,8 @@
 //!   themes/           ← themes_dir()
 //!   profiles/         ← profiles_dir()
 //!   plugins/          ← installed_plugins_dir()
+//!   taps.toml         ← taps_config_path()
+//!   registry/         ← registry_cache_dir()
 //!   shell/
 //!     init.zsh        ← shell_init_file()
 //! ~/.local/bin/
@@ -85,6 +87,16 @@ pub fn profiles_dir() -> PathBuf {
 /// `~/.config/lynx/plugins/` — installed plugins directory.
 pub fn installed_plugins_dir() -> PathBuf {
     lynx_dir().join("plugins")
+}
+
+/// `~/.config/lynx/taps.toml` — tap registry configuration.
+pub fn taps_config_path() -> PathBuf {
+    lynx_dir().join(brand::TAPS_FILE)
+}
+
+/// `~/.config/lynx/registry/` — cached registry indexes.
+pub fn registry_cache_dir() -> PathBuf {
+    lynx_dir().join("registry")
 }
 
 /// `~/.config/lynx/shell/init.zsh` — the shell init file sourced from `.zshrc`.

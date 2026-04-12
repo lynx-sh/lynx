@@ -36,6 +36,12 @@ pub const DEFAULT_THEME: &str = "default";
 
 // ── Shell integration ─────────────────────────────────────────────────────────
 
+/// Taps configuration file name.
+pub const TAPS_FILE: &str = "taps.toml";
+/// Official registry index URL.
+pub const DEFAULT_REGISTRY_URL: &str =
+    "https://raw.githubusercontent.com/lynx-sh/registry/main/index.toml";
+
 /// The line written to `.zshrc` by `lx setup` and matched by `lx uninstall`.
 /// Must be a single exact string — both install and uninstall use this for matching.
 pub const ZSHRC_INIT_LINE: &str =
