@@ -1,6 +1,0 @@
-[profile.default]
-test-threads = "num-cpus"
-retries = 0
-
-[profile.default.junit]
-path = "target/nextest/junit.xml"

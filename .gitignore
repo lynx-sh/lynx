@@ -1,9 +1,15 @@
 /target
 **/*.rs.bk
-.DS_Store
 *.swp
 
-# Secrets and credentials — never commit
+# OS and editor
+.DS_Store
+Thumbs.db
+*.iml
+.idea/
+.vscode/
+
+# Secrets and credentials
 .env
 .env.*
 *.pem
@@ -13,5 +19,8 @@
 credentials
 credentials.*
 *.secret
-# Claude Code local state (skills are tracked, memory is not)
-.claude/memory/
+
+# Dev tooling — internal, not shipped
+.claude/
+.project-tracker/
+.config/
