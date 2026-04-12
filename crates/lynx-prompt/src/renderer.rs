@@ -1,9 +1,9 @@
 use lynx_theme::{
-    color::Color,
-    schema::{SegmentColor, Separators, Theme},
+    schema::{SegmentColor, SeparatorMode, Separators, Theme},
     terminal::{capability, TermCapability},
 };
 
+use crate::color_apply::apply_color_zsh;
 use crate::segment::RenderedSegment;
 
 /// Assemble PROMPT and RPROMPT shell assignments from rendered segments.
@@ -135,55 +135,54 @@ pub fn render_transient_prompt(theme: &Theme) -> String {
 /// cursor position is miscalculated and line editing breaks.
 ///
 /// `is_left` controls which separator (left/right) is used between segments.
+/// Resolve the bg color string for a segment from theme config.
+fn resolve_seg_bg(seg: &RenderedSegment, theme: &Theme) -> Option<String> {
+    seg.cache_key
+        .as_deref()
+        .and_then(|name| theme.segment.get(name))
+        .and_then(|sc| sc.get("color"))
+        .and_then(|c| c.get("bg"))
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+}
+
 fn assemble(segs: &[RenderedSegment], theme: &Theme, sep: &Separators, is_left: bool) -> String {
     if segs.is_empty() {
         return if is_left { "$ ".to_string() } else { String::new() };
     }
 
     let cap = capability();
-    let mut parts: Vec<String> = Vec::with_capacity(segs.len());
 
-    for seg in segs {
-        // Look up color config by the segment's cache_key (which is the segment name).
-        let color_cfg: Option<lynx_theme::schema::SegmentColor> = seg
-            .cache_key
-            .as_deref()
-            .and_then(|name| theme.segment.get(name))
-            .and_then(|sc| sc.get("color"))
-            .and_then(|c| c.clone().try_into().ok());
+    // Resolve color configs and render colored text for each segment.
+    let color_cfgs: Vec<Option<SegmentColor>> = segs
+        .iter()
+        .map(|seg| {
+            seg.cache_key
+                .as_deref()
+                .and_then(|name| theme.segment.get(name))
+                .and_then(|sc| sc.get("color"))
+                .and_then(|c| c.clone().try_into().ok())
+        })
+        .collect();
 
-        let text = if cap != TermCapability::None {
-            if let Some(ref color) = color_cfg {
-                apply_color_zsh(&seg.text, color, cap)
+    let parts: Vec<String> = segs
+        .iter()
+        .zip(color_cfgs.iter())
+        .map(|(seg, color_cfg)| {
+            if cap != TermCapability::None {
+                if let Some(ref color) = color_cfg {
+                    apply_color_zsh(&seg.text, color, cap)
+                } else {
+                    seg.text.clone()
+                }
             } else {
                 seg.text.clone()
             }
-        } else {
-            seg.text.clone()
-        };
+        })
+        .collect();
 
-        parts.push(text);
-    }
-
-    // Determine the separator string between segments.
     let glyph = if is_left { &sep.left } else { &sep.right };
     let sep_str = glyph.char.as_deref().unwrap_or(" ");
-
-    // Apply separator color if configured.
-    let sep_rendered = if cap != TermCapability::None {
-        if let Some(ref col) = glyph.color {
-            let color = SegmentColor {
-                fg: Some(col.clone()),
-                bold: false,
-                bg: None,
-            };
-            apply_color_zsh(sep_str, &color, cap)
-        } else {
-            sep_str.to_string()
-        }
-    } else {
-        sep_str.to_string()
-    };
 
     // Render left_edge before first segment if configured.
     let edge_glyph = if is_left { &sep.left_edge } else { &sep.right_edge };
@@ -203,95 +202,77 @@ fn assemble(segs: &[RenderedSegment], theme: &Theme, sep: &Separators, is_left: 
         edge_str.to_string()
     };
 
-    let joined = parts.join(&sep_rendered);
+    let joined = match sep.mode {
+        SeparatorMode::Static => {
+            // Original behavior: one global separator for all gaps.
+            let sep_rendered = if cap != TermCapability::None {
+                if let Some(ref col) = glyph.color {
+                    let color = SegmentColor {
+                        fg: Some(col.clone()),
+                        bold: false,
+                        bg: None,
+                    };
+                    apply_color_zsh(sep_str, &color, cap)
+                } else {
+                    sep_str.to_string()
+                }
+            } else {
+                sep_str.to_string()
+            };
+            parts.join(&sep_rendered)
+        }
+        SeparatorMode::Adaptive => {
+            // Per-gap separator: fg = prev segment bg, bg = next segment bg.
+            let mut result = String::new();
+            for (i, part) in parts.iter().enumerate() {
+                result.push_str(part);
+                if i + 1 < parts.len() {
+                    let prev_bg = resolve_seg_bg(&segs[i], theme);
+                    let next_bg = resolve_seg_bg(&segs[i + 1], theme);
+                    if cap != TermCapability::None && prev_bg.is_some() {
+                        let color = SegmentColor {
+                            fg: prev_bg,
+                            bg: next_bg,
+                            bold: false,
+                        };
+                        result.push_str(&apply_color_zsh(sep_str, &color, cap));
+                    } else if cap != TermCapability::None {
+                        // No prev bg — fall back to glyph's static color if set.
+                        if let Some(ref col) = glyph.color {
+                            let color = SegmentColor {
+                                fg: Some(col.clone()),
+                                bold: false,
+                                bg: None,
+                            };
+                            result.push_str(&apply_color_zsh(sep_str, &color, cap));
+                        } else {
+                            result.push_str(sep_str);
+                        }
+                    } else {
+                        result.push_str(sep_str);
+                    }
+                }
+            }
+            // Tail arrow: if last segment has bg, emit separator with fg=last_bg, no bg.
+            if let Some(last_bg) = resolve_seg_bg(segs.last().unwrap(), theme) {
+                if cap != TermCapability::None {
+                    let color = SegmentColor {
+                        fg: Some(last_bg),
+                        bg: None,
+                        bold: false,
+                    };
+                    result.push_str(&apply_color_zsh(sep_str, &color, cap));
+                }
+            }
+            result
+        }
+    };
+
     if edge_rendered.is_empty() {
         format!("{joined} ")
     } else {
         format!("{edge_rendered}{joined} ")
     }
-}
-
-/// Apply color + bold to text, wrapping ANSI sequences in zsh `%{...%}`.
-///
-/// The `%{` / `%}` markers tell zsh that the enclosed bytes are zero-width,
-/// so line length computation stays correct. They are zsh-specific and must
-/// only appear in strings that zsh will interpret as a prompt (PROMPT/RPROMPT).
-fn apply_color_zsh(text: &str, color: &SegmentColor, cap: TermCapability) -> String {
-    let mut prefix = String::new();
-
-    if let Some(fg) = &color.fg {
-        let c = if fg.starts_with('#') {
-            Color::Hex(fg.clone())
-        } else {
-            Color::Named(fg.clone())
-        };
-        let esc = c.render_fg(cap);
-        if !esc.is_empty() {
-            prefix.push_str(&zsh_wrap(&esc));
-        }
-    }
-
-    if let Some(bg) = &color.bg {
-        let c = if bg.starts_with('#') {
-            Color::Hex(bg.clone())
-        } else {
-            Color::Named(bg.clone())
-        };
-        let esc = c.render_bg(cap);
-        if !esc.is_empty() {
-            prefix.push_str(&zsh_wrap(&esc));
-        }
-    }
-
-    if color.bold {
-        prefix.push_str(&zsh_wrap("\x1b[1m"));
-    }
-
-    if prefix.is_empty() {
-        return text.to_string();
-    }
-
-    let reset = zsh_wrap(Color::reset());
-    format!("{prefix}{text}{reset}")
-}
-
-/// Wrap an ANSI escape string in zsh zero-width markers `%{...%}`.
-#[inline]
-fn zsh_wrap(esc: &str) -> String {
-    format!("%{{{esc}%}}")
-}
-
-/// Apply a SegmentColor from theme config to a text string (no zsh wrapping).
-/// Used outside of prompt contexts (e.g. lx doctor output).
-pub fn colorize(text: &str, color: &SegmentColor) -> String {
-    let cap = capability();
-    let mut out = String::new();
-
-    if let Some(fg) = &color.fg {
-        let c = if fg.starts_with('#') {
-            Color::Hex(fg.clone())
-        } else {
-            Color::Named(fg.clone())
-        };
-        out.push_str(&c.render_fg(cap));
-    }
-
-    if let Some(bg) = &color.bg {
-        let c = if bg.starts_with('#') {
-            Color::Hex(bg.clone())
-        } else {
-            Color::Named(bg.clone())
-        };
-        out.push_str(&c.render_bg(cap));
-    }
-
-    if color.bold {
-        out.push_str("\x1b[1m");
-    }
-
-    out.push_str(text);
-    out.push_str(Color::reset());
-    out
 }
 
 #[cfg(test)]
@@ -402,32 +383,80 @@ mod tests {
     }
 
     #[test]
-    fn segment_with_fg_and_bg_emits_both_codes() {
+    fn adaptive_separator_uses_prev_bg_as_fg() {
         override_capability(TermCapability::TrueColor);
 
-        let color = SegmentColor {
-            fg: Some("white".to_string()),
-            bg: Some("blue".to_string()),
-            bold: false,
-        };
-        let result = apply_color_zsh("test", &color, TermCapability::TrueColor);
-        assert!(result.contains("38;"), "expected fg (38;) code in: {result:?}");
-        assert!(result.contains("48;"), "expected bg (48;) code in: {result:?}");
-        assert!(result.contains("\x1b[0m"), "expected reset in: {result:?}");
+        // Build a theme where segments have bg colors.
+        let mut theme = load("default").unwrap();
+        // Set dir bg=blue, git_branch bg=green via segment config.
+        let dir_color = toml::Value::try_from(toml::toml! {
+            color = { fg = "white", bg = "blue" }
+        }).unwrap();
+        let git_color = toml::Value::try_from(toml::toml! {
+            color = { fg = "black", bg = "green" }
+        }).unwrap();
+        theme.segment.insert("dir".to_string(), dir_color);
+        theme.segment.insert("git_branch".to_string(), git_color);
+
+        let mut sep = Separators::default();
+        sep.mode = SeparatorMode::Adaptive;
+        sep.left.char = Some("\u{e0b0}".to_string()); //
+
+        let segs = vec![
+            RenderedSegment::new("~/code").with_cache_key("dir"),
+            RenderedSegment::new("main").with_cache_key("git_branch"),
+        ];
+
+        let result = assemble(&segs, &theme, &sep, true);
+        // Separator between dir→git_branch should have fg=blue (dir's bg).
+        // blue = (122, 162, 247) → 38;2;122;162;247
+        assert!(result.contains("38;2;122;162;247"), "separator fg should be dir's bg (blue): {result:?}");
+        // Separator bg should be green (git_branch's bg).
+        // green = (158, 206, 106) → 48;2;158;206;106
+        assert!(result.contains("48;2;158;206;106"), "separator bg should be git_branch's bg (green): {result:?}");
     }
 
     #[test]
-    fn colorize_emits_bg_when_set() {
+    fn adaptive_tail_arrow_emitted() {
         override_capability(TermCapability::TrueColor);
 
-        let color = SegmentColor {
-            fg: Some("white".to_string()),
-            bg: Some("blue".to_string()),
-            bold: false,
-        };
-        let result = colorize("test", &color);
-        assert!(result.contains("38;"), "expected fg code in colorize: {result:?}");
-        assert!(result.contains("48;"), "expected bg code in colorize: {result:?}");
+        let mut theme = load("default").unwrap();
+        let dir_color = toml::Value::try_from(toml::toml! {
+            color = { fg = "white", bg = "blue" }
+        }).unwrap();
+        theme.segment.insert("dir".to_string(), dir_color);
+
+        let mut sep = Separators::default();
+        sep.mode = SeparatorMode::Adaptive;
+        sep.left.char = Some("\u{e0b0}".to_string());
+
+        let segs = vec![RenderedSegment::new("~/code").with_cache_key("dir")];
+        let result = assemble(&segs, &theme, &sep, true);
+        // Tail arrow: separator after last segment with fg=blue, no bg.
+        // Count occurrences of the separator char — should appear once (tail arrow).
+        let sep_count = result.matches('\u{e0b0}').count();
+        assert!(sep_count >= 1, "expected tail arrow separator: {result:?}");
+    }
+
+    #[test]
+    fn static_mode_unchanged_from_default() {
+        override_capability(TermCapability::None);
+
+        let theme = load("default").unwrap();
+        let segs = vec![
+            RenderedSegment::new("a").with_cache_key("dir"),
+            RenderedSegment::new("b").with_cache_key("git_branch"),
+        ];
+
+        // Default separators have mode=Static.
+        let result_static = assemble(&segs, &theme, &theme.separators, true);
+
+        // Explicitly set Static.
+        let mut sep = theme.separators.clone();
+        sep.mode = SeparatorMode::Static;
+        let result_explicit = assemble(&segs, &theme, &sep, true);
+
+        assert_eq!(result_static, result_explicit, "Static mode must be byte-identical to default");
     }
 
     #[test]

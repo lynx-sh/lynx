@@ -1,6 +1,17 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+/// Separator rendering mode.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum SeparatorMode {
+    /// One global separator style for all gaps (default — preserves existing behavior).
+    #[default]
+    Static,
+    /// Per-gap separator colors computed from adjacent segment backgrounds.
+    Adaptive,
+}
+
 /// Configuration for a single separator glyph + color.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct SeparatorGlyph {
@@ -14,6 +25,9 @@ pub struct SeparatorGlyph {
 /// When absent, the renderer falls back to a single space between segments.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct Separators {
+    /// Rendering mode: static (one style for all gaps) or adaptive (per-gap colors).
+    #[serde(default)]
+    pub mode: SeparatorMode,
     /// Between left segments (left-to-right flow).
     #[serde(default)]
     pub left: SeparatorGlyph,

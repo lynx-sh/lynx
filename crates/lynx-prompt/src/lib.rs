@@ -1,5 +1,6 @@
 pub mod cache;
 pub mod cache_keys;
+pub mod color_apply;
 pub mod evaluator;
 pub mod renderer;
 pub mod segment;
