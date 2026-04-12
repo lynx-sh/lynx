@@ -16,6 +16,7 @@ members = [
     "crates/lynx-daemon",
     "crates/lynx-convert",
     "crates/lynx-doctor",
+    "crates/lynx-dashboard",
     "crates/lynx-cli",
     "crates/lynx-studio",
     "crates/lynx-test-utils",

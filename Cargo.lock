@@ -1004,6 +1004,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "lynx-dashboard"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "futures-core",
+ "lynx-config",
+ "lynx-core",
+ "lynx-doctor",
+ "lynx-intro",
+ "lynx-registry",
+ "lynx-task",
+ "lynx-theme",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-stream",
+ "toml",
+ "tower-http",
+ "tracing",
+]
+
+[[package]]
 name = "lynx-depgraph"
 version = "0.1.0"
 dependencies = [
