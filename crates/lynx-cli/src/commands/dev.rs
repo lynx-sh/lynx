@@ -45,7 +45,7 @@ fn cmd_sync(source: &str) -> Result<()> {
     let lynx_dir = lynx_dir();
     if !lynx_dir.exists() {
         bail!(
-            "LYNX_DIR not installed at {} — run `lx install` first",
+            "LYNX_DIR not installed at {} — run `lx setup` first",
             lynx_dir.display()
         );
     }

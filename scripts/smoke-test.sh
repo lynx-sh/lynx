@@ -36,10 +36,10 @@ if ! command -v lx &>/dev/null; then
   fail "lx not found on PATH — run: cargo install --path crates/lynx-cli"
 fi
 
-# ── 2. lx install copies files ────────────────────────────────────────────
-print_step "lx install --source $WORKSPACE_ROOT --dir $LYNX_INSTALL_DIR"
-lx install --source "$WORKSPACE_ROOT" --dir "$LYNX_INSTALL_DIR" \
-  || fail "lx install exited non-zero"
+# ── 2. lx setup copies files ────────────────────────────────────────────
+print_step "lx setup --source $WORKSPACE_ROOT --dir $LYNX_INSTALL_DIR"
+lx setup --source "$WORKSPACE_ROOT" --dir "$LYNX_INSTALL_DIR" \
+  || fail "lx setup exited non-zero"
 
 [[ -f "${LYNX_INSTALL_DIR}/shell/core/hooks.zsh" ]] \
   || fail "hooks.zsh not installed"
@@ -66,17 +66,17 @@ unset LYNX_CACHE_GIT_STATE 2>/dev/null || true
 prompt_output="$(lx prompt render 2>/dev/null)"
 [[ "$prompt_output" == *"PROMPT="* ]] || fail "lx prompt render did not produce PROMPT="
 
-# ── 6. lx install --zshrc patches .zshrc ──────────────────────────────────
-print_step "lx install --zshrc patches .zshrc"
+# ── 6. lx setup --zshrc patches .zshrc ──────────────────────────────────
+print_step "lx setup --zshrc patches .zshrc"
 FAKE_ZSHRC="${FAKE_HOME}/.zshrc"
-HOME="$FAKE_HOME" lx install --source "$WORKSPACE_ROOT" --dir "$LYNX_INSTALL_DIR" --zshrc \
-  || fail "lx install --zshrc exited non-zero"
+HOME="$FAKE_HOME" lx setup --source "$WORKSPACE_ROOT" --dir "$LYNX_INSTALL_DIR" --zshrc \
+  || fail "lx setup --zshrc exited non-zero"
 grep -q 'eval "$(lx init)"' "$FAKE_ZSHRC" \
   || fail ".zshrc not patched with eval line"
 
 # ── 7. Idempotency: run install again, still only one eval line ───────────
 print_step "install idempotency"
-HOME="$FAKE_HOME" lx install --source "$WORKSPACE_ROOT" --dir "$LYNX_INSTALL_DIR" --zshrc \
+HOME="$FAKE_HOME" lx setup --source "$WORKSPACE_ROOT" --dir "$LYNX_INSTALL_DIR" --zshrc \
   2>/dev/null || true
 count=$(grep -c 'eval "$(lx init)"' "$FAKE_ZSHRC")
 [[ "$count" -eq 1 ]] || fail ".zshrc has $count eval lines (expected 1)"

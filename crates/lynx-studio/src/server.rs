@@ -77,7 +77,7 @@ fn resolve_or_copy_builtin(name: &str) -> Result<std::path::PathBuf> {
     if user_path.exists() {
         return Ok(user_path);
     }
-    anyhow::bail!("theme '{name}' not found — run `lx install` to set up default themes")
+    anyhow::bail!("theme '{name}' not found — run `lx setup` to set up default themes")
 }
 
 // ─── Router ───────────────────────────────────────────────────────────────────

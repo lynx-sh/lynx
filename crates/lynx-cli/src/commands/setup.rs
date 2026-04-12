@@ -6,7 +6,7 @@ use lynx_core::brand;
 use lynx_core::brand::ZSHRC_INIT_LINE;
 
 #[derive(Args)]
-pub struct InstallArgs {
+pub struct SetupArgs {
     /// Also add `source ~/.config/lynx/shell/init.zsh` to ~/.zshrc
     #[arg(long)]
     pub zshrc: bool,
@@ -20,7 +20,7 @@ pub struct InstallArgs {
     pub source: Option<String>,
 }
 
-pub async fn run(args: InstallArgs) -> Result<()> {
+pub async fn run(args: SetupArgs) -> Result<()> {
     let home = home_dir()?;
 
     let lynx_dir: PathBuf = args
@@ -52,7 +52,7 @@ pub async fn run(args: InstallArgs) -> Result<()> {
         println!("  ✓ shell/   → {}/shell/", lynx_dir.display());
     } else {
         anyhow::bail!(
-            "shell/ not found at {} — run lx install from the Lynx source directory or pass --source",
+            "shell/ not found at {} — run lx setup from the Lynx source directory or pass --source",
             shell_src.display()
         );
     }
@@ -101,7 +101,7 @@ pub async fn run(args: InstallArgs) -> Result<()> {
         println!();
         println!("    {ZSHRC_INIT_LINE}");
         println!();
-        println!("Or run `lx install --zshrc` to do it automatically.");
+        println!("Or run `lx setup --zshrc` to do it automatically.");
     } else {
         println!();
         println!("Restart your shell or run:");

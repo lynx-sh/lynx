@@ -36,7 +36,7 @@ pub const DEFAULT_THEME: &str = "default";
 
 // ── Shell integration ─────────────────────────────────────────────────────────
 
-/// The line written to `.zshrc` by `lx install` and matched by `lx uninstall`.
+/// The line written to `.zshrc` by `lx setup` and matched by `lx uninstall`.
 /// Must be a single exact string — both install and uninstall use this for matching.
 pub const ZSHRC_INIT_LINE: &str =
     r#"source "${HOME}/.config/lynx/shell/init.zsh""#;

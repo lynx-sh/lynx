@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Integration tests for lx install command
+# Integration tests for lx setup command
 # Each test runs in an isolated temp directory
 
 setup() {
@@ -14,44 +14,44 @@ teardown() {
   rm -rf "$HOME"
 }
 
-@test "lx install --help exits 0 and shows usage" {
-  run lx install --help
+@test "lx setup --help exits 0 and shows usage" {
+  run lx setup --help
   [ "$status" -eq 0 ]
   [[ "$output" == *"install"* ]]
 }
 
-@test "lx install copies shell/core/hooks.zsh to LYNX_DIR" {
+@test "lx setup copies shell/core/hooks.zsh to LYNX_DIR" {
   local target="${HOME}/.config/lynx"
-  run lx install --source "$LYNX_SOURCE_DIR" --dir "$target"
+  run lx setup --source "$LYNX_SOURCE_DIR" --dir "$target"
   [ "$status" -eq 0 ]
   [ -f "${target}/shell/core/hooks.zsh" ]
 }
 
-@test "lx install copies plugins/ to LYNX_DIR" {
+@test "lx setup copies plugins/ to LYNX_DIR" {
   local target="${HOME}/.config/lynx"
-  run lx install --source "$LYNX_SOURCE_DIR" --dir "$target"
+  run lx setup --source "$LYNX_SOURCE_DIR" --dir "$target"
   [ "$status" -eq 0 ]
   [ -d "${target}/plugins" ]
 }
 
-@test "lx install writes default config.toml" {
+@test "lx setup writes default config.toml" {
   local target="${HOME}/.config/lynx"
-  run lx install --source "$LYNX_SOURCE_DIR" --dir "$target"
+  run lx setup --source "$LYNX_SOURCE_DIR" --dir "$target"
   [ "$status" -eq 0 ]
   [ -f "${target}/config.toml" ]
 }
 
-@test "lx install --zshrc patches ~/.zshrc" {
+@test "lx setup --zshrc patches ~/.zshrc" {
   local target="${HOME}/.config/lynx"
-  run lx install --source "$LYNX_SOURCE_DIR" --dir "$target" --zshrc
+  run lx setup --source "$LYNX_SOURCE_DIR" --dir "$target" --zshrc
   [ "$status" -eq 0 ]
   grep -q 'source "${HOME}/.config/lynx/shell/init.zsh"' "${HOME}/.zshrc"
 }
 
-@test "lx install --zshrc is idempotent" {
+@test "lx setup --zshrc is idempotent" {
   local target="${HOME}/.config/lynx"
-  lx install --source "$LYNX_SOURCE_DIR" --dir "$target" --zshrc
-  lx install --source "$LYNX_SOURCE_DIR" --dir "$target" --zshrc
+  lx setup --source "$LYNX_SOURCE_DIR" --dir "$target" --zshrc
+  lx setup --source "$LYNX_SOURCE_DIR" --dir "$target" --zshrc
   local count
   count=$(grep -c 'source "${HOME}/.config/lynx/shell/init.zsh"' "${HOME}/.zshrc")
   [ "$count" -eq 1 ]
@@ -59,13 +59,13 @@ teardown() {
 
 @test "installed hooks.zsh passes zsh syntax check" {
   local target="${HOME}/.config/lynx"
-  lx install --source "$LYNX_SOURCE_DIR" --dir "$target"
+  lx setup --source "$LYNX_SOURCE_DIR" --dir "$target"
   zsh -n "${target}/shell/core/hooks.zsh"
 }
 
 @test "lx prompt render produces PROMPT= after install" {
   local target="${HOME}/.config/lynx"
-  lx install --source "$LYNX_SOURCE_DIR" --dir "$target"
+  lx setup --source "$LYNX_SOURCE_DIR" --dir "$target"
 
   # Simulate what precmd does: set env and call lx prompt render
   export LYNX_DIR="$target"
