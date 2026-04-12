@@ -129,7 +129,7 @@ macro_rules! builtin {
     };
 }
 
-const BUILTIN_THEMES: &[(&str, &str)] = &[builtin!("default"), builtin!("minimal"), builtin!("rkj-repo")];
+const BUILTIN_THEMES: &[(&str, &str)] = &[builtin!("default"), builtin!("minimal"), builtin!("rkj-repo"), builtin!("tokyo-night")];
 
 /// Resolve the user theme directory: `~/.config/lynx/themes/`.
 pub fn user_theme_dir() -> PathBuf {
