@@ -93,6 +93,18 @@ pub struct LsColors {
     pub audio: Option<LsColorsEntry>,
     pub broken: Option<LsColorsEntry>,
     pub other_writable: Option<LsColorsEntry>,
+    /// Per-extension colors — lets themers color individual file types.
+    /// Keys are extensions without the dot (e.g. `rs`, `py`, `toml`).
+    ///
+    /// ```toml
+    /// [ls_colors.extensions]
+    /// rs   = { fg = "#e7894f" }
+    /// py   = { fg = "#4584b6" }
+    /// toml = { fg = "#9ece6a" }
+    /// sh   = { fg = "#e0af68", bold = true }
+    /// ```
+    #[serde(default)]
+    pub extensions: std::collections::HashMap<String, LsColorsEntry>,
     /// Eza metadata column colors — only used when eza is the ls backend.
     #[serde(default)]
     pub columns: EzaColumns,

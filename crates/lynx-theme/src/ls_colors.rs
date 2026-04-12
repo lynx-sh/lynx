@@ -64,6 +64,16 @@ impl LsColors {
             }
         }
 
+        // Per-extension overrides — these come AFTER category entries so they
+        // take priority (LS_COLORS uses last-match-wins for duplicate extensions).
+        let mut ext_keys: Vec<&String> = self.extensions.keys().collect();
+        ext_keys.sort(); // deterministic output
+        for ext in ext_keys {
+            if let Some(sgr) = entry_sgr(&self.extensions[ext]) {
+                parts.push(format!("*.{ext}={sgr}"));
+            }
+        }
+
         if parts.is_empty() {
             None
         } else {
@@ -221,37 +231,51 @@ fn bsd_pair(entry: Option<&LsColorsEntry>) -> String {
 }
 
 /// Map an RGB color to the nearest BSD LSCOLORS character.
+///
+/// Uses a hue-first approach: identify the dominant channel(s) to pick the
+/// correct ANSI hue, then use brightness to decide if it's a chromatic color
+/// or achromatic (black/white). This avoids the Euclidean RGB trap where
+/// light blues map to white instead of blue.
 fn rgb_to_bsd_char(r: u8, g: u8, b: u8, bold: bool) -> char {
-    // Map to nearest ANSI 8-color by finding closest match.
-    let ansi_colors: [(u8, u8, u8, char); 8] = [
-        (0, 0, 0, 'a'),       // black
-        (205, 0, 0, 'b'),     // red
-        (0, 205, 0, 'c'),     // green
-        (205, 205, 0, 'd'),   // brown/yellow
-        (0, 0, 238, 'e'),     // blue
-        (205, 0, 205, 'f'),   // magenta
-        (0, 205, 205, 'g'),   // cyan
-        (229, 229, 229, 'h'), // white
-    ];
+    let (ri, gi, bi) = (r as i32, g as i32, b as i32);
+    let max = ri.max(gi).max(bi);
+    let min = ri.min(gi).min(bi);
+    let chroma = max - min;
 
-    let mut best = 'x';
-    let mut best_dist = u32::MAX;
-    for (cr, cg, cb, ch) in &ansi_colors {
-        let dr = r as i32 - *cr as i32;
-        let dg = g as i32 - *cg as i32;
-        let db = b as i32 - *cb as i32;
-        let dist = (dr * dr + dg * dg + db * db) as u32;
-        if dist < best_dist {
-            best_dist = dist;
-            best = *ch;
-        }
-    }
-
-    if bold {
-        best.to_ascii_uppercase()
+    // Achromatic: if saturation is very low, map to black or white by brightness.
+    let ch = if chroma < 30 {
+        if max < 80 { 'a' } else { 'h' } // black or white
     } else {
-        best
-    }
+        // Chromatic: pick hue based on dominant channel(s).
+        match (ri == max, gi == max, bi == max) {
+            // Red dominant
+            (true, false, false) => {
+                if gi > bi + 40 { 'd' } // red+green lean → brown/yellow
+                else if bi > gi + 40 { 'f' } // red+blue lean → magenta
+                else { 'b' } // pure red
+            }
+            // Green dominant
+            (false, true, false) => {
+                if bi > ri + 40 { 'g' } // green+blue lean → cyan
+                else if ri > bi + 40 { 'd' } // green+red lean → yellow/brown
+                else { 'c' } // pure green
+            }
+            // Blue dominant
+            (false, false, true) => {
+                if ri > gi + 40 { 'f' } // blue+red lean → magenta
+                else if gi > ri + 40 { 'g' } // blue+green lean → cyan
+                else { 'e' } // pure blue
+            }
+            // Ties — secondary channel decides
+            (true, true, false) => 'd',  // red+green = yellow/brown
+            (true, false, true) => 'f',  // red+blue = magenta
+            (false, true, true) => 'g',  // green+blue = cyan
+            (true, true, true) => 'h',   // all equal = white
+            _ => 'h',
+        }
+    };
+
+    if bold { ch.to_ascii_uppercase() } else { ch }
 }
 
 /// Convert a color string (named or hex) to a truecolor (24-bit) fg SGR parameter.
@@ -400,6 +424,44 @@ dir = { fg = "blue", bold = true }
         assert!(theme.ls_colors.dir.is_some(), "dir should be Some after parse");
         let s = theme.ls_colors.to_ls_colors_string().unwrap();
         assert!(s.contains("di="), "expected di= in: {s}");
+    }
+
+    #[test]
+    fn extension_colors_emitted() {
+        let toml = r##"
+[meta]
+name = "test"
+
+[segments.left]
+order = []
+
+[ls_colors]
+dir = { fg = "blue", bold = true }
+
+[ls_colors.extensions]
+rs = { fg = "#e7894f" }
+py = { fg = "#4584b6" }
+sh = { fg = "#e0af68", bold = true }
+"##;
+        let theme: crate::schema::Theme = toml::from_str(toml).expect("should parse");
+        assert_eq!(theme.ls_colors.extensions.len(), 3);
+        let s = theme.ls_colors.to_ls_colors_string().unwrap();
+        assert!(s.contains("*.rs=38;2;231;137;79"), "missing rs ext in: {s}");
+        assert!(s.contains("*.py=38;2;69;132;182"), "missing py ext in: {s}");
+        assert!(s.contains("*.sh=1;38;2;224;175;104"), "missing sh ext in: {s}");
+    }
+
+    #[test]
+    fn tokyo_night_extensions_roundtrip() {
+        let theme = crate::loader::parse_and_validate(
+            include_str!("../../../themes/tokyo-night.toml"), "tokyo-night"
+        ).unwrap();
+        assert!(!theme.ls_colors.extensions.is_empty(), "extensions should be non-empty");
+        let s = theme.ls_colors.to_ls_colors_string().unwrap();
+        assert!(s.contains("*.rs="), "missing *.rs in: {s}");
+        assert!(s.contains("*.py="), "missing *.py in: {s}");
+        assert!(s.contains("*.sh="), "missing *.sh in: {s}");
+        assert!(s.contains("*.toml="), "missing *.toml in: {s}");
     }
 
     #[test]

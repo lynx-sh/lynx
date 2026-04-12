@@ -84,6 +84,12 @@ fn resolve_ls_colors_palette(
         resolve_color_ref(&mut entry.fg, palette);
         resolve_color_ref(&mut entry.bg, palette);
     }
+
+    // Per-extension entries.
+    for entry in lsc.extensions.values_mut() {
+        resolve_color_ref(&mut entry.fg, palette);
+        resolve_color_ref(&mut entry.bg, palette);
+    }
 }
 
 fn resolve_color_ref(field: &mut Option<String>, palette: &HashMap<String, String>) {

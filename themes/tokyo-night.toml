@@ -50,7 +50,7 @@ color = { fg = "#769ff0", bg = "#212736" }
 
 [segment.time]
 format = "24h"
-icon = " "
+icon = "  "
 color = { fg = "#a0a9cb", bg = "#1d2230" }
 
 [segment.prompt_char]
@@ -105,6 +105,59 @@ image          = { fg = "#bb9af7" }
 audio          = { fg = "#7dcfff" }
 broken         = { fg = "#f7768e", bold = true }
 other_writable = { fg = "#7aa2f7", bg = "#9ece6a" }
+
+[ls_colors.extensions]
+# Rust / systems
+rs   = { fg = "#e7894f" }
+toml = { fg = "#9ece6a" }
+lock = { fg = "#565f89" }
+# Shell / scripts
+sh   = { fg = "#e0af68", bold = true }
+zsh  = { fg = "#e0af68" }
+bash = { fg = "#e0af68" }
+fish = { fg = "#e0af68" }
+# Web / JS / TS
+js   = { fg = "#e0af68" }
+ts   = { fg = "#7aa2f7" }
+tsx  = { fg = "#7aa2f7" }
+jsx  = { fg = "#e0af68" }
+json = { fg = "#9ece6a" }
+css  = { fg = "#7dcfff" }
+html = { fg = "#ff9e64" }
+vue  = { fg = "#9ece6a" }
+svelte = { fg = "#ff9e64" }
+# Python
+py   = { fg = "#bb9af7" }
+pyi  = { fg = "#bb9af7" }
+# Go
+go   = { fg = "#7dcfff" }
+mod  = { fg = "#7dcfff" }
+sum  = { fg = "#565f89" }
+# Ruby
+rb   = { fg = "#f7768e" }
+# Config / docs
+yaml = { fg = "#9ece6a" }
+yml  = { fg = "#9ece6a" }
+md   = { fg = "#c0caf5" }
+txt  = { fg = "#a9b1d6" }
+log  = { fg = "#565f89" }
+env  = { fg = "#e0af68" }
+ini  = { fg = "#9ece6a" }
+conf = { fg = "#9ece6a" }
+cfg  = { fg = "#9ece6a" }
+# Data
+sql  = { fg = "#ff9e64" }
+db   = { fg = "#565f89" }
+csv  = { fg = "#9ece6a" }
+# Docker / CI
+dockerfile = { fg = "#7dcfff" }
+# Makefile / build
+mk   = { fg = "#a9b1d6" }
+# C / C++
+c    = { fg = "#7aa2f7" }
+h    = { fg = "#7aa2f7" }
+cpp  = { fg = "#7aa2f7" }
+hpp  = { fg = "#7aa2f7" }
 
 [ls_colors.columns]
 date         = "#565f89"
