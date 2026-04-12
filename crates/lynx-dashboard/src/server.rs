@@ -91,6 +91,8 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/api/workflows", get(api::workflows::list_workflows))
         .route("/api/jobs", get(api::workflows::list_jobs))
         .route("/api/workflow/run", post(api::workflows::run_workflow))
+        .route("/api/job/:id", get(api::workflows::get_job))
+        .route("/api/job/:id/stream", get(api::workflows::stream_job))
         // Cron
         .route("/api/cron", get(api::cron::list_tasks))
         .route("/api/cron/add", post(api::cron::add_task))

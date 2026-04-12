@@ -47,9 +47,10 @@ lx dashboard
 │  GET  /api/taps            → list taps                │
 │  POST /api/tap/add         → add community tap        │
 │  GET  /api/workflows       → list workflows           │
-│  POST /api/workflow/run    → start workflow (CLI only)  │
+│  POST /api/workflow/run    → start workflow (bg)        │
 │  GET  /api/jobs            → running/recent jobs       │
-│  GET  /api/job/:id/stream  → SSE live output (planned) │
+│  GET  /api/job/:id         → job result JSON           │
+│  GET  /api/job/:id/stream  → SSE live log output       │
 │  GET  /api/cron            → scheduled tasks           │
 │  GET  /api/intros          → available intros          │
 │  GET  /api/doctor          → diagnostic results        │
