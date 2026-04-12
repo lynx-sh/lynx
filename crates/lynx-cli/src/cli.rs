@@ -67,4 +67,6 @@ pub enum Command {
     Diag(crate::commands::diag::DiagArgs),
     /// Manage shell startup intros — ASCII art, system info, welcome messages
     Intro(crate::commands::intro::IntroArgs),
+    /// Manage package registry taps (sources)
+    Tap(crate::commands::tap::TapArgs),
 }

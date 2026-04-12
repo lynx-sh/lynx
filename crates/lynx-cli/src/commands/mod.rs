@@ -19,6 +19,7 @@ pub mod profile;
 pub mod prompt;
 pub mod rollback;
 pub mod sync;
+pub mod tap;
 pub mod task;
 pub mod nerd_font;
 pub mod theme;
@@ -55,5 +56,6 @@ pub async fn dispatch(cli: Cli) -> Result<()> {
         Command::Dev(args) => dev::run(args).await,
         Command::Diag(args) => diag::run(args).await,
         Command::Intro(args) => intro::run(args).await,
+        Command::Tap(args) => tap::run(args).await,
     }
 }
