@@ -22,9 +22,9 @@ pub struct PluginArgs {
 
 #[derive(Subcommand)]
 pub enum PluginCommand {
-    /// Install a plugin from a local path
+    /// Install a plugin — from the registry by name, or from a local path
     Add {
-        /// Local path to the plugin directory
+        /// Plugin name (registry) or path to a local plugin directory
         path: String,
     },
     /// Remove an installed plugin

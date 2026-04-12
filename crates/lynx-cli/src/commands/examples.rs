@@ -3,7 +3,7 @@ use clap::Args;
 
 #[derive(Args)]
 pub struct ExamplesArgs {
-    /// Show examples for a specific command (plugin, theme, cron, run, jobs, dashboard, event, config, doctor)
+    /// Show examples for a specific command (plugin, theme, cron, run, jobs, dashboard, event, config, doctor, context, daemon)
     pub command: Option<String>,
 }
 
@@ -43,8 +43,10 @@ fn print_quickstart() {
   lx theme random                  # try a random theme
 
   # Plugins
+  lx plugin search                 # browse registry plugins
+  lx plugin add git-extras         # install from registry by name
+  lx plugin add ./plugins/my-tools # install from local path
   lx plugin new my-tools           # scaffold a new plugin
-  lx plugin add ./plugins/my-tools # install it
   lx plugin list                   # see what's loaded
 
   # Cron (scheduled commands)
@@ -88,7 +90,12 @@ fn print_plugin_examples() {
   lx plugin — examples
   ─────────────────────
 
-  # Create and install a new plugin
+  # Install a plugin from the registry
+  lx plugin search git             # find registry plugins
+  lx plugin add git-extras         # install by name
+  lx plugin list
+
+  # Create and install a local plugin
   lx plugin new git-extras
   lx plugin add ./git-extras
   lx plugin list
@@ -178,8 +185,8 @@ fn print_event_examples() {
   # Emit a custom event from a shell script
   lx event emit "project:opened" --data "$PWD"
 
-  # Listen for events (blocks — useful for debugging)
-  lx event on "shell:chpwd"
+  # Inspect recent events (useful for debugging)
+  lx event log
 
   # Fire a hook when changing directories
   # (add to your plugin's plugin.toml)
@@ -276,8 +283,8 @@ fn print_daemon_examples() {
   # Register as a system service (launchd on macOS, systemd on Linux)
   lx daemon install
 
-  # Reload daemon config without restart (after editing tasks.toml)
-  lx daemon reload
+  # Restart daemon to pick up config changes (after editing tasks.toml)
+  lx daemon restart
 "#
     );
 }
