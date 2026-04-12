@@ -50,13 +50,36 @@ pub fn render_prompt(
             let top_right_str = assemble_no_trail(top_right, theme, sep, false, ctx);
             let top_visible = visible_len(&top_str);
             let right_visible = visible_len(&top_right_str);
-            let padding = columns
+            let gap = columns
                 .map(|cols| {
                     let used = top_visible + right_visible;
                     if cols as usize > used { cols as usize - used } else { 0 }
                 })
                 .unwrap_or(1);
-            format!("{top_str}{}{top_right_str}", " ".repeat(padding))
+
+            // Use filler char if configured, otherwise plain spaces.
+            let fill_str = if let Some(ref filler) = theme.segments.filler {
+                let fill_char = &filler.char;
+                let repeated = fill_char.repeat(gap);
+                if let Some(ref color_name) = filler.color {
+                    let cap = capability();
+                    if cap != TermCapability::None {
+                        let color = SegmentColor {
+                            fg: Some(color_name.clone()),
+                            bg: None,
+                            bold: false,
+                        };
+                        apply_color_zsh(&repeated, &color, cap)
+                    } else {
+                        repeated
+                    }
+                } else {
+                    repeated
+                }
+            } else {
+                " ".repeat(gap)
+            };
+            format!("{top_str}{fill_str}{top_right_str}")
         } else {
             top_str
         };
@@ -128,17 +151,34 @@ fn assemble_no_trail(
     assembled.strip_suffix(' ').unwrap_or(&assembled).to_string()
 }
 
-/// Emit a minimal transient PROMPT (replaces full prompt after command runs).
-/// Just outputs `PROMPT="<symbol> "` — the symbol is taken from the
-/// `prompt_char` segment config or defaults to `❯`.
+/// Emit a transient PROMPT (replaces full prompt after command runs).
+///
+/// Uses `[transient]` theme config when available, falling back to the
+/// `prompt_char` segment's symbol for backwards compatibility.
 pub fn render_transient_prompt(theme: &Theme) -> String {
-    let symbol = theme
-        .segment
-        .get("prompt_char")
-        .and_then(|v| v.get("symbol"))
-        .and_then(|v| v.as_str())
-        .unwrap_or("❯");
-    format!("PROMPT=\"{symbol} \"\nRPROMPT=\"\"\n")
+    if let Some(ref transient) = theme.transient {
+        let cap = capability();
+        let text = if cap != TermCapability::None && (transient.fg.is_some() || transient.bg.is_some()) {
+            let color = SegmentColor {
+                fg: transient.fg.clone(),
+                bg: transient.bg.clone(),
+                bold: false,
+            };
+            apply_color_zsh(&transient.template, &color, cap)
+        } else {
+            transient.template.clone()
+        };
+        format!("PROMPT=\"{text}\"\nRPROMPT=\"\"\n")
+    } else {
+        // Legacy fallback: prompt_char symbol.
+        let symbol = theme
+            .segment
+            .get("prompt_char")
+            .and_then(|v| v.get("symbol"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("❯");
+        format!("PROMPT=\"{symbol} \"\nRPROMPT=\"\"\n")
+    }
 }
 
 /// Assemble a prompt string from segments, applying theme colors and separators.
@@ -674,6 +714,43 @@ mod tests {
         assert!(result.contains('\u{e0b4}'), "expected trailing diamond: {result:?}");
         // Dir should NOT have diamond caps.
         assert!(result.contains("~/code"), "expected dir content: {result:?}");
+    }
+
+    #[test]
+    fn filler_replaces_spaces_on_top_line() {
+        override_capability(TermCapability::None);
+        let mut theme = load_default();
+        theme.segments.filler = Some(lynx_theme::schema::FillerConfig {
+            char: "─".to_string(),
+            color: None,
+        });
+        let top = vec![RenderedSegment::new("left").with_cache_key("dir")];
+        let top_right = vec![RenderedSegment::new("right").with_cache_key("git_branch")];
+        let out = render_prompt(&[], &[], &top, &top_right, &[], &theme, Some(40), None);
+        assert!(out.contains("─"), "expected filler char in top line: {out:?}");
+        assert!(!out.contains("     "), "should not have long space runs: {out:?}");
+    }
+
+    #[test]
+    fn transient_prompt_uses_theme_config() {
+        override_capability(TermCapability::None);
+        let mut theme = load_default();
+        theme.transient = Some(lynx_theme::schema::TransientConfig {
+            template: "→ ".to_string(),
+            fg: None,
+            bg: None,
+        });
+        let out = render_transient_prompt(&theme);
+        assert!(out.contains("→"), "expected custom transient template: {out:?}");
+        assert!(!out.contains("❯"), "should not contain default symbol: {out:?}");
+    }
+
+    #[test]
+    fn transient_prompt_falls_back_to_prompt_char() {
+        let theme = load_default();
+        // No [transient] config — should use prompt_char symbol.
+        let out = render_transient_prompt(&theme);
+        assert!(out.contains("PROMPT="), "expected PROMPT assignment: {out:?}");
     }
 
     #[test]

@@ -70,6 +70,10 @@ pub struct Theme {
     /// Auto-suggestion style — drives ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE.
     #[serde(default)]
     pub autosuggestions: AutoSuggestions,
+    /// Transient prompt config — shown after a command completes, replacing the
+    /// full prompt. When absent, falls back to `prompt_char` segment's symbol.
+    #[serde(default)]
+    pub transient: Option<TransientConfig>,
     /// Per-segment config tables — raw TOML values.
     /// Each segment impl deserializes its own typed config from these.
     /// Universal fields (`show_in`, `hide_in`, `color`, `cache_ttl_ms`) are
@@ -109,6 +113,46 @@ pub struct SegmentLayout {
     /// Insert a blank line before the prompt. Default: `false`.
     #[serde(default)]
     pub spacing: bool,
+    /// Filler character repeated between top and top_right segments to span
+    /// the full terminal width. When absent, padding is plain spaces.
+    #[serde(default)]
+    pub filler: Option<FillerConfig>,
+}
+
+/// Filler that stretches to fill remaining terminal width on a line.
+/// Used between top and top_right segments for box-drawing prompts.
+///
+/// TOML example:
+/// ```toml
+/// [segments.filler]
+/// char = "─"
+/// color = "$muted"
+/// ```
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FillerConfig {
+    /// The character to repeat. Default: "─".
+    pub char: String,
+    /// Foreground color for the filler (named or hex).
+    pub color: Option<String>,
+}
+
+/// Transient prompt — the simplified prompt shown after a command runs.
+/// When absent, the renderer falls back to the `prompt_char` segment symbol.
+///
+/// TOML example:
+/// ```toml
+/// [transient]
+/// template = "❯ "
+/// fg = "#e0f8ff"
+/// ```
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TransientConfig {
+    /// The text to display as the transient prompt.
+    pub template: String,
+    /// Foreground color (named or hex).
+    pub fg: Option<String>,
+    /// Background color (named or hex).
+    pub bg: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
