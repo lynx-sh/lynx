@@ -42,6 +42,10 @@ pub struct ShellConfig {
     /// Each entry binds a key sequence to a ZLE widget.
     #[serde(default)]
     pub keybindings: Vec<KeyBinding>,
+    /// Set to true for plugins that hook into ZLE (e.g. zsh-syntax-highlighting,
+    /// zsh-autosuggestions). These must be sourced directly — zle -N fails inside eval.
+    #[serde(default)]
+    pub zle_hook: bool,
 }
 
 /// A single key → widget binding emitted as `bindkey '<key>' <widget>`.
