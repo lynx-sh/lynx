@@ -50,6 +50,10 @@ pub enum SegmentCondition {
     CwdMatches { cwd_matches: String },
     /// `true` = only when last exit code is non-zero; `false` = only on zero exit.
     ExitCodeNonzero { exit_code_nonzero: bool },
+    /// `true` = only when the segment's cache entry has this boolean field set to true.
+    /// Used for conditional colors: `{ cache_is_true = "staged" }` matches when
+    /// the segment's cache has `"staged": true`.
+    CacheIsTrue { cache_is_true: String },
 }
 
 /// Shared color/style type — used by individual segment typed configs.
@@ -108,6 +112,30 @@ impl<'de> serde::Deserialize<'de> for SegmentColor {
 
         deserializer.deserialize_any(ColorVisitor)
     }
+}
+
+/// A conditional color override — applied when condition evaluates to true.
+///
+/// TOML example:
+/// ```toml
+/// [[segment.git_branch.color_when]]
+/// condition = { cache_is_true = "staged" }
+/// bg = "$git_staged_bg"
+///
+/// [[segment.git_branch.color_when]]
+/// condition = { cache_is_true = "modified" }
+/// bg = "$git_dirty_bg"
+/// ```
+#[derive(Debug, Clone, Deserialize)]
+pub struct ConditionalColor {
+    /// The condition to evaluate.
+    pub condition: SegmentCondition,
+    /// Override foreground color (falls back to base color if None).
+    pub fg: Option<String>,
+    /// Override background color (falls back to base color if None).
+    pub bg: Option<String>,
+    /// Override bold (falls back to base color if None).
+    pub bold: Option<bool>,
 }
 
 /// Per-segment separator overrides — read by the renderer from `[segment.<name>]`.

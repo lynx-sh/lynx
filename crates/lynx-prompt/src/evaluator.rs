@@ -82,6 +82,16 @@ fn eval_condition(cond: &SegmentCondition, ctx: &RenderContext) -> bool {
                 .unwrap_or(false);
             *exit_code_nonzero == is_nonzero
         }
+        SegmentCondition::CacheIsTrue { cache_is_true } => {
+            // Check all cache entries for a boolean field matching the key.
+            // Used for conditional colors: cache_is_true = "staged" matches
+            // when any cache entry has {"staged": true}.
+            ctx.cache.values().any(|v| {
+                v.get(cache_is_true.as_str())
+                    .and_then(|f| f.as_bool())
+                    .unwrap_or(false)
+            })
+        }
     }
 }
 
@@ -116,6 +126,29 @@ fn glob_match(pattern: &str, value: &str, env: &HashMap<String, String>) -> bool
     regex::Regex::new(&re)
         .map(|r| r.is_match(value))
         .unwrap_or(false)
+}
+
+/// Resolve the effective color for a segment, checking `color_when` conditional overrides
+/// in order (first match wins) and falling back to the base `color`.
+///
+/// Returns the merged `SegmentColor` — conditional fields override base fields,
+/// unset conditional fields fall through to the base.
+pub fn resolve_conditional_color(
+    base: &lynx_theme::schema::SegmentColor,
+    color_when: &[lynx_theme::schema::ConditionalColor],
+    ctx: &RenderContext,
+) -> lynx_theme::schema::SegmentColor {
+    for cw in color_when {
+        if eval_condition(&cw.condition, ctx) {
+            // Merge: conditional fields override base, unset fields fall through.
+            return lynx_theme::schema::SegmentColor {
+                fg: cw.fg.clone().or_else(|| base.fg.clone()),
+                bg: cw.bg.clone().or_else(|| base.bg.clone()),
+                bold: cw.bold.unwrap_or(base.bold),
+            };
+        }
+    }
+    base.clone()
 }
 
 /// Run all segments in the given order concurrently and return the non-None results

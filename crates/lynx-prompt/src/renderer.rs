@@ -1,5 +1,5 @@
 use lynx_theme::{
-    schema::{SegmentColor, SegmentSeparators, SeparatorMode, Separators, Theme},
+    schema::{ConditionalColor, SegmentColor, SegmentSeparators, SeparatorMode, Separators, Theme},
     terminal::{capability, TermCapability},
 };
 
@@ -23,6 +23,7 @@ pub fn render_prompt(
     continuation: &[RenderedSegment],
     theme: &Theme,
     columns: Option<u32>,
+    ctx: Option<&crate::segment::RenderContext>,
 ) -> String {
     let sep = &theme.separators;
 
@@ -32,11 +33,11 @@ pub fn render_prompt(
     let left_str = if !top.is_empty() {
         let mut plain_sep = Separators::default();
         plain_sep.mode = SeparatorMode::Static;
-        assemble(left, theme, &plain_sep, true)
+        assemble(left, theme, &plain_sep, true, ctx)
     } else {
-        assemble(left, theme, sep, true)
+        assemble(left, theme, sep, true, ctx)
     };
-    let rprompt = assemble(right, theme, sep, false);
+    let rprompt = assemble(right, theme, sep, false, ctx);
 
     // Optional blank line before the prompt for visual breathing room.
     let spacer = if theme.segments.spacing { "$'\\n'" } else { "" };
@@ -44,9 +45,9 @@ pub fn render_prompt(
     let mut out = if top.is_empty() {
         format!("PROMPT={spacer}\"{left_str}\"\nRPROMPT=\"{rprompt}\"\n")
     } else {
-        let top_str = assemble(top, theme, sep, true);
+        let top_str = assemble(top, theme, sep, true, ctx);
         let top_line = if !top_right.is_empty() {
-            let top_right_str = assemble_no_trail(top_right, theme, sep, false);
+            let top_right_str = assemble_no_trail(top_right, theme, sep, false, ctx);
             let top_visible = visible_len(&top_str);
             let right_visible = visible_len(&top_right_str);
             let padding = columns
@@ -66,7 +67,7 @@ pub fn render_prompt(
     };
 
     if !continuation.is_empty() {
-        let prompt2 = assemble(continuation, theme, sep, true);
+        let prompt2 = assemble(continuation, theme, sep, true, ctx);
         out.push_str(&format!("PROMPT2=\"{prompt2}\"\n"));
     }
 
@@ -120,8 +121,9 @@ fn assemble_no_trail(
     theme: &Theme,
     sep: &Separators,
     is_left: bool,
+    ctx: Option<&crate::segment::RenderContext>,
 ) -> String {
-    let assembled = assemble(segs, theme, sep, is_left);
+    let assembled = assemble(segs, theme, sep, is_left, ctx);
     // assemble() always appends a trailing space; strip it for right-side content.
     assembled.strip_suffix(' ').unwrap_or(&assembled).to_string()
 }
@@ -229,7 +231,7 @@ fn resolve_seg_separators(seg: &RenderedSegment, theme: &Theme) -> SegmentSepara
         .unwrap_or_default()
 }
 
-fn assemble(segs: &[RenderedSegment], theme: &Theme, sep: &Separators, is_left: bool) -> String {
+fn assemble(segs: &[RenderedSegment], theme: &Theme, sep: &Separators, is_left: bool, ctx: Option<&crate::segment::RenderContext>) -> String {
     if segs.is_empty() {
         return if is_left { "$ ".to_string() } else { String::new() };
     }
@@ -237,14 +239,30 @@ fn assemble(segs: &[RenderedSegment], theme: &Theme, sep: &Separators, is_left: 
     let cap = capability();
 
     // Resolve color configs and render colored text for each segment.
+    // If ctx is provided and the segment has color_when, evaluate conditions.
     let color_cfgs: Vec<Option<SegmentColor>> = segs
         .iter()
         .map(|seg| {
-            seg.cache_key
+            let seg_config = seg.cache_key
                 .as_deref()
-                .and_then(|name| theme.segment.get(name))
+                .and_then(|name| theme.segment.get(name));
+
+            let base_color: Option<SegmentColor> = seg_config
                 .and_then(|sc| sc.get("color"))
-                .and_then(|c| c.clone().try_into().ok())
+                .and_then(|c| c.clone().try_into().ok());
+
+            // Check for color_when conditional overrides.
+            if let (Some(base), Some(render_ctx)) = (&base_color, ctx) {
+                let color_when: Vec<ConditionalColor> = seg_config
+                    .and_then(|sc| sc.get("color_when"))
+                    .and_then(|cw| cw.clone().try_into().ok())
+                    .unwrap_or_default();
+                if !color_when.is_empty() {
+                    return Some(crate::evaluator::resolve_conditional_color(base, &color_when, render_ctx));
+                }
+            }
+
+            base_color
         })
         .collect();
 
@@ -381,7 +399,7 @@ mod tests {
         let theme = load_default();
         let left = vec![RenderedSegment::new("~/code").with_cache_key("dir")];
         let right = vec![RenderedSegment::new("main").with_cache_key("git_branch")];
-        let out = render_prompt(&left, &right, &[], &[], &[], &theme, None);
+        let out = render_prompt(&left, &right, &[], &[], &[], &theme, None, None);
         assert!(out.contains("PROMPT="));
         assert!(out.contains("RPROMPT="));
     }
@@ -389,7 +407,7 @@ mod tests {
     #[test]
     fn empty_segments_produce_bare_prompt() {
         let theme = load_default();
-        let out = render_prompt(&[], &[], &[], &[], &[], &theme, None);
+        let out = render_prompt(&[], &[], &[], &[], &[], &theme, None, None);
         assert!(out.contains("PROMPT="));
     }
 
@@ -398,7 +416,7 @@ mod tests {
         let theme = load_default();
         let top = vec![RenderedSegment::new("info").with_cache_key("dir")];
         let left = vec![RenderedSegment::new("~/code").with_cache_key("dir")];
-        let out = render_prompt(&left, &[], &top, &[], &[], &theme, None);
+        let out = render_prompt(&left, &[], &top, &[], &[], &theme, None, None);
         assert!(out.contains("$'\\n'"), "expected ANSI-C newline ($'\\n') in two-line prompt");
     }
 
@@ -408,7 +426,7 @@ mod tests {
         let theme = load_default();
         let top = vec![RenderedSegment::new("info").with_cache_key("dir")];
         let top_right = vec![RenderedSegment::new("[main]").with_cache_key("git_branch")];
-        let out = render_prompt(&[], &[], &top, &top_right, &[], &theme, Some(80));
+        let out = render_prompt(&[], &[], &top, &top_right, &[], &theme, Some(80), None);
         // top_right content must appear in the top line
         assert!(out.contains("[main]"), "expected top_right content in output: {out:?}");
         // padding spaces must appear between top and top_right
@@ -419,7 +437,7 @@ mod tests {
     fn continuation_emits_prompt2() {
         let theme = load_default();
         let cont = vec![RenderedSegment::new("> ").with_cache_key("prompt_char")];
-        let out = render_prompt(&[], &[], &[], &[], &cont, &theme, None);
+        let out = render_prompt(&[], &[], &[], &[], &cont, &theme, None, None);
         assert!(out.contains("PROMPT2="));
     }
 
@@ -456,7 +474,7 @@ mod tests {
         let theme = load_default();
         // dir segment has color = { fg = "blue", bold = true } in default theme
         let segs = vec![RenderedSegment::new("~/code").with_cache_key("dir")];
-        let result = assemble(&segs, &theme, &theme.separators, true);
+        let result = assemble(&segs, &theme, &theme.separators, true, None);
 
         assert!(
             result.contains("%{") && result.contains("%}"),
@@ -470,7 +488,7 @@ mod tests {
 
         let theme = load_default();
         let segs = vec![RenderedSegment::new("~/code").with_cache_key("dir")];
-        let result = assemble(&segs, &theme, &theme.separators, true);
+        let result = assemble(&segs, &theme, &theme.separators, true, None);
 
         assert!(
             !result.contains("\x1b["),
@@ -503,7 +521,7 @@ mod tests {
             RenderedSegment::new("main").with_cache_key("git_branch"),
         ];
 
-        let result = assemble(&segs, &theme, &sep, true);
+        let result = assemble(&segs, &theme, &sep, true, None);
         // Separator between dir→git_branch should have fg=blue (dir's bg).
         // blue = (122, 162, 247) → 38;2;122;162;247
         assert!(result.contains("38;2;122;162;247"), "separator fg should be dir's bg (blue): {result:?}");
@@ -527,7 +545,7 @@ mod tests {
         sep.left.char = Some("\u{e0b0}".to_string());
 
         let segs = vec![RenderedSegment::new("~/code").with_cache_key("dir")];
-        let result = assemble(&segs, &theme, &sep, true);
+        let result = assemble(&segs, &theme, &sep, true, None);
         // Tail arrow: separator after last segment with fg=blue, no bg.
         // Count occurrences of the separator char — should appear once (tail arrow).
         let sep_count = result.matches('\u{e0b0}').count();
@@ -545,12 +563,12 @@ mod tests {
         ];
 
         // Default separators have mode=Static.
-        let result_static = assemble(&segs, &theme, &theme.separators, true);
+        let result_static = assemble(&segs, &theme, &theme.separators, true, None);
 
         // Explicitly set Static.
         let mut sep = theme.separators.clone();
         sep.mode = SeparatorMode::Static;
-        let result_explicit = assemble(&segs, &theme, &sep, true);
+        let result_explicit = assemble(&segs, &theme, &sep, true, None);
 
         assert_eq!(result_static, result_explicit, "Static mode must be byte-identical to default");
     }
@@ -565,7 +583,7 @@ mod tests {
         ];
         let mut sep = Separators::default();
         sep.left.char = Some("|".to_string());
-        let result = assemble(&segs, &theme, &sep, true);
+        let result = assemble(&segs, &theme, &sep, true, None);
         assert!(result.contains('|'), "expected | separator in: {result:?}");
     }
 
@@ -582,7 +600,7 @@ mod tests {
         let segs = vec![
             RenderedSegment::new("~/code").with_cache_key("dir"),
         ];
-        let result = assemble(&segs, &theme, &theme.separators, true);
+        let result = assemble(&segs, &theme, &theme.separators, true, None);
         assert!(result.contains('\u{e0b6}'), "expected leading char: {result:?}");
         assert!(result.contains("~/code"), "expected segment content: {result:?}");
         // Leading char should appear before the content.
@@ -608,7 +626,7 @@ mod tests {
             RenderedSegment::new("~/code").with_cache_key("dir"),
             RenderedSegment::new("main").with_cache_key("git_branch"),
         ];
-        let result = assemble(&segs, &theme, &sep, true);
+        let result = assemble(&segs, &theme, &sep, true, None);
         // The gap between dir and git_branch should use trailing_char, not "|".
         assert!(result.contains('\u{e0b4}'), "expected trailing char in gap: {result:?}");
         // The global "|" should NOT appear between these two segments.
@@ -627,7 +645,7 @@ mod tests {
         theme.segment.insert("dir".to_string(), dir_cfg);
 
         let segs = vec![RenderedSegment::new("~/code").with_cache_key("dir")];
-        let result = assemble(&segs, &theme, &theme.separators, true);
+        let result = assemble(&segs, &theme, &theme.separators, true, None);
         assert!(result.contains('\u{e0b4}'), "expected trailing char after last segment: {result:?}");
     }
 
@@ -650,7 +668,7 @@ mod tests {
             RenderedSegment::new("zsh").with_cache_key("shell"),
             RenderedSegment::new("~/code").with_cache_key("dir"),
         ];
-        let result = assemble(&segs, &theme, &sep, true);
+        let result = assemble(&segs, &theme, &sep, true, None);
         // Shell should have diamond caps.
         assert!(result.contains('\u{e0b6}'), "expected leading diamond: {result:?}");
         assert!(result.contains('\u{e0b4}'), "expected trailing diamond: {result:?}");
@@ -668,7 +686,7 @@ mod tests {
             RenderedSegment::new("a").with_cache_key("dir"),
             RenderedSegment::new("b").with_cache_key("git_branch"),
         ];
-        let result = assemble(&segs, &theme, &theme.separators, true);
+        let result = assemble(&segs, &theme, &theme.separators, true, None);
         // With no separator config, segments are space-separated.
         assert_eq!(result, "a b ", "default behavior should be space-separated: {result:?}");
     }

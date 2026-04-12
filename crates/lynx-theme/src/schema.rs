@@ -6,8 +6,8 @@ pub use crate::colors::{
     AutoSuggestions, EzaColumns, LsColors, LsColorsEntry, SyntaxHighlight,
 };
 pub use crate::segments::{
-    SegmentColor, SegmentCondition, SegmentSeparators, SegmentVisibility, StatusIcon,
-    KNOWN_SEGMENTS,
+    ConditionalColor, SegmentColor, SegmentCondition, SegmentSeparators, SegmentVisibility,
+    StatusIcon, KNOWN_SEGMENTS,
 };
 
 /// Separator rendering mode.
