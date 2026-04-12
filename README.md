@@ -59,7 +59,7 @@ cd lynx
 cargo build --release
 cp target/release/lx ~/.local/bin/
 mkdir -p ~/.config/lynx
-cp -r shell themes contexts profiles ~/.config/lynx/
+cp -r shell themes contexts ~/.config/lynx/
 echo 'source "${HOME}/.config/lynx/shell/init.zsh"' >> ~/.zshrc
 ```
 

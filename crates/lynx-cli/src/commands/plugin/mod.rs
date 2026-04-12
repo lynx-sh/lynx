@@ -53,7 +53,7 @@ pub enum PluginCommand {
         /// Plugin name to exec
         name: String,
     },
-    /// Unload a plugin from the shell (called by eval-bridge on profile switch)
+    /// Unload a plugin from the shell
     Unload {
         /// Plugin name to unload
         name: String,

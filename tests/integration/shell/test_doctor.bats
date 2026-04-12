@@ -34,7 +34,6 @@ teardown() {
   local files=(
     "$BATS_TEST_DIRNAME/../../../crates/lynx-cli/src/commands/config.rs"
     "$BATS_TEST_DIRNAME/../../../crates/lynx-cli/src/commands/plugin"
-    "$BATS_TEST_DIRNAME/../../../crates/lynx-cli/src/commands/profile.rs"
     "$BATS_TEST_DIRNAME/../../../crates/lynx-cli/src/commands/theme.rs"
     "$BATS_TEST_DIRNAME/../../../crates/lynx-cli/src/commands/context.rs"
     "$BATS_TEST_DIRNAME/../../../crates/lynx-cli/src/commands/sync.rs"

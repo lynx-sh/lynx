@@ -11,7 +11,7 @@ use lynx_prompt::{
     ExitCodeSegment, GitActionSegment, GitAheadBehindSegment, GitBranchSegment, GitShaSegment,
     GitStashSegment, GitStatusSegment, GitTimeSinceCommitSegment, GolangVersionSegment,
     HistNumberSegment, HostnameSegment, KubectlContextSegment, NewlineSegment,
-    NodeVersionSegment, ProfileBadgeSegment, PromptCharSegment, RubyVersionSegment,
+    NodeVersionSegment, PromptCharSegment, RubyVersionSegment,
     RustVersionSegment, SshIndicatorSegment, TaskStatusSegment, TimeSegment, UsernameSegment,
     VenvSegment, ViModeSegment, CustomSegment,
 };
@@ -95,7 +95,6 @@ async fn cmd_render(transient: bool) -> Result<()> {
         Box::new(RustVersionSegment),
         Box::new(VenvSegment),
         Box::new(CondaEnvSegment),
-        Box::new(ProfileBadgeSegment),
         Box::new(TaskStatusSegment),
         Box::new(CmdDurationSegment),
         Box::new(ExitCodeSegment),
@@ -170,17 +169,6 @@ fn build_render_context_from_env() -> RenderContext {
         }
     }
 
-    if let Ok(config) = load_config() {
-        if let Some(profile) = &config.active_profile {
-            if !profile.is_empty() {
-                cache.insert(
-                    cache_keys::PROFILE_STATE.into(),
-                    serde_json::json!({ "name": profile }),
-                );
-            }
-        }
-    }
-
     // Capture env snapshot — segments must read from ctx.env, not std::env::var().
     let env_keys = [
         "USER",
@@ -213,7 +201,6 @@ fn build_render_context_from_env() -> RenderContext {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lynx_test_utils::temp_home;
     use std::sync::{Mutex, OnceLock};
 
     fn env_lock() -> &'static Mutex<()> {
@@ -325,31 +312,6 @@ mod tests {
         std::env::set_var("PWD", "/");
         let ctx = build_render_context_from_env();
         assert_eq!(ctx.cache[lynx_prompt::cache_keys::KUBECTL_STATE]["context"], "dev");
-    }
-
-    #[test]
-    fn profile_state_is_loaded_from_config() {
-        let _lock = env_lock().lock().expect("lock");
-        let _guard = EnvGuard::new(&["HOME", "PWD", "LYNX_DIR"]);
-        let home = temp_home();
-        std::env::set_var("HOME", home.path());
-        std::env::remove_var("LYNX_DIR");
-        std::env::set_var("PWD", "/");
-        let config_dir = home.path().join(lynx_core::brand::CONFIG_DIR);
-        std::fs::create_dir_all(&config_dir).expect("create config dir");
-        std::fs::write(
-            config_dir.join(lynx_core::brand::CONFIG_FILE),
-            r#"schema_version = 1
-enabled_plugins = []
-active_theme = "default"
-active_context = "interactive"
-active_profile = "work"
-"#,
-        )
-        .expect("write config");
-
-        let ctx = build_render_context_from_env();
-        assert_eq!(ctx.cache[lynx_prompt::cache_keys::PROFILE_STATE]["name"], "work");
     }
 
     #[test]

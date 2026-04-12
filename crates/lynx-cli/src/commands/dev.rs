@@ -82,7 +82,6 @@ fn cmd_sync(source: &str) -> Result<()> {
         ("shell",    lynx_dir.join("shell")),
         ("plugins",  lynx_dir.join("plugins")),
         ("contexts", lynx_dir.join("contexts")),
-        ("profiles", lynx_dir.join("profiles")),
     ];
 
     for (dir_name, dst) in sync_pairs {

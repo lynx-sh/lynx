@@ -9,7 +9,6 @@ impl Default for LynxConfig {
             active_context: Context::Interactive,
             enabled_plugins: vec![],
             sync: SyncConfig { remote: None },
-            active_profile: None,
             intro: IntroConfig::default(),
         }
     }

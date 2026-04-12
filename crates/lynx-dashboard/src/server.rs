@@ -87,9 +87,6 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/api/intros", get(api::intros::list_intros))
         .route("/api/intro/preview", get(api::intros::preview_intro))
         .route("/api/intro/set", post(api::intros::set_intro))
-        // Profiles
-        .route("/api/profiles", get(api::profiles::list_profiles))
-        .route("/api/profile/set", post(api::profiles::set_profile))
         // Workflows (B19 pending — returns 501)
         .route("/api/workflows", get(api::workflows::list_workflows))
         .route("/api/jobs", get(api::workflows::list_jobs))

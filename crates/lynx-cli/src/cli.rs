@@ -48,8 +48,6 @@ pub enum Command {
     Uninstall(crate::commands::uninstall::UninstallArgs),
     /// Show real-world usage examples and quickstart guide
     Examples(crate::commands::examples::ExamplesArgs),
-    /// Manage shell profiles
-    Profile(crate::commands::profile::ProfileArgs),
     /// Render PROMPT/RPROMPT for eval by shell precmd hook
     Prompt(crate::commands::prompt::PromptArgs),
     /// Emit zsh that populates _lynx_git_state (standalone / debugging)

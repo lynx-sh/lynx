@@ -17,7 +17,6 @@ pub mod jobs;
 pub mod setup;
 pub mod migrate;
 pub mod plugin;
-pub mod profile;
 pub mod prompt;
 pub mod rollback;
 pub mod run;
@@ -73,7 +72,6 @@ pub async fn dispatch(cli: Cli) -> Result<()> {
         Command::Update(args) => update::run(args).await,
         Command::Uninstall(args) => uninstall::run(args).await,
         Command::Examples(args) => examples::run(args).await,
-        Command::Profile(args) => profile::run(args).await,
         Command::Prompt(args) => prompt::run(args).await,
         Command::GitState(args) => git::run(args).await,
         Command::KubectlState(args) => kubectl_state::run(args).await,

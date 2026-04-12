@@ -674,7 +674,6 @@ pub const KNOWN_SEGMENTS: &[&str] = &[
     "ruby_version",
     "golang_version",
     "rust_version",
-    "profile_badge",
     "username",
     "hostname",
     "ssh_indicator",
