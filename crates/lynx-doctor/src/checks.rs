@@ -1,16 +1,16 @@
-// Individual health checks for `lx doctor`.
+// Individual health checks for Lynx environment.
 //
 // Each function returns one Check. They never abort or short-circuit — the
 // caller collects all results and presents them together so the user can fix
 // multiple issues in one pass.
 
-use super::{Check, Status};
+use crate::{Check, Status};
 use lynx_config::load;
 use lynx_core::diag;
 use lynx_theme::loader::load as load_theme;
 
 /// Run every check and return results in display order.
-pub(super) fn run_all() -> Vec<Check> {
+pub(crate) fn run_all() -> Vec<Check> {
     vec![
         check_zsh_version(),
         check_lx_on_path(),
@@ -62,7 +62,7 @@ fn check_zsh_version() -> Check {
     }
 }
 
-pub(super) fn parse_zsh_version(s: &str) -> Option<(u32, u32)> {
+pub(crate) fn parse_zsh_version(s: &str) -> Option<(u32, u32)> {
     let s = s.trim().strip_prefix("zsh ")?.split_whitespace().next()?;
     let mut parts = s.split('.');
     let major: u32 = parts.next()?.parse().ok()?;

@@ -13,6 +13,7 @@ path = "src/main.rs"
 lynx-core     = { path = "../lynx-core" }
 lynx-config   = { path = "../lynx-config" }
 lynx-convert  = { path = "../lynx-convert" }
+lynx-doctor   = { path = "../lynx-doctor" }
 lynx-events   = { path = "../lynx-events" }
 lynx-manifest = { path = "../lynx-manifest" }
 lynx-plugin   = { path = "../lynx-plugin" }

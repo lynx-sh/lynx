@@ -183,23 +183,13 @@ async fn cmd_enable(name: &str) -> Result<()> {
         println!("Plugin '{name}' is already enabled.");
         return Ok(());
     }
-    mutate_config_transaction(&format!("plugin-enable-{name}"), |cfg| {
-        cfg.enabled_plugins.push(name.to_string());
-        Ok(())
-    })?;
+    lynx_config::enable_plugin(name)?;
     println!("Enabled plugin '{name}'. Restart your shell to activate.");
     Ok(())
 }
 
 async fn cmd_disable(name: &str) -> Result<()> {
-    let config = load_config()?;
-    if !config.enabled_plugins.iter().any(|p| p == name) {
-        bail!("plugin '{name}' is not enabled.");
-    }
-    mutate_config_transaction(&format!("plugin-disable-{name}"), |cfg| {
-        cfg.enabled_plugins.retain(|p| p != name);
-        Ok(())
-    })?;
+    lynx_config::disable_plugin(name)?;
     println!("Disabled plugin '{name}'. Restart your shell to take effect.");
     Ok(())
 }

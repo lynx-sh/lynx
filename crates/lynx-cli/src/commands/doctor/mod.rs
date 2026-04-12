@@ -1,12 +1,11 @@
 // `lx doctor` — environment health checks.
 //
-// Checks are defined in checks.rs. This module owns the output types (Check,
-// Status) and the two output formatters (human-readable and JSON).
+// All check logic lives in the lynx-doctor library crate.
+// This module owns only the CLI args and output formatters.
 
 use anyhow::Result;
 use clap::Args;
-
-mod checks;
+use lynx_doctor::{Check, Status};
 
 #[derive(Args)]
 pub struct DoctorArgs {
@@ -15,40 +14,8 @@ pub struct DoctorArgs {
     pub json: bool,
 }
 
-#[derive(Debug)]
-pub(crate) struct Check {
-    pub name: &'static str,
-    pub status: Status,
-    pub detail: String,
-    pub fix: Option<String>,
-}
-
-#[derive(Debug, PartialEq)]
-pub(crate) enum Status {
-    Pass,
-    Warn,
-    Fail,
-}
-
-impl Status {
-    pub fn symbol(&self) -> &'static str {
-        match self {
-            Status::Pass => "✓",
-            Status::Warn => "⚠",
-            Status::Fail => "✗",
-        }
-    }
-    pub fn label(&self) -> &'static str {
-        match self {
-            Status::Pass => "pass",
-            Status::Warn => "warn",
-            Status::Fail => "fail",
-        }
-    }
-}
-
 pub async fn run(args: DoctorArgs) -> Result<()> {
-    let results = checks::run_all();
+    let results = lynx_doctor::run_all();
 
     if args.json {
         print_json(&results);

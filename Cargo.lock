@@ -930,6 +930,7 @@ dependencies = [
  "lynx-core",
  "lynx-daemon",
  "lynx-depgraph",
+ "lynx-doctor",
  "lynx-events",
  "lynx-intro",
  "lynx-manifest",
@@ -1012,6 +1013,19 @@ dependencies = [
  "lynx-shell",
  "serde",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "lynx-doctor"
+version = "0.1.0"
+dependencies = [
+ "lynx-config",
+ "lynx-core",
+ "lynx-test-utils",
+ "lynx-theme",
+ "tempfile",
+ "toml",
+ "which",
 ]
 
 [[package]]
