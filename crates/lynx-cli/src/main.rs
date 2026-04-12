@@ -1,6 +1,7 @@
 mod bus;
 mod cli;
 mod commands;
+mod error_display;
 
 use anyhow::Result;
 use clap::{CommandFactory, Parser, error::ErrorKind};
@@ -34,7 +35,7 @@ async fn main() {
     // Print errors to STDOUT so they're visible even when the shell precmd hook
     // re-renders the prompt (which can overwrite stderr output).
     if let Err(e) = result {
-        println!("error: {e:#}");
+        error_display::render_error(&e);
         std::process::exit(1);
     }
 }
