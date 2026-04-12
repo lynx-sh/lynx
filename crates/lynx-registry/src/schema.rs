@@ -15,20 +15,99 @@ pub struct PluginVersion {
     pub min_lynx_version: Option<String>,
 }
 
-/// A plugin entry in the registry index.
+/// Package type in the registry.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum PackageType {
+    #[default]
+    Plugin,
+    Tool,
+    Theme,
+    Intro,
+    Bundle,
+}
+
+/// Install commands for tools — one field per package manager.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+pub struct InstallMethods {
+    /// Homebrew formula name (e.g. "eza", "ripgrep")
+    #[serde(default)]
+    pub brew: Option<String>,
+    /// APT package name
+    #[serde(default)]
+    pub apt: Option<String>,
+    /// DNF package name
+    #[serde(default)]
+    pub dnf: Option<String>,
+    /// Pacman package name
+    #[serde(default)]
+    pub pacman: Option<String>,
+    /// Cargo crate name
+    #[serde(default)]
+    pub cargo: Option<String>,
+    /// Direct download URL (for binaries or scripts)
+    #[serde(default)]
+    pub url: Option<String>,
+}
+
+/// A package entry in the registry index.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RegistryEntry {
-    /// Plugin name — must match the plugin.toml `[plugin].name` field.
+    /// Package name.
     pub name: String,
     /// Human-readable description (shown in search results).
     pub description: String,
     /// Author / maintainer name.
     #[serde(default)]
     pub author: String,
+    /// Package type: plugin, tool, theme, intro, or bundle.
+    #[serde(default)]
+    pub package_type: PackageType,
+    /// Category for browsing (e.g. "file-management", "search", "security").
+    #[serde(default)]
+    pub category: String,
+    /// Supported platforms. Empty = all platforms.
+    #[serde(default)]
+    pub platform: Vec<String>,
+    /// Install methods for tools (brew, apt, cargo, url, etc.).
+    #[serde(default)]
+    pub install: Option<InstallMethods>,
+    /// System command this tool replaces (e.g. "ls" for eza, "cat" for bat).
+    #[serde(default)]
+    pub replaces: Option<String>,
+    /// Whether this package integrates with Lynx theme colors.
+    #[serde(default)]
+    pub theme_integrated: bool,
+    /// Whether this package ships bundled with Lynx (not downloaded).
+    #[serde(default)]
+    pub bundled: bool,
+    /// List of package names included in a bundle.
+    #[serde(default)]
+    pub packages: Vec<String>,
     /// Latest available version (must match one entry in `versions`).
     pub latest_version: String,
     /// All available versions, newest-first.
     pub versions: Vec<PluginVersion>,
+}
+
+impl Default for RegistryEntry {
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+            description: String::new(),
+            author: String::new(),
+            package_type: PackageType::default(),
+            category: String::new(),
+            platform: Vec::new(),
+            install: None,
+            replaces: None,
+            theme_integrated: false,
+            bundled: false,
+            packages: Vec::new(),
+            latest_version: String::new(),
+            versions: Vec::new(),
+        }
+    }
 }
 
 impl RegistryEntry {
@@ -46,6 +125,22 @@ impl RegistryEntry {
     /// Total byte size estimate — not stored in index, must come from fetch.
     pub fn version_count(&self) -> usize {
         self.versions.len()
+    }
+
+    pub fn is_plugin(&self) -> bool {
+        self.package_type == PackageType::Plugin
+    }
+    pub fn is_tool(&self) -> bool {
+        self.package_type == PackageType::Tool
+    }
+    pub fn is_theme(&self) -> bool {
+        self.package_type == PackageType::Theme
+    }
+    pub fn is_intro(&self) -> bool {
+        self.package_type == PackageType::Intro
+    }
+    pub fn is_bundle(&self) -> bool {
+        self.package_type == PackageType::Bundle
     }
 }
 
@@ -71,6 +166,23 @@ impl RegistryIndex {
             .filter(|e| {
                 e.name.to_lowercase().contains(&q) || e.description.to_lowercase().contains(&q)
             })
+            .collect()
+    }
+
+    /// Filter entries by package type.
+    pub fn search_by_type(&self, pkg_type: &PackageType) -> Vec<&RegistryEntry> {
+        self.plugins
+            .iter()
+            .filter(|e| &e.package_type == pkg_type)
+            .collect()
+    }
+
+    /// Filter entries by category (case-insensitive exact match).
+    pub fn search_by_category(&self, category: &str) -> Vec<&RegistryEntry> {
+        let cat = category.to_lowercase();
+        self.plugins
+            .iter()
+            .filter(|e| e.category.to_lowercase() == cat)
             .collect()
     }
 }
@@ -330,5 +442,170 @@ url = "https://example.com/broken.tar.gz"
         let serialized = toml::to_string_pretty(&lock).unwrap();
         let parsed: LockFile = toml::from_str(&serialized).unwrap();
         assert_eq!(lock, parsed);
+    }
+
+    // ── B18-P02: expanded schema tests ──────────────────────────────────────
+
+    #[test]
+    fn backward_compat_plugin_only_index_parses() {
+        // Existing plugin-only index (no package_type field) must still parse.
+        let idx: RegistryIndex = toml::from_str(sample_index_toml()).unwrap();
+        assert_eq!(idx.plugins.len(), 3);
+        // All entries default to PackageType::Plugin.
+        assert!(idx.plugins.iter().all(|e| e.is_plugin()));
+    }
+
+    #[test]
+    fn parse_tool_entry() {
+        let toml = r#"
+[[plugin]]
+name = "eza"
+description = "Modern ls replacement"
+author = "lynx-sh"
+package_type = "tool"
+category = "file-management"
+replaces = "ls"
+theme_integrated = true
+latest_version = "0.0.0"
+
+[plugin.install]
+brew = "eza"
+apt = "eza"
+cargo = "eza"
+
+[[plugin.versions]]
+version = "0.0.0"
+url = "n/a"
+checksum_sha256 = "n/a"
+"#;
+        let idx: RegistryIndex = toml::from_str(toml).unwrap();
+        let eza = idx.find("eza").unwrap();
+        assert!(eza.is_tool());
+        assert_eq!(eza.category, "file-management");
+        assert_eq!(eza.replaces.as_deref(), Some("ls"));
+        assert!(eza.theme_integrated);
+        let install = eza.install.as_ref().unwrap();
+        assert_eq!(install.brew.as_deref(), Some("eza"));
+        assert_eq!(install.apt.as_deref(), Some("eza"));
+    }
+
+    #[test]
+    fn parse_theme_entry() {
+        let toml = r#"
+[[plugin]]
+name = "catppuccin"
+description = "Catppuccin theme for Lynx"
+package_type = "theme"
+category = "themes"
+latest_version = "1.0.0"
+
+[[plugin.versions]]
+version = "1.0.0"
+url = "https://example.com/catppuccin.toml"
+checksum_sha256 = "abc"
+"#;
+        let idx: RegistryIndex = toml::from_str(toml).unwrap();
+        let theme = idx.find("catppuccin").unwrap();
+        assert!(theme.is_theme());
+    }
+
+    #[test]
+    fn parse_bundle_entry() {
+        let toml = r#"
+[[plugin]]
+name = "modern-cli"
+description = "Modern CLI tools bundle"
+package_type = "bundle"
+category = "bundles"
+packages = ["eza", "bat", "fd", "ripgrep"]
+latest_version = "1.0.0"
+
+[[plugin.versions]]
+version = "1.0.0"
+url = "n/a"
+checksum_sha256 = "n/a"
+"#;
+        let idx: RegistryIndex = toml::from_str(toml).unwrap();
+        let bundle = idx.find("modern-cli").unwrap();
+        assert!(bundle.is_bundle());
+        assert_eq!(bundle.packages, vec!["eza", "bat", "fd", "ripgrep"]);
+    }
+
+    #[test]
+    fn search_by_type_filters_correctly() {
+        let toml = r#"
+[[plugin]]
+name = "git"
+description = "Git plugin"
+package_type = "plugin"
+latest_version = "1.0.0"
+[[plugin.versions]]
+version = "1.0.0"
+url = "x"
+checksum_sha256 = "x"
+
+[[plugin]]
+name = "eza"
+description = "Modern ls"
+package_type = "tool"
+latest_version = "1.0.0"
+[[plugin.versions]]
+version = "1.0.0"
+url = "x"
+checksum_sha256 = "x"
+
+[[plugin]]
+name = "tokyo-night"
+description = "Tokyo Night theme"
+package_type = "theme"
+latest_version = "1.0.0"
+[[plugin.versions]]
+version = "1.0.0"
+url = "x"
+checksum_sha256 = "x"
+"#;
+        let idx: RegistryIndex = toml::from_str(toml).unwrap();
+        assert_eq!(idx.search_by_type(&PackageType::Plugin).len(), 1);
+        assert_eq!(idx.search_by_type(&PackageType::Tool).len(), 1);
+        assert_eq!(idx.search_by_type(&PackageType::Theme).len(), 1);
+        assert_eq!(idx.search_by_type(&PackageType::Bundle).len(), 0);
+    }
+
+    #[test]
+    fn search_by_category_case_insensitive() {
+        let toml = r#"
+[[plugin]]
+name = "eza"
+description = "Modern ls"
+category = "File-Management"
+latest_version = "1.0.0"
+[[plugin.versions]]
+version = "1.0.0"
+url = "x"
+checksum_sha256 = "x"
+"#;
+        let idx: RegistryIndex = toml::from_str(toml).unwrap();
+        assert_eq!(idx.search_by_category("file-management").len(), 1);
+        assert_eq!(idx.search_by_category("FILE-MANAGEMENT").len(), 1);
+        assert_eq!(idx.search_by_category("search").len(), 0);
+    }
+
+    #[test]
+    fn platform_field_parses() {
+        let toml = r#"
+[[plugin]]
+name = "linpeas"
+description = "Privilege escalation audit"
+package_type = "tool"
+platform = ["linux", "macos"]
+latest_version = "1.0.0"
+[[plugin.versions]]
+version = "1.0.0"
+url = "x"
+checksum_sha256 = "x"
+"#;
+        let idx: RegistryIndex = toml::from_str(toml).unwrap();
+        let entry = idx.find("linpeas").unwrap();
+        assert_eq!(entry.platform, vec!["linux", "macos"]);
     }
 }

@@ -171,7 +171,7 @@ mod tests {
             plugins: vec![RegistryEntry {
                 name: "git".into(),
                 description: "Git integration".into(),
-                author: "proxikal".into(),
+                author: "lynx-sh".into(),
                 latest_version: "1.0.0".into(),
                 versions: vec![PluginVersion {
                     version: "1.0.0".into(),
@@ -179,6 +179,7 @@ mod tests {
                     checksum_sha256: "abc123".into(),
                     min_lynx_version: None,
                 }],
+                ..Default::default()
             }],
         }
     }
