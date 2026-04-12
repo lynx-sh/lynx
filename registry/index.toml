@@ -1,0 +1,347 @@
+# Lynx Official Registry — https://github.com/lynx-sh/registry
+#
+# Package types: plugin, tool, theme, intro, bundle
+# All entries are available via: lx browse / lx install <name>
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TOOLS — installed via system package manager, auto-aliased by Lynx
+# ═══════════════════════════════════════════════════════════════════════════════
+
+[[plugin]]
+name = "eza"
+description = "Modern ls replacement with icons, git integration, and tree view"
+author = "lynx-sh"
+package_type = "tool"
+category = "file-management"
+replaces = "ls"
+theme_integrated = true
+latest_version = "0.0.0"
+[plugin.install]
+brew = "eza"
+apt = "eza"
+cargo = "eza"
+[[plugin.versions]]
+version = "0.0.0"
+url = "pm"
+checksum_sha256 = "pm"
+
+[[plugin]]
+name = "bat"
+description = "cat with syntax highlighting, line numbers, and Git integration"
+author = "lynx-sh"
+package_type = "tool"
+category = "file-management"
+replaces = "cat"
+theme_integrated = true
+latest_version = "0.0.0"
+[plugin.install]
+brew = "bat"
+apt = "bat"
+cargo = "bat"
+[[plugin.versions]]
+version = "0.0.0"
+url = "pm"
+checksum_sha256 = "pm"
+
+[[plugin]]
+name = "fd"
+description = "Fast, user-friendly alternative to find"
+author = "lynx-sh"
+package_type = "tool"
+category = "search"
+replaces = "find"
+latest_version = "0.0.0"
+[plugin.install]
+brew = "fd"
+apt = "fd-find"
+cargo = "fd-find"
+[[plugin.versions]]
+version = "0.0.0"
+url = "pm"
+checksum_sha256 = "pm"
+
+[[plugin]]
+name = "ripgrep"
+description = "Blazing fast recursive search — rg"
+author = "lynx-sh"
+package_type = "tool"
+category = "search"
+latest_version = "0.0.0"
+[plugin.install]
+brew = "ripgrep"
+apt = "ripgrep"
+cargo = "ripgrep"
+[[plugin.versions]]
+version = "0.0.0"
+url = "pm"
+checksum_sha256 = "pm"
+
+[[plugin]]
+name = "zoxide"
+description = "Smarter cd that learns your most-used directories"
+author = "lynx-sh"
+package_type = "tool"
+category = "navigation"
+replaces = "cd"
+latest_version = "0.0.0"
+[plugin.install]
+brew = "zoxide"
+apt = "zoxide"
+cargo = "zoxide"
+[[plugin.versions]]
+version = "0.0.0"
+url = "pm"
+checksum_sha256 = "pm"
+
+[[plugin]]
+name = "delta"
+description = "Beautiful git diff viewer with syntax highlighting"
+author = "lynx-sh"
+package_type = "tool"
+category = "developer-tools"
+theme_integrated = true
+latest_version = "0.0.0"
+[plugin.install]
+brew = "git-delta"
+apt = "git-delta"
+cargo = "git-delta"
+[[plugin.versions]]
+version = "0.0.0"
+url = "pm"
+checksum_sha256 = "pm"
+
+[[plugin]]
+name = "dust"
+description = "Intuitive disk usage analyzer (du replacement)"
+author = "lynx-sh"
+package_type = "tool"
+category = "system"
+latest_version = "0.0.0"
+[plugin.install]
+brew = "dust"
+apt = "du-dust"
+cargo = "du-dust"
+[[plugin.versions]]
+version = "0.0.0"
+url = "pm"
+checksum_sha256 = "pm"
+
+[[plugin]]
+name = "procs"
+description = "Modern ps replacement with color and tree view"
+author = "lynx-sh"
+package_type = "tool"
+category = "system"
+latest_version = "0.0.0"
+[plugin.install]
+brew = "procs"
+cargo = "procs"
+[[plugin.versions]]
+version = "0.0.0"
+url = "pm"
+checksum_sha256 = "pm"
+
+[[plugin]]
+name = "bottom"
+description = "Terminal system monitor (htop replacement)"
+author = "lynx-sh"
+package_type = "tool"
+category = "system"
+latest_version = "0.0.0"
+[plugin.install]
+brew = "bottom"
+apt = "bottom"
+cargo = "bottom"
+[[plugin.versions]]
+version = "0.0.0"
+url = "pm"
+checksum_sha256 = "pm"
+
+[[plugin]]
+name = "tldr"
+description = "Community-driven man pages with practical examples"
+author = "lynx-sh"
+package_type = "tool"
+category = "reference"
+latest_version = "0.0.0"
+[plugin.install]
+brew = "tlrc"
+cargo = "tlrc"
+[[plugin.versions]]
+version = "0.0.0"
+url = "pm"
+checksum_sha256 = "pm"
+
+[[plugin]]
+name = "httpie"
+description = "User-friendly HTTP client for the terminal"
+author = "lynx-sh"
+package_type = "tool"
+category = "networking"
+latest_version = "0.0.0"
+[plugin.install]
+brew = "httpie"
+apt = "httpie"
+[[plugin.versions]]
+version = "0.0.0"
+url = "pm"
+checksum_sha256 = "pm"
+
+[[plugin]]
+name = "jq"
+description = "Lightweight command-line JSON processor"
+author = "lynx-sh"
+package_type = "tool"
+category = "data"
+latest_version = "0.0.0"
+[plugin.install]
+brew = "jq"
+apt = "jq"
+[[plugin.versions]]
+version = "0.0.0"
+url = "pm"
+checksum_sha256 = "pm"
+
+[[plugin]]
+name = "yq"
+description = "YAML/JSON/XML processor — jq for YAML"
+author = "lynx-sh"
+package_type = "tool"
+category = "data"
+latest_version = "0.0.0"
+[plugin.install]
+brew = "yq"
+cargo = "yq"
+[[plugin.versions]]
+version = "0.0.0"
+url = "pm"
+checksum_sha256 = "pm"
+
+[[plugin]]
+name = "lazygit"
+description = "Terminal UI for git commands"
+author = "lynx-sh"
+package_type = "tool"
+category = "developer-tools"
+latest_version = "0.0.0"
+[plugin.install]
+brew = "lazygit"
+[[plugin.versions]]
+version = "0.0.0"
+url = "pm"
+checksum_sha256 = "pm"
+
+[[plugin]]
+name = "glow"
+description = "Render markdown in the terminal with style"
+author = "lynx-sh"
+package_type = "tool"
+category = "reference"
+latest_version = "0.0.0"
+[plugin.install]
+brew = "glow"
+[[plugin.versions]]
+version = "0.0.0"
+url = "pm"
+checksum_sha256 = "pm"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# PLUGINS — shell enhancements bundled with Lynx
+# ═══════════════════════════════════════════════════════════════════════════════
+
+[[plugin]]
+name = "syntax-highlight"
+description = "Syntax highlighting for zsh — theme-integrated via Lynx colors"
+author = "lynx-sh"
+package_type = "plugin"
+category = "shell-enhancement"
+bundled = true
+theme_integrated = true
+latest_version = "0.1.0"
+[[plugin.versions]]
+version = "0.1.0"
+url = "bundled"
+checksum_sha256 = "bundled"
+
+[[plugin]]
+name = "autosuggestions"
+description = "Fish-like auto-suggestions for zsh — theme-integrated via Lynx colors"
+author = "lynx-sh"
+package_type = "plugin"
+category = "shell-enhancement"
+bundled = true
+theme_integrated = true
+latest_version = "0.1.0"
+[[plugin.versions]]
+version = "0.1.0"
+url = "bundled"
+checksum_sha256 = "bundled"
+
+[[plugin]]
+name = "fzf"
+description = "Fuzzy finder integration — Ctrl+R history, Ctrl+T file search"
+author = "lynx-sh"
+package_type = "plugin"
+category = "search"
+bundled = true
+latest_version = "0.1.0"
+[[plugin.versions]]
+version = "0.1.0"
+url = "bundled"
+checksum_sha256 = "bundled"
+
+[[plugin]]
+name = "git"
+description = "Git integration — branch, status, stash, ahead/behind cache, workflow aliases"
+author = "lynx-sh"
+package_type = "plugin"
+category = "developer-tools"
+bundled = true
+latest_version = "0.2.0"
+[[plugin.versions]]
+version = "0.2.0"
+url = "bundled"
+checksum_sha256 = "bundled"
+
+[[plugin]]
+name = "atuin"
+description = "Atuin shell history sync and search integration"
+author = "lynx-sh"
+package_type = "plugin"
+category = "shell-enhancement"
+bundled = true
+latest_version = "0.1.0"
+[[plugin.versions]]
+version = "0.1.0"
+url = "bundled"
+checksum_sha256 = "bundled"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# THEMES — shipped with Lynx
+# ═══════════════════════════════════════════════════════════════════════════════
+
+[[plugin]]
+name = "default"
+description = "Clean, minimal default theme"
+author = "lynx-sh"
+package_type = "theme"
+category = "themes"
+bundled = true
+latest_version = "0.1.0"
+[[plugin.versions]]
+version = "0.1.0"
+url = "bundled"
+checksum_sha256 = "bundled"
+
+[[plugin]]
+name = "tokyo-night"
+description = "Tokyo Night powerline theme with rounded separators"
+author = "lynx-sh"
+package_type = "theme"
+category = "themes"
+bundled = true
+latest_version = "0.1.0"
+[[plugin.versions]]
+version = "0.1.0"
+url = "bundled"
+checksum_sha256 = "bundled"
