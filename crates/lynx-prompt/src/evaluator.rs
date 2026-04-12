@@ -51,6 +51,27 @@ fn is_visible(config: &toml::Value, seg: &dyn Segment, ctx: &RenderContext) -> b
         return !eval_condition(cond, ctx);
     }
 
+    // Folder filtering: include_folders / exclude_folders (evaluated after conditions).
+    if let Some(folders) = config.get("include_folders").and_then(|v| v.as_array()) {
+        let matches = folders.iter().any(|f| {
+            f.as_str()
+                .map(|p| glob_match(p, &ctx.cwd, &ctx.env))
+                .unwrap_or(false)
+        });
+        if !matches {
+            return false;
+        }
+    } else if let Some(folders) = config.get("exclude_folders").and_then(|v| v.as_array()) {
+        let excluded = folders.iter().any(|f| {
+            f.as_str()
+                .map(|p| glob_match(p, &ctx.cwd, &ctx.env))
+                .unwrap_or(false)
+        });
+        if excluded {
+            return false;
+        }
+    }
+
     true
 }
 

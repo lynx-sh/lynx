@@ -12,6 +12,11 @@ pub struct SegmentVisibility {
     pub show_when: Option<SegmentCondition>,
     /// Hide this segment when condition is true. Ignored when show_when is set.
     pub hide_when: Option<SegmentCondition>,
+    /// Only show this segment when cwd is inside one of these directories (glob patterns).
+    pub include_folders: Option<Vec<String>>,
+    /// Hide this segment when cwd is inside any of these directories (glob patterns).
+    /// Ignored when include_folders is set.
+    pub exclude_folders: Option<Vec<String>>,
 }
 
 /// A runtime condition evaluated against `RenderContext` — no I/O, no shell.

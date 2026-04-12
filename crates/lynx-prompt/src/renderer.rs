@@ -251,6 +251,41 @@ fn render_gap(
     }
 }
 
+/// Apply min_width / max_width constraints from segment theme config.
+/// Pads with spaces (min) or truncates with ellipsis (max).
+fn apply_width_constraints(text: &str, seg: &RenderedSegment, theme: &Theme) -> String {
+    let config = seg.cache_key
+        .as_deref()
+        .and_then(|name| theme.segment.get(name));
+
+    let min_width = config
+        .and_then(|c| c.get("min_width"))
+        .and_then(|v| v.as_integer())
+        .map(|v| v as usize);
+    let max_width = config
+        .and_then(|c| c.get("max_width"))
+        .and_then(|v| v.as_integer())
+        .map(|v| v as usize);
+
+    let mut result = text.to_string();
+
+    if let Some(max) = max_width {
+        let char_count = result.chars().count();
+        if char_count > max && max >= 1 {
+            result = result.chars().take(max - 1).collect::<String>() + "…";
+        }
+    }
+
+    if let Some(min) = min_width {
+        let char_count = result.chars().count();
+        if char_count < min {
+            result.push_str(&" ".repeat(min - char_count));
+        }
+    }
+
+    result
+}
+
 /// Resolve per-segment separator overrides from theme config.
 fn resolve_seg_separators(seg: &RenderedSegment, theme: &Theme) -> SegmentSeparators {
     seg.cache_key
@@ -310,14 +345,17 @@ fn assemble(segs: &[RenderedSegment], theme: &Theme, sep: &Separators, is_left: 
         .iter()
         .zip(color_cfgs.iter())
         .map(|(seg, color_cfg)| {
+            // Apply width constraints (min_width pads, max_width truncates).
+            let text = apply_width_constraints(&seg.text, seg, theme);
+
             if cap != TermCapability::None {
                 if let Some(ref color) = color_cfg {
-                    apply_color_zsh(&seg.text, color, cap)
+                    apply_color_zsh(&text, color, cap)
                 } else {
-                    seg.text.clone()
+                    text
                 }
             } else {
-                seg.text.clone()
+                text
             }
         })
         .collect();
