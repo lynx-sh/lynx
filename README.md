@@ -35,7 +35,7 @@ $
 ## Install
 
 ```bash
-curl -sf https://raw.githubusercontent.com/proxikal/lynx/main/install.sh | sh
+curl -sf https://raw.githubusercontent.com/lynx-sh/lynx/main/install.sh | sh
 ```
 
 The installer:
@@ -53,7 +53,7 @@ lx doctor
 ### Manual install
 
 ```bash
-git clone https://github.com/proxikal/lynx.git
+git clone https://github.com/lynx-sh/lynx.git
 cd lynx
 cargo build --release
 cp target/release/lx ~/.local/bin/

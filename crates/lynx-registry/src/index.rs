@@ -9,7 +9,7 @@ use crate::schema::{LockFile, RegistryIndex};
 
 /// Default registry index URL — official Lynx plugin index.
 pub const DEFAULT_INDEX_URL: &str =
-    "https://raw.githubusercontent.com/proxikal/lynx-plugins/main/index.toml";
+    "https://raw.githubusercontent.com/lynx-sh/registry/main/index.toml";
 
 /// Path to the local cached index: `~/.config/lynx/registry/index.toml`.
 pub fn index_cache_path() -> PathBuf {

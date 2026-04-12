@@ -6,7 +6,7 @@
 pub const NAME: &str = "Lynx";
 pub const CLI: &str = "lx";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
-pub const REPO: &str = "https://github.com/proxikal/lynx";
+pub const REPO: &str = "https://github.com/lynx-sh/lynx";
 
 // ── Directory layout (relative to $HOME) ─────────────────────────────────────
 

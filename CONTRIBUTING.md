@@ -32,7 +32,7 @@ is higher. This document explains what each type of change needs.
 **Setup:**
 
 ```bash
-git clone https://github.com/proxikal/lynx.git
+git clone https://github.com/lynx-sh/lynx.git
 cd lynx
 cargo build
 ```
@@ -146,7 +146,7 @@ To add a plugin to the official registry:
 1. Build and test your plugin locally (see [Plugin Authoring Guide](docs/plugin-authoring.md))
 2. Publish to a public git repo
 3. Ensure `lx plugin add ./your-plugin` + `lx doctor` pass cleanly
-4. Open a PR to [lynx-plugins](https://github.com/proxikal/lynx-plugins) adding
+4. Open a PR to [lynx-plugins](https://github.com/lynx-sh/lynx-plugins) adding
    your entry to `index.toml`
 
 **Quality bar for accepted registry plugins:**

@@ -96,7 +96,7 @@ async fn do_update(version: &str, yes: bool) -> Result<()> {
 async fn fetch_latest_version() -> Result<String> {
     // In a real implementation this calls the GitHub releases API.
     // For now return current version to avoid network calls in tests.
-    // Real: GET https://api.github.com/repos/proxikal/lynx/releases/latest
+    // Real: GET https://api.github.com/repos/lynx-sh/lynx/releases/latest
     Ok(brand::VERSION.to_string())
 }
 

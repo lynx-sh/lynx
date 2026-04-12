@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Lynx installer
-# Usage: curl -sf https://raw.githubusercontent.com/proxikal/lynx/main/install.sh | sh
+# Usage: curl -sf https://raw.githubusercontent.com/lynx-sh/lynx/main/install.sh | sh
 #
 # Installs lx to ~/.local/bin and shell integration to ~/.config/lynx.
 # Requires: cargo (to build), or a pre-built release binary.
@@ -61,7 +61,7 @@ elif command -v lx &>/dev/null; then
 else
   err "lx binary not found and not running from the repo."
   echo "  Clone the repo and run install.sh from there:"
-  echo "    git clone https://github.com/proxikal/lynx && cd lynx && ./install.sh"
+  echo "    git clone https://github.com/lynx-sh/lynx && cd lynx && ./install.sh"
   exit 1
 fi
 
