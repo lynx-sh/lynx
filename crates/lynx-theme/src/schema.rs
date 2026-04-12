@@ -88,6 +88,41 @@ pub struct LsColorsEntry {
     pub bold: bool,
 }
 
+/// The `[ls_colors.columns]` table — eza metadata column colors.
+///
+/// These map to EZA_COLORS keys and colorize the *content* of each column
+/// in `ls -la` output (dates, sizes, permission bits, user/group names).
+/// Has no effect on plain `/bin/ls` — only eza reads these keys.
+///
+/// All fields are optional; absent fields fall back to eza's own defaults.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+pub struct EzaColumns {
+    /// File modification date/time — eza key `da`
+    pub date: Option<String>,
+    /// Size number (the digits) — eza key `sn`
+    pub size_number: Option<String>,
+    /// Size unit suffix (B, k, M, G) — eza key `sb`
+    pub size_unit: Option<String>,
+    /// Owner name when it matches the current user — eza key `uu`
+    pub user_you: Option<String>,
+    /// Owner name when it does NOT match the current user — eza key `un`
+    pub user_other: Option<String>,
+    /// Group name when the current user is a member — eza key `gu`
+    pub group_you: Option<String>,
+    /// Group name when the current user is NOT a member — eza key `gn`
+    pub group_other: Option<String>,
+    /// Read permission bits (r) for all three tiers — eza keys `ur`, `gr`, `or`
+    pub perm_read: Option<String>,
+    /// Write permission bits (w) for all three tiers — eza keys `uw`, `gw`, `ow`
+    pub perm_write: Option<String>,
+    /// Execute permission bits (x) for all three tiers — eza keys `ux`, `gx`, `ox`
+    pub perm_exec: Option<String>,
+    /// Column header row (when using --header) — eza key `hd`
+    pub header: Option<String>,
+    /// Symlink target path — eza key `lp`
+    pub symlink_path: Option<String>,
+}
+
 /// The `[ls_colors]` table — semantic mapping from file-type categories to colors.
 /// Absent fields default to no override (terminal/distro default applies).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
@@ -100,6 +135,9 @@ pub struct LsColors {
     pub audio: Option<LsColorsEntry>,
     pub broken: Option<LsColorsEntry>,
     pub other_writable: Option<LsColorsEntry>,
+    /// Eza metadata column colors — only used when eza is the ls backend.
+    #[serde(default)]
+    pub columns: EzaColumns,
 }
 
 /// Top-level theme file structure.
@@ -305,11 +343,67 @@ impl LsColors {
 
     /// Build the value string for `export EZA_COLORS=...`.
     ///
-    /// EZA reads `LS_COLORS` first, then `EZA_COLORS` as overrides. The format
-    /// is identical to `LS_COLORS`. We emit the same entries here — users can
-    /// layer additional EZA-specific keys on top in their own config.
+    /// Starts with the file-type entries (same as LS_COLORS), then appends
+    /// eza-specific column color keys from `[ls_colors.columns]`.
+    /// Eza reads LS_COLORS first, then EZA_COLORS as overrides — so emitting
+    /// both here is correct and intentional.
     pub fn to_eza_colors_string(&self) -> Option<String> {
-        self.to_ls_colors_string()
+        let mut parts: Vec<String> = Vec::new();
+
+        // File-type entries (shared with LS_COLORS).
+        if let Some(base) = self.to_ls_colors_string() {
+            parts.push(base);
+        }
+
+        // Column-specific entries — only eza reads these keys.
+        let c = &self.columns;
+        let col_pairs: &[(&str, &Option<String>)] = &[
+            ("da", &c.date),
+            ("sn", &c.size_number),
+            ("sb", &c.size_unit),
+            ("uu", &c.user_you),
+            ("un", &c.user_other),
+            ("gu", &c.group_you),
+            ("gn", &c.group_other),
+            ("hd", &c.header),
+            ("lp", &c.symlink_path),
+        ];
+        for (key, val) in col_pairs {
+            if let Some(color) = val {
+                if let Some(sgr) = color_to_fg_sgr(color) {
+                    parts.push(format!("{key}={sgr}"));
+                }
+            }
+        }
+
+        // Permission bits — one theme color fans out to three eza keys each.
+        if let Some(color) = &c.perm_read {
+            if let Some(sgr) = color_to_fg_sgr(color) {
+                for key in &["ur", "gr", "or"] {
+                    parts.push(format!("{key}={sgr}"));
+                }
+            }
+        }
+        if let Some(color) = &c.perm_write {
+            if let Some(sgr) = color_to_fg_sgr(color) {
+                for key in &["uw", "gw", "ow"] {
+                    parts.push(format!("{key}={sgr}"));
+                }
+            }
+        }
+        if let Some(color) = &c.perm_exec {
+            if let Some(sgr) = color_to_fg_sgr(color) {
+                for key in &["ux", "gx", "ox"] {
+                    parts.push(format!("{key}={sgr}"));
+                }
+            }
+        }
+
+        if parts.is_empty() {
+            None
+        } else {
+            Some(parts.join(":"))
+        }
     }
 
     /// Build the BSD `LSCOLORS` string for macOS `/bin/ls`.

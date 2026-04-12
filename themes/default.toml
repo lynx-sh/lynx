@@ -73,3 +73,17 @@ image         = { fg = "magenta"               }
 audio         = { fg = "cyan"                  }
 broken        = { fg = "red",     bold = true  }
 other_writable = { fg = "blue",   bg = "dark-green" }
+
+[ls_colors.columns]
+date         = "#6272a4"   # muted — timestamps recede
+size_number  = "#ffb86c"   # orange — sizes stand out
+size_unit    = "#6272a4"   # muted — unit is secondary
+user_you     = "#50fa7b"   # green — your files
+user_other   = "#ff5555"   # red — other owners
+group_you    = "#8be9fd"   # cyan — groups you're in
+group_other  = "#6272a4"   # muted — groups you're not in
+perm_read    = "#50fa7b"   # green — readable
+perm_write   = "#f1fa8c"   # yellow — writable
+perm_exec    = "#ff5555"   # red — executable
+header       = "#8be9fd"   # cyan — column headers
+symlink_path = "#8be9fd"   # cyan — symlink targets
