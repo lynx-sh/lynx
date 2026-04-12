@@ -61,7 +61,7 @@ fn detect(cwd: &Path) -> Option<Detection> {
     // Priority order: most specific first.
     if cwd.join("Cargo.toml").exists() {
         return Some(Detection {
-            icon: " \u{e7a8} ",  // Nerd Fonts Rust (seti range)
+            icon: " \u{f013} ",  // Font Awesome gear (fa-cog) — full-size
             name: "rust",
             version: rust_version(cwd).unwrap_or_default(),
         });

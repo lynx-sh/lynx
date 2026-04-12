@@ -26,7 +26,7 @@ order = ["prompt_char"]
 order = []
 
 [segment.custom_apple]
-template = "  "
+template = " 󰀵 "
 color = { fg = "#090c0c", bg = "#a3aed2" }
 
 [segment.dir]
@@ -36,7 +36,7 @@ truncate_to_repo = true
 color = { fg = "#090c0c", bg = "#769ff0", bold = true }
 
 [segment.git_branch]
-icon = "  "
+icon = "  "
 color = { fg = "#769ff0", bg = "#394260" }
 
 [segment.git_status]
@@ -50,7 +50,7 @@ color = { fg = "#769ff0", bg = "#212736" }
 
 [segment.time]
 format = "24h"
-icon = "⏱ "
+icon = " "
 color = { fg = "#a0a9cb", bg = "#1d2230" }
 
 [segment.prompt_char]
