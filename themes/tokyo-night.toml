@@ -16,8 +16,11 @@ color = "#a3aed2"
 [segments]
 spacing = false
 
+[segments.top]
+order = ["custom_apple", "dir", "git_branch", "git_status", "lang_version", "time"]
+
 [segments.left]
-order = ["custom_apple", "dir", "git_branch", "git_status", "lang_version", "time", "newline", "prompt_char"]
+order = ["prompt_char"]
 
 [segments.right]
 order = []
