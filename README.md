@@ -76,7 +76,8 @@ lx doctor     # diagnoses any issues with your install
 
 ```bash
 lx theme list           # see available themes
-lx theme set minimal    # switch to a theme
+lx theme set tokyo-night # switch to a powerline theme
+lx theme convert <url>  # import an OMZ theme
 ```
 
 ### 3. Add a plugin

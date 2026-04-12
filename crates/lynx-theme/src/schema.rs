@@ -452,7 +452,9 @@ dir = { fg = "blue", bold = true }
 
     #[test]
     fn default_theme_ls_colors_is_non_empty() {
-        let theme = crate::loader::load("default").unwrap();
+        let theme = crate::loader::parse_and_validate(
+            include_str!("../../../themes/default.toml"), "default"
+        ).unwrap();
         assert!(
             theme.ls_colors.to_ls_colors_string().is_some(),
             "default theme should have non-empty ls_colors; dir={:?}", theme.ls_colors.dir
@@ -461,7 +463,9 @@ dir = { fg = "blue", bold = true }
 
     #[test]
     fn minimal_theme_ls_colors_is_non_empty() {
-        let theme = crate::loader::load("minimal").unwrap();
+        let theme = crate::loader::parse_and_validate(
+            include_str!("../../../themes/minimal.toml"), "minimal"
+        ).unwrap();
         assert!(
             theme.ls_colors.to_ls_colors_string().is_some(),
             "minimal theme should have non-empty ls_colors"

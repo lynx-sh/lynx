@@ -278,11 +278,15 @@ fn assemble(segs: &[RenderedSegment], theme: &Theme, sep: &Separators, is_left: 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lynx_theme::{loader::load, terminal::override_capability};
+    use lynx_theme::{parse_and_validate, terminal::override_capability};
+
+    fn load_default() -> lynx_theme::Theme {
+        parse_and_validate(include_str!("../../../themes/default.toml"), "default").unwrap()
+    }
 
     #[test]
     fn render_produces_prompt_and_rprompt() {
-        let theme = load("default").unwrap();
+        let theme = load_default();
         let left = vec![RenderedSegment::new("~/code").with_cache_key("dir")];
         let right = vec![RenderedSegment::new("main").with_cache_key("git_branch")];
         let out = render_prompt(&left, &right, &[], &[], &[], &theme, None);
@@ -292,14 +296,14 @@ mod tests {
 
     #[test]
     fn empty_segments_produce_bare_prompt() {
-        let theme = load("default").unwrap();
+        let theme = load_default();
         let out = render_prompt(&[], &[], &[], &[], &[], &theme, None);
         assert!(out.contains("PROMPT="));
     }
 
     #[test]
     fn two_line_prompt_contains_newline() {
-        let theme = load("default").unwrap();
+        let theme = load_default();
         let top = vec![RenderedSegment::new("info").with_cache_key("dir")];
         let left = vec![RenderedSegment::new("~/code").with_cache_key("dir")];
         let out = render_prompt(&left, &[], &top, &[], &[], &theme, None);
@@ -309,7 +313,7 @@ mod tests {
     #[test]
     fn top_right_padded_to_right_edge() {
         override_capability(TermCapability::None);
-        let theme = load("default").unwrap();
+        let theme = load_default();
         let top = vec![RenderedSegment::new("info").with_cache_key("dir")];
         let top_right = vec![RenderedSegment::new("[main]").with_cache_key("git_branch")];
         let out = render_prompt(&[], &[], &top, &top_right, &[], &theme, Some(80));
@@ -321,7 +325,7 @@ mod tests {
 
     #[test]
     fn continuation_emits_prompt2() {
-        let theme = load("default").unwrap();
+        let theme = load_default();
         let cont = vec![RenderedSegment::new("> ").with_cache_key("prompt_char")];
         let out = render_prompt(&[], &[], &[], &[], &cont, &theme, None);
         assert!(out.contains("PROMPT2="));
@@ -329,7 +333,7 @@ mod tests {
 
     #[test]
     fn transient_prompt_is_minimal() {
-        let theme = load("default").unwrap();
+        let theme = load_default();
         let out = render_transient_prompt(&theme);
         assert!(out.contains("PROMPT="));
         assert!(out.contains("RPROMPT=\"\""));
@@ -357,7 +361,7 @@ mod tests {
     fn colored_segment_contains_zsh_wrappers() {
         override_capability(TermCapability::Ansi256);
 
-        let theme = load("default").unwrap();
+        let theme = load_default();
         // dir segment has color = { fg = "blue", bold = true } in default theme
         let segs = vec![RenderedSegment::new("~/code").with_cache_key("dir")];
         let result = assemble(&segs, &theme, &theme.separators, true);
@@ -372,7 +376,7 @@ mod tests {
     fn no_color_terminal_produces_plain_text() {
         override_capability(TermCapability::None);
 
-        let theme = load("default").unwrap();
+        let theme = load_default();
         let segs = vec![RenderedSegment::new("~/code").with_cache_key("dir")];
         let result = assemble(&segs, &theme, &theme.separators, true);
 
@@ -387,7 +391,7 @@ mod tests {
         override_capability(TermCapability::TrueColor);
 
         // Build a theme where segments have bg colors.
-        let mut theme = load("default").unwrap();
+        let mut theme = load_default();
         // Set dir bg=blue, git_branch bg=green via segment config.
         let dir_color = toml::Value::try_from(toml::toml! {
             color = { fg = "white", bg = "blue" }
@@ -420,7 +424,7 @@ mod tests {
     fn adaptive_tail_arrow_emitted() {
         override_capability(TermCapability::TrueColor);
 
-        let mut theme = load("default").unwrap();
+        let mut theme = load_default();
         let dir_color = toml::Value::try_from(toml::toml! {
             color = { fg = "white", bg = "blue" }
         }).unwrap();
@@ -442,7 +446,7 @@ mod tests {
     fn static_mode_unchanged_from_default() {
         override_capability(TermCapability::None);
 
-        let theme = load("default").unwrap();
+        let theme = load_default();
         let segs = vec![
             RenderedSegment::new("a").with_cache_key("dir"),
             RenderedSegment::new("b").with_cache_key("git_branch"),
@@ -462,7 +466,7 @@ mod tests {
     #[test]
     fn custom_separator_char_is_used() {
         override_capability(TermCapability::None);
-        let theme = load("default").unwrap();
+        let theme = load_default();
         let segs = vec![
             RenderedSegment::new("a").with_cache_key("dir"),
             RenderedSegment::new("b").with_cache_key("git_branch"),

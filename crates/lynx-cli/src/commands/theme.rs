@@ -177,12 +177,10 @@ async fn cmd_edit() -> Result<()> {
 
     // Determine the path: prefer user theme dir, else error (built-ins are read-only).
     let user_path = user_theme_dir().join(format!("{theme_name}.toml"));
-    let path = if user_path.exists() {
-        user_path
-    } else {
-        // Can't edit a built-in in place — copy to user dir first.
-        copy_builtin_to_user(theme_name)?
-    };
+    if !user_path.exists() {
+        bail!("theme '{theme_name}' not found — run `lx install` to set up default themes");
+    }
+    let path = user_path;
 
     let editor = std::env::var("EDITOR").unwrap_or_else(|_| "vi".to_string());
     let snapshot = std::fs::read_to_string(&path)
@@ -297,32 +295,14 @@ async fn cmd_segment(cmd: SegmentCommand) -> Result<()> {
     Ok(())
 }
 
-/// Resolve the mutable user-theme path, copying from built-in if needed.
+/// Resolve the mutable user-theme path. Theme must exist in themes dir.
 fn resolve_user_theme_path(theme_name: &str) -> Result<PathBuf> {
     let user_path = user_theme_dir().join(format!("{theme_name}.toml"));
     if user_path.exists() {
         Ok(user_path)
     } else {
-        copy_builtin_to_user(theme_name)
+        bail!("theme '{theme_name}' not found — run `lx install` to set up default themes")
     }
-}
-
-fn copy_builtin_to_user(name: &str) -> Result<PathBuf> {
-    let dir = user_theme_dir();
-    std::fs::create_dir_all(&dir).context("failed to create user theme directory")?;
-    let dest = dir.join(format!("{name}.toml"));
-
-    // load_theme reads the built-in content — serialise back to disk.
-    let theme = load_theme(name).with_context(|| format!("theme '{name}' not found"))?;
-    // Re-read the built-in source content rather than re-serialising.
-    // We load the theme to validate it, then write the raw TOML.
-    // Since built-ins are bundled via include_str!, find them through the loader.
-    drop(theme); // validated above
-                 // Use the raw content from the loader.
-    let content = lynx_theme::loader::builtin_content(name)
-        .with_context(|| format!("built-in theme '{name}' content unavailable"))?;
-    std::fs::write(&dest, content).context("failed to write theme file")?;
-    Ok(dest)
 }
 
 async fn emit_theme_changed(name: &str) {

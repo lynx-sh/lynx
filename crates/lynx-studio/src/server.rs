@@ -26,7 +26,7 @@ use axum::{
 };
 use lynx_config::load as load_config;
 use lynx_theme::{
-    loader::{builtin_content, load as load_theme, user_theme_dir},
+    loader::user_theme_dir,
     patch::{self, Side},
 };
 use serde::{Deserialize, Serialize};
@@ -77,15 +77,7 @@ fn resolve_or_copy_builtin(name: &str) -> Result<std::path::PathBuf> {
     if user_path.exists() {
         return Ok(user_path);
     }
-    // Copy built-in to user dir.
-    let dir = user_theme_dir();
-    std::fs::create_dir_all(&dir)?;
-    let content = builtin_content(name)
-        .ok_or_else(|| anyhow::anyhow!("built-in theme '{name}' not found"))?;
-    // Validate before writing.
-    load_theme(name)?;
-    std::fs::write(&user_path, content)?;
-    Ok(user_path)
+    anyhow::bail!("theme '{name}' not found — run `lx install` to set up default themes")
 }
 
 // ─── Router ───────────────────────────────────────────────────────────────────

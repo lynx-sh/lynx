@@ -554,6 +554,106 @@ color   = { fg = "magenta", bold = true }
 
 ---
 
+### `git_sha` — Commit SHA
+
+Shows the short commit SHA from the current git repository.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `length` | integer | `7` | Number of hex characters to display (max 40) |
+| `prefix` | string | `""` | Prefix before the SHA |
+| `color` | color | none | Text color |
+
+```toml
+[segment.git_sha]
+length = 7
+color = { fg = "grey" }
+```
+
+**Example output:** `abc1234`
+
+---
+
+### `git_time_since_commit` — Commit Age
+
+Shows time elapsed since the last commit with color aging (green → yellow → red).
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `fresh_secs` | integer | `600` | Seconds before time is "fresh" (green) |
+| `warn_secs` | integer | `1800` | Seconds before time is "warn" (yellow) |
+| `fresh_color` | string | `"green"` | Color for fresh commits |
+| `warn_color` | string | `"yellow"` | Color for warning-age commits |
+| `old_color` | string | `"red"` | Color for old commits |
+
+**Example output:** `5m` (green), `20m` (yellow), `2h0m` (red), `3d` (red)
+
+---
+
+### `aws_profile` — AWS Profile
+
+Shows the current AWS profile from `$AWS_PROFILE` with production detection.
+Zero I/O — reads only the environment variable.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `prod_patterns` | string array | `["*prod*", "*production*"]` | Patterns that identify production profiles |
+| `color` | string | `"green"` | Color for non-production profiles |
+| `prod_color` | string | `"red"` | Color for production profiles (also bold) |
+| `icon` | string | `""` | Icon prepended to the profile name |
+
+```toml
+[segment.aws_profile]
+icon = "☁"
+prod_patterns = ["*prod*", "*production*"]
+```
+
+**Example output:** `☁ staging` (green), `☁ my-prod-account` (red, bold)
+
+---
+
+### `hist_number` — Shell History Number
+
+Shows the current shell history number from `$HISTCMD`.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `prefix` | string | `""` | Prefix before the history number |
+| `color` | color | none | Text color |
+
+```toml
+[segment.hist_number]
+prefix = "!"
+color = { fg = "grey" }
+```
+
+**Example output:** `!42`
+
+---
+
+### `prompt_char` — Prompt Character
+
+Shows a configurable prompt character with context-aware variants.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `symbol` | string | `"❯"` | Default prompt symbol |
+| `error_symbol` | string | (falls back to `symbol`) | Symbol when last command failed |
+| `root_symbol` | string | (falls back to `symbol`) | Symbol when running as root |
+| `in_git_repo_symbol` | string | (falls back to `symbol`) | Symbol when inside a git repo |
+
+Priority order: error > root > git_repo > default.
+
+```toml
+[segment.prompt_char]
+symbol = "❯"
+error_symbol = "✗"
+root_symbol = "#"
+in_git_repo_symbol = "±"
+```
+
+---
+
 ## File Listing Colors
 
 > **Status:** Planned — tracked in H-054. The schema below is the target design.
@@ -632,6 +732,58 @@ color = { fg = "red", bold = false }
 | `fg` | string | Foreground color (named or hex) |
 | `bold` | bool | Bold text (default `false`) |
 | `bg` | string | Background color (named or hex) — not all segments use this |
+
+---
+
+## Separators
+
+The `[separators]` table controls the glyphs and colors between segments.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `mode` | string | `"static"` | `"static"` (one style for all gaps) or `"adaptive"` (per-gap colors from adjacent bg) |
+| `left.char` | string | `" "` | Character between left segments |
+| `left.color` | string | none | Foreground color of the left separator (static mode) |
+| `right.char` | string | `" "` | Character between right segments |
+| `left_edge.char` | string | `""` | Leading edge before first left segment |
+| `right_edge.char` | string | `""` | Trailing edge after last left segment |
+
+### Adaptive mode (powerline)
+
+When `mode = "adaptive"`, the renderer computes separator colors automatically:
+- The separator between two segments uses **fg = previous segment's bg** and **bg = next segment's bg**
+- After the last bg-colored segment, a "tail arrow" is emitted with **fg = last segment's bg** and no bg
+- Segments without a bg color fall back to the static separator color
+
+```toml
+[separators]
+mode = "adaptive"
+
+[separators.left]
+char = "\ue0b0"  # Powerline right chevron
+```
+
+This requires segments to have `bg` colors set in their `color` config.
+
+---
+
+## Theme Convert (OMZ Import)
+
+Convert Oh My Zsh themes to Lynx TOML format:
+
+```bash
+# From a GitHub URL
+lx theme convert https://github.com/ohmyzsh/ohmyzsh/blob/master/themes/candy.zsh-theme candy
+
+# From a local file
+lx theme convert ./mytheme.zsh-theme mytheme
+
+# Overwrite existing
+lx theme convert ./mytheme.zsh-theme mytheme --force
+```
+
+The converter maps OMZ `%` tokens and `$(function)` calls to Lynx segments.
+Agnoster-style themes produce partial output with notes for manual tuning.
 
 ---
 
@@ -739,8 +891,9 @@ lx theme patch segment.username.show_in '["interactive"]'
 lx theme patch segment.context_badge.hide_in '["minimal"]'
 ```
 
-All patch operations: copy built-in to user dir if needed → snapshot → apply
-→ validate → rollback on failure → emit `theme:changed`.
+All patch operations: snapshot → apply → validate → rollback on failure →
+emit `theme:changed`. Theme files live in `~/.config/lynx/themes/` (set up
+by `lx install`).
 
 ### Layer 3 — Full editor
 
