@@ -134,7 +134,9 @@ fn maybe_show_intro(config: &lynx_config::schema::LynxConfig, context: Context) 
         let env: std::collections::HashMap<String, String> = std::env::vars().collect();
         let tokens = lynx_intro::build_token_map(&env);
         let rendered = lynx_intro::render_intro(&intro, &tokens);
-        print!("{}", rendered);
+        // MUST use eprint! — lx init output is eval'd by the shell.
+        // Stdout gets executed as zsh; stderr goes directly to the terminal.
+        eprint!("{}", rendered);
     } else {
         diag::warn("init", &format!("intro '{}' failed to load — skipping", slug));
     }
