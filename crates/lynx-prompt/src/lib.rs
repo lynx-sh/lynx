@@ -12,7 +12,7 @@ pub use segments::{
     ExitCodeSegment, GitActionSegment, GitAheadBehindSegment, GitBranchSegment, GitShaSegment,
     GitStashSegment, GitStatusSegment, GitTimeSinceCommitSegment, GolangVersionSegment,
     HistNumberSegment, HostnameSegment, KubectlContextSegment, NewlineSegment,
-    NodeVersionSegment, ProfileBadgeSegment, PromptCharSegment, RubyVersionSegment,
+    NodeVersionSegment, PromptCharSegment, RubyVersionSegment,
     RustVersionSegment, SshIndicatorSegment, TaskStatusSegment, TimeSegment, UsernameSegment,
     VenvSegment, ViModeSegment, CustomSegment,
 };

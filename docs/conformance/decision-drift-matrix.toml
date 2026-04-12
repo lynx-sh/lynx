@@ -131,8 +131,7 @@ owner_phase = "none"
 evidence = [
   "docs/decisions/adr-004-toml-everywhere.md:17",
   "crates/lynx-config/src/lib.rs:1",
-  "themes/default.toml:1",
-  "profiles/default.toml:1"
+  "themes/default.toml:1"
 ]
 
 [[decisions]]

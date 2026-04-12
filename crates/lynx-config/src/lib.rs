@@ -1,7 +1,5 @@
 pub mod defaults;
 pub mod migrate;
-pub mod profile;
-pub mod profile_activator;
 pub mod schema;
 pub mod snapshot;
 pub mod validate;

@@ -7,7 +7,6 @@ pub mod config;
 pub mod cron;
 pub mod intros;
 pub mod plugins;
-pub mod profiles;
 pub mod registry;
 pub mod system;
 pub mod themes;

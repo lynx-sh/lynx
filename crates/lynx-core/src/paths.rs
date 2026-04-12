@@ -13,7 +13,6 @@
 //!     tasks/          ← task_logs_dir()
 //!     events.jsonl    ← events_log_file()
 //!   themes/           ← themes_dir()
-//!   profiles/         ← profiles_dir()
 //!   plugins/          ← installed_plugins_dir()
 //!   taps.toml         ← taps_config_path()
 //!   registry/         ← registry_cache_dir()
@@ -87,11 +86,6 @@ pub fn workflows_dir() -> PathBuf {
 /// `~/.config/lynx/jobs/`
 pub fn jobs_dir() -> PathBuf {
     lynx_dir().join("jobs")
-}
-
-/// `~/.config/lynx/profiles/`
-pub fn profiles_dir() -> PathBuf {
-    lynx_dir().join("profiles")
 }
 
 /// `~/.config/lynx/plugins/` — installed plugins directory.
@@ -192,7 +186,6 @@ mod tests {
         assert_eq!(task_logs_dir(), base.join("logs").join("tasks"));
         assert_eq!(events_log_file(), base.join("logs").join("events.jsonl"));
         assert_eq!(themes_dir(), base.join("themes"));
-        assert_eq!(profiles_dir(), base.join("profiles"));
         assert_eq!(installed_plugins_dir(), base.join("plugins"));
     }
 

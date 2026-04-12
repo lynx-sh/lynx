@@ -184,9 +184,6 @@ segment costs zero evaluation time (D-017).
 [segment.username]
 show_in = ["interactive"]       # only show in interactive context
 
-[segment.profile_badge]
-hide_in = ["agent", "minimal"]  # hide in agent and minimal
-
 [segment.context_badge]
 show_in = ["agent", "minimal"]  # always shown (overrides hide_in)
 ```
@@ -495,26 +492,6 @@ color = { fg = "cyan" }
 
 ---
 
-### `profile_badge` — Active Profile Name
-
-Shows the active Lynx profile name. Hidden in agent and minimal contexts,
-and when no profile is active.
-
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `icon` | string | `"⬡ "` | Prefix icon |
-| `color` | color | none | Text color |
-
-```toml
-[segment.profile_badge]
-icon  = "⬡ "
-color = { fg = "magenta" }
-```
-
-**Example output:** `⬡ work`
-
----
-
 ### `task_status` — Running Background Tasks
 
 Shows a count of running Lynx background tasks. Hidden when no tasks are running.
@@ -802,7 +779,7 @@ author      = "you"
 order = ["dir", "git_branch", "git_status"]
 
 [segments.right]
-order = ["kubectl_context", "profile_badge", "cmd_duration", "task_status", "context_badge"]
+order = ["kubectl_context", "cmd_duration", "task_status", "context_badge"]
 
 [segment.dir]
 max_depth        = 3
@@ -821,10 +798,6 @@ untracked = { icon = "?", color = "#565f89" }
 [segment.kubectl_context]
 prod_pattern = "prod.*"
 color        = { fg = "#7dcfff" }
-
-[segment.profile_badge]
-icon  = " "
-color = { fg = "#bb9af7" }
 
 [segment.cmd_duration]
 min_ms = 1000

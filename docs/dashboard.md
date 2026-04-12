@@ -4,7 +4,7 @@
 
 `lx dashboard` starts a local web server that opens a full management UI in your browser.
 Every aspect of Lynx is configurable from this single interface — themes, plugins, registry,
-workflows, intros, profiles, and system diagnostics.
+workflows, intros, and system diagnostics.
 
 ## Related Decisions
 

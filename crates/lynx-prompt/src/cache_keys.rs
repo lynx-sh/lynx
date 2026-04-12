@@ -10,9 +10,6 @@ pub const GIT_STATE: &str = "git_state";
 /// Kubectl context JSON — current context name and namespace.
 pub const KUBECTL_STATE: &str = "kubectl_state";
 
-/// Active profile state JSON — currently active profile name.
-pub const PROFILE_STATE: &str = "profile_state";
-
 /// Node.js version state JSON — set by the node plugin from .node-version/.nvmrc.
 pub const NODE_STATE: &str = "node_state";
 
