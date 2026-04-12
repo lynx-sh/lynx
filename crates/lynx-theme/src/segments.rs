@@ -120,7 +120,10 @@ pub struct StatusIcon {
 /// The set of segment names that Lynx recognises. Used for validation.
 pub const KNOWN_SEGMENTS: &[&str] = &[
     "aws_profile",
+    "battery",
     "dir",
+    "docker",
+    "gcp",
     "git_branch",
     "git_status",
     "git_action",
@@ -139,6 +142,7 @@ pub const KNOWN_SEGMENTS: &[&str] = &[
     "golang_version",
     "rust_version",
     "shell",
+    "terraform",
     "text",
     "username",
     "hostname",
