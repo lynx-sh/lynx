@@ -254,19 +254,18 @@ fn rgb_to_bsd_char(r: u8, g: u8, b: u8, bold: bool) -> char {
     }
 }
 
-/// Convert a color string (named or hex) to an ANSI 256-color fg SGR parameter.
-/// Returns `None` for unknown colors.
+/// Convert a color string (named or hex) to a truecolor (24-bit) fg SGR parameter.
+/// Uses `38;2;R;G;B` format — supported by all modern terminals (iTerm2, kitty,
+/// Alacritty, WezTerm, Windows Terminal, GNOME Terminal, etc.).
 fn color_to_fg_sgr(color: &str) -> Option<String> {
     let (r, g, b) = resolve_color_rgb(color)?;
-    let idx = rgb_to_256(r, g, b);
-    Some(format!("38;5;{idx}"))
+    Some(format!("38;2;{r};{g};{b}"))
 }
 
-/// Convert a color string (named or hex) to an ANSI 256-color bg SGR parameter.
+/// Convert a color string (named or hex) to a truecolor (24-bit) bg SGR parameter.
 fn color_to_bg_sgr(color: &str) -> Option<String> {
     let (r, g, b) = resolve_color_rgb(color)?;
-    let idx = rgb_to_256(r, g, b);
-    Some(format!("48;5;{idx}"))
+    Some(format!("48;2;{r};{g};{b}"))
 }
 
 /// Resolve a color string to (r, g, b). Handles hex (#rrggbb) and named colors.
@@ -287,14 +286,6 @@ fn parse_hex_rgb(hex: &str) -> Option<(u8, u8, u8)> {
     let g = u8::from_str_radix(&s[2..4], 16).ok()?;
     let b = u8::from_str_radix(&s[4..6], 16).ok()?;
     Some((r, g, b))
-}
-
-/// Nearest xterm-256 color cube index for an RGB value (mirrors color.rs logic).
-fn rgb_to_256(r: u8, g: u8, b: u8) -> u8 {
-    let ri = (r as u32 * 5 / 255) as u8;
-    let gi = (g as u32 * 5 / 255) as u8;
-    let bi = (b as u32 * 5 / 255) as u8;
-    16 + 36 * ri + 6 * gi + bi
 }
 
 #[cfg(test)]
@@ -324,8 +315,8 @@ mod tests {
         };
         let s = lsc.to_ls_colors_string().unwrap();
         assert!(s.starts_with("di="), "expected di= prefix, got: {s}");
-        // bold + 256-color fg code
-        assert!(s.contains("1;38;5;"), "expected bold+256-color code in: {s}");
+        // bold + truecolor fg code
+        assert!(s.contains("1;38;2;"), "expected bold+truecolor code in: {s}");
     }
 
     #[test]
@@ -358,7 +349,7 @@ mod tests {
     }
 
     #[test]
-    fn hex_color_is_converted_to_256() {
+    fn hex_color_is_truecolor() {
         let lsc = LsColors {
             dir: Some(LsColorsEntry {
                 fg: Some("#7aa2f7".to_string()),
@@ -367,11 +358,11 @@ mod tests {
             ..Default::default()
         };
         let s = lsc.to_ls_colors_string().unwrap();
-        assert!(s.contains("38;5;"), "expected 256-color code in: {s}");
+        assert!(s.contains("38;2;122;162;247"), "expected truecolor code in: {s}");
     }
 
     #[test]
-    fn bg_color_produces_48_code() {
+    fn bg_color_produces_truecolor_48_code() {
         let lsc = LsColors {
             dir: Some(LsColorsEntry {
                 fg: Some("blue".to_string()),
@@ -381,7 +372,7 @@ mod tests {
             ..Default::default()
         };
         let s = lsc.to_ls_colors_string().unwrap();
-        assert!(s.contains("48;5;"), "expected bg 256-color code in: {s}");
+        assert!(s.contains("48;2;"), "expected bg truecolor code in: {s}");
     }
 
     #[test]
