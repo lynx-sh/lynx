@@ -929,6 +929,7 @@ dependencies = [
  "lynx-convert",
  "lynx-core",
  "lynx-daemon",
+ "lynx-dashboard",
  "lynx-depgraph",
  "lynx-doctor",
  "lynx-events",
@@ -938,7 +939,6 @@ dependencies = [
  "lynx-prompt",
  "lynx-registry",
  "lynx-shell",
- "lynx-studio",
  "lynx-task",
  "lynx-test-utils",
  "lynx-theme",
@@ -1158,25 +1158,6 @@ dependencies = [
  "serde",
  "thiserror 1.0.69",
  "toml",
-]
-
-[[package]]
-name = "lynx-studio"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "axum",
- "futures-core",
- "lynx-config",
- "lynx-core",
- "lynx-theme",
- "serde",
- "serde_json",
- "tokio",
- "tokio-stream",
- "toml",
- "tower-http",
- "tracing",
 ]
 
 [[package]]

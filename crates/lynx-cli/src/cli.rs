@@ -77,4 +77,6 @@ pub enum Command {
     Browse(crate::commands::browse::BrowseArgs),
     /// Audit enabled plugins — show exports, hooks, binary deps, checksums
     Audit(crate::commands::audit::AuditArgs),
+    /// Open the Lynx Dashboard — full management web UI
+    Dashboard(crate::commands::dashboard::DashboardArgs),
 }

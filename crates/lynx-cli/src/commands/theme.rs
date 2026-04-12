@@ -117,7 +117,10 @@ pub async fn run(args: ThemeArgs) -> Result<()> {
         }
         ThemeCommand::Segment(seg) => cmd_segment(seg).await,
         ThemeCommand::Convert { source, name, force } => cmd_convert(&source, name.as_deref(), force).await,
-        ThemeCommand::Studio => lynx_studio::run().await,
+        ThemeCommand::Studio => {
+            eprintln!("Note: `lx theme studio` is deprecated. Use `lx dashboard` instead.");
+            lynx_dashboard::run().await
+        }
     }
 }
 

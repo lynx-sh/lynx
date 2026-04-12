@@ -1,4 +1,5 @@
 pub mod benchmark;
+pub mod dashboard;
 pub mod dev;
 pub mod intro;
 pub mod diag;
@@ -64,5 +65,6 @@ pub async fn dispatch(cli: Cli) -> Result<()> {
         Command::Remove(args) => install::run_uninstall(args).await,
         Command::Browse(args) => browse::run(args).await,
         Command::Audit(args) => audit::run(args).await,
+        Command::Dashboard(args) => dashboard::run(args).await,
     }
 }
