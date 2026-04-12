@@ -56,15 +56,17 @@ pub fn load_index_from(path: &Path) -> Result<RegistryIndex> {
 }
 
 /// Fetch the registry index from a URL, cache it locally, and return it.
-/// Uses a blocking HTTP request — not suitable for the async context; call
-/// from a `tokio::task::spawn_blocking` block.
+/// Uses a blocking HTTP request (ureq — no async runtime needed, per D-026).
 pub fn fetch_and_cache_index(url: &str) -> Result<RegistryIndex> {
     debug!("fetching registry index from {url}");
-    let body = reqwest::blocking::get(url)
-        .with_context(|| format!("HTTP GET failed for {url}"))?
-        .error_for_status()
-        .with_context(|| format!("registry index returned error status from {url}"))?
-        .text()
+    let resp = ureq::get(url)
+        .call()
+        .with_context(|| format!("HTTP GET failed for {url}"))?;
+    if resp.status() >= 400 {
+        anyhow::bail!("registry index returned status {} from {url}", resp.status());
+    }
+    let body = resp
+        .into_string()
         .context("failed to read registry index response body")?;
 
     let idx = parse_index(&body)?;
