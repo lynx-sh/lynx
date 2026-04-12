@@ -76,17 +76,43 @@ fn unix_ts() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{Mutex, OnceLock};
     use tempfile::TempDir;
 
-    fn with_temp_lynx_dir() -> TempDir {
+    fn env_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
+
+    struct LynxDirGuard(Option<std::ffi::OsString>);
+
+    impl LynxDirGuard {
+        fn set(dir: &std::path::Path) -> Self {
+            let prev = std::env::var_os("LYNX_DIR");
+            std::env::set_var("LYNX_DIR", dir);
+            Self(prev)
+        }
+    }
+
+    impl Drop for LynxDirGuard {
+        fn drop(&mut self) {
+            match &self.0 {
+                Some(v) => std::env::set_var("LYNX_DIR", v),
+                None => std::env::remove_var("LYNX_DIR"),
+            }
+        }
+    }
+
+    fn with_temp_lynx_dir() -> (TempDir, LynxDirGuard) {
         let dir = TempDir::new().expect("tempdir");
-        std::env::set_var("LYNX_DIR", dir.path());
-        dir
+        let guard = LynxDirGuard::set(dir.path());
+        (dir, guard)
     }
 
     #[test]
     fn log_creates_file_and_appends() {
-        let _dir = with_temp_lynx_dir();
+        let _lock = env_lock().lock().expect("lock");
+        let (_dir, _guard) = with_temp_lynx_dir();
 
         log("INFO", "test", "hello world");
         log("WARN", "test", "second line");
@@ -100,8 +126,9 @@ mod tests {
 
     #[test]
     fn tail_returns_empty_when_no_log() {
+        let _lock = env_lock().lock().expect("lock");
         let dir = TempDir::new().expect("tempdir");
-        std::env::set_var("LYNX_DIR", dir.path());
+        let _guard = LynxDirGuard::set(dir.path());
         // Don't create the log file — tail must handle missing file gracefully
         let lines = tail(10);
         assert!(lines.is_empty());
@@ -109,7 +136,8 @@ mod tests {
 
     #[test]
     fn clear_empties_log() {
-        let _dir = with_temp_lynx_dir();
+        let _lock = env_lock().lock().expect("lock");
+        let (_dir, _guard) = with_temp_lynx_dir();
 
         log("INFO", "test", "entry");
         clear().unwrap();

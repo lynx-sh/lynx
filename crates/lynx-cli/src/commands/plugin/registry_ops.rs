@@ -233,11 +233,38 @@ mod tests {
         LOCK.get_or_init(|| Mutex::new(()))
     }
 
+    struct EnvGuard {
+        vars: Vec<(String, Option<std::ffi::OsString>)>,
+    }
+
+    impl EnvGuard {
+        fn new(keys: &[&str]) -> Self {
+            let vars = keys
+                .iter()
+                .map(|k| (k.to_string(), std::env::var_os(k)))
+                .collect();
+            Self { vars }
+        }
+    }
+
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            for (k, v) in &self.vars {
+                match v {
+                    Some(val) => std::env::set_var(k, val),
+                    None => std::env::remove_var(k),
+                }
+            }
+        }
+    }
+
     #[test]
     fn verify_installed_plugin_checksum_matches_expected() {
         let _lock = env_lock().lock().expect("lock");
+        let _guard = EnvGuard::new(&["HOME", "LYNX_DIR"]);
         let home = temp_home();
         std::env::set_var("HOME", home.path());
+        std::env::remove_var("LYNX_DIR");
 
         let install_root = home.path().join(".local/share/lynx/plugins/git");
         std::fs::create_dir_all(install_root.join("shell")).expect("create plugin dir");
@@ -265,8 +292,10 @@ mod tests {
     #[test]
     fn verify_installed_plugin_checksum_detects_mismatch() {
         let _lock = env_lock().lock().expect("lock");
+        let _guard = EnvGuard::new(&["HOME", "LYNX_DIR"]);
         let home = temp_home();
         std::env::set_var("HOME", home.path());
+        std::env::remove_var("LYNX_DIR");
 
         let install_root = home.path().join(".local/share/lynx/plugins/git");
         std::fs::create_dir_all(install_root.join("shell")).expect("create plugin dir");

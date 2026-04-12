@@ -144,6 +144,37 @@ pub fn tail_log(n: usize, filter: Option<&str>) -> std::io::Result<Vec<LogEntry>
 mod tests {
     use super::*;
     use crate::types::Event;
+    use std::sync::{Mutex, OnceLock};
+
+    fn env_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
+
+    struct EnvGuard {
+        vars: Vec<(String, Option<std::ffi::OsString>)>,
+    }
+
+    impl EnvGuard {
+        fn new(keys: &[&str]) -> Self {
+            let vars = keys
+                .iter()
+                .map(|k| (k.to_string(), std::env::var_os(k)))
+                .collect();
+            Self { vars }
+        }
+    }
+
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            for (k, v) in &self.vars {
+                match v {
+                    Some(val) => std::env::set_var(k, val),
+                    None => std::env::remove_var(k),
+                }
+            }
+        }
+    }
 
     #[test]
     fn secret_key_detection() {
@@ -166,6 +197,8 @@ mod tests {
 
     #[test]
     fn write_and_tail_roundtrip() {
+        let _lock = env_lock().lock().expect("lock");
+        let _guard = EnvGuard::new(&["HOME", "LYNX_DIR"]);
         let tmp = tempfile::tempdir().unwrap();
         std::env::set_var("HOME", tmp.path());
         std::env::remove_var("LYNX_DIR");
@@ -182,14 +215,15 @@ mod tests {
         let filtered = tail_log(10, Some("git:")).unwrap();
         assert_eq!(filtered.len(), 1);
         assert_eq!(filtered[0].source, "plugin:git");
-
-        std::env::remove_var("HOME");
     }
 
     #[test]
     fn tail_log_limits_results() {
+        let _lock = env_lock().lock().expect("lock");
+        let _guard = EnvGuard::new(&["HOME", "LYNX_DIR"]);
         let tmp = tempfile::tempdir().unwrap();
         std::env::set_var("HOME", tmp.path());
+        std::env::remove_var("LYNX_DIR");
 
         for i in 0..5 {
             write_entry(&Event::new("shell:precmd", i.to_string()), "shell").unwrap();
@@ -198,7 +232,5 @@ mod tests {
         let entries = tail_log(3, None).unwrap();
         assert_eq!(entries.len(), 3);
         assert_eq!(entries[2].data, "4"); // most recent
-
-        std::env::remove_var("HOME");
     }
 }
