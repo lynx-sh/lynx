@@ -1,6 +1,6 @@
-use std::process::Command;
-
 use anyhow::{bail, Context as _, Result};
+
+use super::open_in_vscode;
 use clap::{Args, Subcommand};
 
 use lynx_config::{load, snapshot::mutate_config_transaction};
@@ -133,19 +133,10 @@ fn cmd_edit(slug: &str) -> Result<()> {
         copy_builtin_to_user(slug)?
     };
 
-    let editor = std::env::var("EDITOR").unwrap_or_else(|_| "vi".to_string());
     let snapshot = std::fs::read_to_string(&path)
         .with_context(|| format!("failed to read intro file {path:?}"))?;
 
-    let status = Command::new(&editor)
-        .arg(&path)
-        .status()
-        .with_context(|| format!("failed to launch editor '{editor}'"))?;
-
-    if !status.success() {
-        std::fs::write(&path, &snapshot).ok();
-        bail!("editor exited with error — intro unchanged");
-    }
+    open_in_vscode(&path)?;
 
     // Validate the saved file.
     match lynx_intro::loader::load_user(slug) {
@@ -232,11 +223,7 @@ color = "muted"
     std::fs::write(&path, &template)
         .with_context(|| format!("failed to write new intro '{slug}'"))?;
 
-    let editor = std::env::var("EDITOR").unwrap_or_else(|_| "vi".to_string());
-    Command::new(&editor)
-        .arg(&path)
-        .status()
-        .with_context(|| format!("failed to launch editor '{editor}'"))?;
+    open_in_vscode(&path)?;
 
     // Validate after edit.
     match lynx_intro::loader::load_user(slug) {

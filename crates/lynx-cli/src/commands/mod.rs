@@ -33,7 +33,26 @@ pub mod uninstall;
 pub mod update;
 
 use crate::cli::{Cli, Command};
-use anyhow::Result;
+use anyhow::{bail, Result};
+
+/// Open a file in VS Code (blocking until the window/tab is closed).
+/// Errors with a clear install message if `code` is not in PATH.
+pub(crate) fn open_in_vscode(path: &std::path::Path) -> Result<()> {
+    let status = std::process::Command::new("code")
+        .arg("--wait")
+        .arg(path)
+        .status()
+        .map_err(|_| anyhow::anyhow!(
+            "VS Code is required to edit this file.\n\
+             Install it at https://code.visualstudio.com and make sure `code` is in your PATH.\n\
+             Then re-run this command."
+        ))?;
+
+    if !status.success() {
+        bail!("VS Code exited with an error — file may not have been saved");
+    }
+    Ok(())
+}
 
 pub async fn dispatch(cli: Cli) -> Result<()> {
     match cli.command {
