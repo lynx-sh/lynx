@@ -10,7 +10,7 @@ mode = "adaptive"
 char = "\ue0b4"
 
 [separators.left_edge]
-char = "\ue0b6"
+char = "░▒▓"
 
 [separators.right]
 char = "\ue0b6"
