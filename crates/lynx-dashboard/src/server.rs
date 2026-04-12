@@ -3,7 +3,6 @@
 use std::sync::Arc;
 
 use axum::{
-    http::StatusCode,
     response::{
         sse::{Event, KeepAlive, Sse},
         IntoResponse,
@@ -45,9 +44,19 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/css/base.css", get(crate::frontend::base_css))
         .route("/css/layout.css", get(crate::frontend::layout_css))
         .route("/css/components.css", get(crate::frontend::components_css))
+        .route("/css/pages.css", get(crate::frontend::pages_css))
         .route("/js/app.js", get(crate::frontend::app_js))
         .route("/js/api.js", get(crate::frontend::api_js))
         .route("/js/components/sidebar.js", get(crate::frontend::sidebar_js))
+        .route("/js/components/color-picker.js", get(crate::frontend::color_picker_js))
+        .route("/js/pages/overview.js", get(crate::frontend::overview_js))
+        .route("/js/pages/themes.js", get(crate::frontend::themes_js))
+        .route("/js/pages/plugins.js", get(crate::frontend::plugins_js))
+        .route("/js/pages/registry.js", get(crate::frontend::registry_js))
+        .route("/js/pages/workflows.js", get(crate::frontend::workflows_js))
+        .route("/js/pages/cron.js", get(crate::frontend::cron_js))
+        .route("/js/pages/intros.js", get(crate::frontend::intros_js))
+        .route("/js/pages/system.js", get(crate::frontend::system_js))
         // API info
         .route("/api/info", get(get_info))
         // Config
@@ -63,6 +72,8 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/api/plugins", get(api::plugins::list_plugins))
         .route("/api/plugin/enable", post(api::plugins::enable_plugin))
         .route("/api/plugin/disable", post(api::plugins::disable_plugin))
+        // Colors (for color picker suggestions)
+        .route("/api/colors", get(api::system::get_colors))
         // System
         .route("/api/doctor", get(api::system::get_doctor))
         .route("/api/diag", get(api::system::get_diag))
@@ -87,9 +98,9 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/api/cron", get(api::cron::list_tasks))
         .route("/api/cron/add", post(api::cron::add_task))
         .route("/api/cron/remove", post(api::cron::remove_task))
-        // Theme apply/reset (placeholders)
-        .route("/api/theme/apply", post(placeholder_post))
-        .route("/api/theme/reset", post(placeholder_post))
+        // Theme apply/reset
+        .route("/api/theme/apply", post(api::themes::apply_theme))
+        .route("/api/theme/reset", post(api::themes::reset_theme))
         // SSE
         .route("/api/events", get(get_events))
         .with_state(state)
@@ -103,12 +114,6 @@ async fn get_info() -> impl IntoResponse {
         "version": env!("CARGO_PKG_VERSION"),
         "status": "ok"
     }))
-}
-
-async fn placeholder_post() -> impl IntoResponse {
-    (StatusCode::NOT_IMPLEMENTED, Json(serde_json::json!({
-        "error": "not yet implemented"
-    })))
 }
 
 async fn get_events(

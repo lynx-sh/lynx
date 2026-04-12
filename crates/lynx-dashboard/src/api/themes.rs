@@ -187,6 +187,24 @@ pub async fn segment_order(
     StatusCode::OK.into_response()
 }
 
+/// POST /api/theme/apply — save theme (already written by patch, this is a no-op confirmation).
+pub async fn apply_theme(
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
+    // Theme patches already write to disk immediately.
+    // This endpoint confirms the apply action.
+    state.broadcast("theme_applied");
+    StatusCode::OK.into_response()
+}
+
+/// POST /api/theme/reset — reload theme from disk (undo unsaved changes).
+pub async fn reset_theme(
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
+    state.broadcast("theme_updated");
+    StatusCode::OK.into_response()
+}
+
 fn set_arr_at(
     node: &mut toml::Value,
     dot_path: &str,

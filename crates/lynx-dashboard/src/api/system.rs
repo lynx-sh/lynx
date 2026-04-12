@@ -28,6 +28,27 @@ pub async fn get_doctor() -> impl IntoResponse {
     }))
 }
 
+/// GET /api/colors — named color registry for picker suggestions.
+pub async fn get_colors() -> impl IntoResponse {
+    let names = [
+        "black", "red", "green", "yellow", "blue", "magenta", "cyan", "white", "grey",
+        "light-red", "light-green", "light-yellow", "light-blue", "light-magenta", "light-cyan",
+        "orange", "pink", "purple", "brown", "navy", "teal", "lime",
+    ];
+    let colors: Vec<serde_json::Value> = names
+        .iter()
+        .filter_map(|&name| {
+            lynx_theme::color::named_to_rgb(name).map(|(r, g, b)| {
+                serde_json::json!({
+                    "name": name,
+                    "hex": format!("#{r:02x}{g:02x}{b:02x}"),
+                })
+            })
+        })
+        .collect();
+    Json(colors)
+}
+
 /// GET /api/diag — return recent diagnostic log entries.
 pub async fn get_diag() -> impl IntoResponse {
     let lines = lynx_core::diag::tail(100);

@@ -39,27 +39,26 @@ const App = {
     App.renderPage(page);
   },
 
-  renderPage(page) {
-    const el = document.getElementById('page');
-    const titles = {
-      overview:  'Overview',
-      themes:    'Themes',
-      plugins:   'Plugins',
-      registry:  'Registry',
-      workflows: 'Workflows',
-      cron:      'Cron Jobs',
-      intros:    'Intros',
-      system:    'System',
-    };
+  pages: {
+    overview:  OverviewPage,
+    themes:    ThemesPage,
+    plugins:   PluginsPage,
+    registry:  RegistryPage,
+    workflows: WorkflowsPage,
+    cron:      CronPage,
+    intros:    IntrosPage,
+    system:    SystemPage,
+  },
 
-    const title = titles[page] || page;
-    el.innerHTML = `
-      <h1 class="page-title">${title}</h1>
-      <div class="empty-state">
-        <div class="empty-state-icon">${Sidebar.pages.find(p => p.id === page)?.icon || '\u2699'}</div>
-        <p>This page will be implemented in a future phase.</p>
-      </div>
-    `;
+  async renderPage(page) {
+    const el = document.getElementById('page');
+    const handler = App.pages[page];
+    if (handler) {
+      await handler.render(el);
+    } else {
+      el.innerHTML = `<h1 class="page-title">${page}</h1>
+        <div class="empty-state"><p>Page not found.</p></div>`;
+    }
   },
 
   connectSSE() {
