@@ -6,6 +6,7 @@ use clap::{Args, Subcommand};
 use lynx_core::paths::{lynx_dir, themes_dir};
 
 #[derive(Args)]
+#[command(arg_required_else_help = true)]
 pub struct DevArgs {
     #[command(subcommand)]
     pub command: DevCommand,

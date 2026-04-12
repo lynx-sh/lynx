@@ -14,6 +14,7 @@ mod scaffold;
 mod shell_glue;
 
 #[derive(Args)]
+#[command(arg_required_else_help = true)]
 pub struct PluginArgs {
     #[command(subcommand)]
     pub command: PluginCommand,

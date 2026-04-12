@@ -9,6 +9,7 @@ use lynx_config::{
 use std::path::PathBuf;
 
 #[derive(Args)]
+#[command(arg_required_else_help = true)]
 pub struct ProfileArgs {
     #[command(subcommand)]
     pub command: ProfileCommand,

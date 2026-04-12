@@ -3,6 +3,7 @@ use clap::{Args, Subcommand};
 use lynx_events::{logger, types::Event};
 
 #[derive(Args)]
+#[command(arg_required_else_help = true)]
 pub struct EventArgs {
     #[command(subcommand)]
     pub command: EventCommand,

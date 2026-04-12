@@ -8,6 +8,7 @@ use lynx_config::snapshot::mutate_config_transaction;
 use lynx_core::brand;
 
 #[derive(Args)]
+#[command(arg_required_else_help = true)]
 pub struct SyncArgs {
     #[command(subcommand)]
     pub command: SyncCommand,

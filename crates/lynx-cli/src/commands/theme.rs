@@ -9,6 +9,7 @@ use lynx_theme::loader::{list, load as load_theme, load_from_path, user_theme_di
 use lynx_theme::patch::{self, Side};
 
 #[derive(Args)]
+#[command(arg_required_else_help = true)]
 pub struct ThemeArgs {
     #[command(subcommand)]
     pub command: ThemeCommand,

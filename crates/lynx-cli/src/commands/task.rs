@@ -8,6 +8,7 @@ use lynx_task::{
 use std::io::{BufRead, BufReader};
 
 #[derive(Args)]
+#[command(arg_required_else_help = true)]
 pub struct TaskArgs {
     #[command(subcommand)]
     pub command: TaskCommand,

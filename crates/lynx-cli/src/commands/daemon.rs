@@ -7,6 +7,7 @@ use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
 #[derive(Args)]
+#[command(arg_required_else_help = true)]
 pub struct DaemonArgs {
     #[command(subcommand)]
     pub command: DaemonCommand,

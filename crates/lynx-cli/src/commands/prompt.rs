@@ -18,6 +18,7 @@ use lynx_theme::loader::load as load_theme;
 use std::collections::HashMap;
 
 #[derive(Args)]
+#[command(arg_required_else_help = true)]
 pub struct PromptArgs {
     #[command(subcommand)]
     pub command: PromptCommand,

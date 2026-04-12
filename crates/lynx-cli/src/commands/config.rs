@@ -8,6 +8,7 @@ use lynx_config::{config_path, load};
 use lynx_core::redact;
 
 #[derive(Args)]
+#[command(arg_required_else_help = true)]
 pub struct ConfigArgs {
     #[command(subcommand)]
     pub command: ConfigCommand,
