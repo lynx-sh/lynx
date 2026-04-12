@@ -23,11 +23,17 @@ pub enum DevCommand {
         #[arg(long)]
         source: Option<String>,
     },
+    /// Catch unknown subcommands for friendly error
+    #[command(external_subcommand)]
+    Other(Vec<String>),
 }
 
 pub async fn run(args: DevArgs) -> Result<()> {
     match args.command {
         DevCommand::Sync { source } => cmd_sync(source.as_deref()),
+        DevCommand::Other(args) => {
+            bail!("unknown dev command '{}' — run `lx dev` for help", args.first().map(|s| s.as_str()).unwrap_or(""))
+        }
     }
 }
 

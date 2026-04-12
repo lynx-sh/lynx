@@ -24,6 +24,9 @@ pub enum SyncCommand {
     Pull,
     /// Show ahead/behind counts
     Status,
+    /// Catch unknown subcommands for friendly error
+    #[command(external_subcommand)]
+    Other(Vec<String>),
 }
 
 pub async fn run(args: SyncArgs) -> Result<()> {
@@ -32,6 +35,9 @@ pub async fn run(args: SyncArgs) -> Result<()> {
         SyncCommand::Push => cmd_push(),
         SyncCommand::Pull => cmd_pull(),
         SyncCommand::Status => cmd_status(),
+        SyncCommand::Other(args) => {
+            bail!("unknown sync command '{}' — run `lx sync` for help", args.first().map(|s| s.as_str()).unwrap_or(""))
+        }
     }
 }
 

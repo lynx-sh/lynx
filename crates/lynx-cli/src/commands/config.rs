@@ -28,6 +28,9 @@ pub enum ConfigCommand {
     Set { key: String, value: String },
     /// Show real-world usage examples
     Examples,
+    /// Catch unknown subcommands for friendly error
+    #[command(external_subcommand)]
+    Other(Vec<String>),
 }
 
 pub async fn run(args: ConfigArgs) -> Result<()> {
@@ -42,6 +45,9 @@ pub async fn run(args: ConfigArgs) -> Result<()> {
                 command: Some("config".into()),
             })
             .await
+        }
+        ConfigCommand::Other(args) => {
+            bail!("unknown config command '{}' — run `lx config` for help", args.first().map(|s| s.as_str()).unwrap_or(""))
         }
     }
 }

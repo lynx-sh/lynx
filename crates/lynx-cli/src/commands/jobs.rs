@@ -33,6 +33,9 @@ pub enum JobsCommand {
         #[arg(long, default_value_t = 72)]
         hours: u64,
     },
+    /// Catch unknown subcommands for friendly error
+    #[command(external_subcommand)]
+    Other(Vec<String>),
 }
 
 pub async fn run(args: JobsArgs) -> Result<()> {
@@ -42,6 +45,9 @@ pub async fn run(args: JobsArgs) -> Result<()> {
         JobsCommand::Kill { id } => cmd_kill(&id),
         JobsCommand::Log { id } => cmd_log(&id),
         JobsCommand::Clean { hours } => cmd_clean(hours),
+        JobsCommand::Other(args) => {
+            anyhow::bail!("unknown jobs command '{}' — run `lx jobs` for help", args.first().map(|s| s.as_str()).unwrap_or(""))
+        }
     }
 }
 

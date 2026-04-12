@@ -76,6 +76,9 @@ pub enum CronCommand {
     },
     /// Show real-world usage examples
     Examples,
+    /// Catch unknown subcommands for friendly error
+    #[command(external_subcommand)]
+    Other(Vec<String>),
 }
 
 pub async fn run(args: CronArgs) -> Result<()> {
@@ -100,6 +103,9 @@ pub async fn run(args: CronArgs) -> Result<()> {
                 command: Some("cron".into()),
             })
             .await
+        }
+        CronCommand::Other(args) => {
+            bail!("unknown cron command '{}' — run `lx cron` for help", args.first().map(|s| s.as_str()).unwrap_or(""))
         }
     }
 }

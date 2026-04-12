@@ -101,6 +101,9 @@ pub enum PluginCommand {
         /// Plugin name to disable
         name: String,
     },
+    /// Catch unknown subcommands for friendly error
+    #[command(external_subcommand)]
+    Other(Vec<String>),
 }
 
 pub async fn run(args: PluginArgs) -> Result<()> {
@@ -124,6 +127,9 @@ pub async fn run(args: PluginArgs) -> Result<()> {
                 command: Some("plugin".into()),
             })
             .await
+        }
+        PluginCommand::Other(args) => {
+            bail!("unknown plugin command '{}' — run `lx plugin` for help", args.first().map(|s| s.as_str()).unwrap_or(""))
         }
     }
 }

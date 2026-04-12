@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
 use clap::Args;
 
 #[derive(Args)]
@@ -21,9 +21,7 @@ pub async fn run(args: ExamplesArgs) -> Result<()> {
         Some("jobs") => print_jobs_examples(),
         Some("dashboard") => print_dashboard_examples(),
         Some(other) => {
-            println!(
-                "lx: unknown command '{other}' — try: plugin, theme, cron, run, jobs, dashboard, event, config, doctor"
-            );
+            bail!("unknown command '{other}' — try: lx examples plugin, theme, cron, run, jobs, dashboard, event, config, doctor");
         }
         None => print_quickstart(),
     }

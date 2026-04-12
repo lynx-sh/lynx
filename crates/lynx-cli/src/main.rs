@@ -25,6 +25,13 @@ async fn main() {
             let root = Cli::command();
             print_subcommand_help(root, &args)
         }
+        Err(e) if matches!(e.kind(), ErrorKind::InvalidSubcommand) => {
+            // Unknown top-level subcommand — render through our error system
+            // so users see the styled red error + hint, not clap's generic stderr.
+            let args: Vec<String> = std::env::args().skip(1).collect();
+            let cmd = args.first().map(|s| s.as_str()).unwrap_or("?");
+            Err(anyhow::anyhow!("unknown command '{cmd}' — run `lx` to see available commands"))
+        }
         Err(e) => {
             // All other clap errors (unknown flag, bad arg value, etc.) go to
             // stderr as normal — these ARE errors the user should fix.

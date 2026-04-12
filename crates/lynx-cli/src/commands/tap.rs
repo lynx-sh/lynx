@@ -28,6 +28,9 @@ pub enum TapCommand {
     },
     /// Refresh all tap indexes
     Update,
+    /// Catch unknown subcommands for friendly error
+    #[command(external_subcommand)]
+    Other(Vec<String>),
 }
 
 pub async fn run(args: TapArgs) -> Result<()> {
@@ -36,6 +39,9 @@ pub async fn run(args: TapArgs) -> Result<()> {
         TapCommand::Add { source } => cmd_add(&source),
         TapCommand::Remove { name } => cmd_remove(&name),
         TapCommand::Update => cmd_update(),
+        TapCommand::Other(args) => {
+            anyhow::bail!("unknown tap command '{}' — run `lx tap` for help", args.first().map(|s| s.as_str()).unwrap_or(""))
+        }
     }
 }
 
