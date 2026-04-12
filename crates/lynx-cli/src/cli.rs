@@ -69,4 +69,8 @@ pub enum Command {
     Intro(crate::commands::intro::IntroArgs),
     /// Manage package registry taps (sources)
     Tap(crate::commands::tap::TapArgs),
+    /// Install packages from the registry (tools, plugins, themes)
+    Install(crate::commands::install::InstallPkgArgs),
+    /// Remove a package's Lynx integration (preserves system binaries)
+    Remove(crate::commands::install::UninstallPkgArgs),
 }

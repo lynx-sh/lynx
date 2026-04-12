@@ -1,0 +1,170 @@
+//! Unified package installer — `lx install` and `lx uninstall` (D-028).
+//!
+//! Resolves packages from all configured taps, detects the type,
+//! and routes to the correct installer.
+
+use anyhow::{bail, Result};
+use clap::Args;
+use lynx_config::snapshot::mutate_config_transaction;
+use lynx_core::paths;
+use lynx_registry::autoplug::generate_tool_plugin;
+use lynx_registry::installer::{install_tool_via_pm, uninstall_tool};
+use lynx_registry::schema::PackageType;
+use lynx_registry::tap::{load_taps, merge_tap_indexes, TrustTier};
+
+#[derive(Args)]
+pub struct InstallPkgArgs {
+    /// Package names to install
+    pub names: Vec<String>,
+    /// Force reinstall if already present
+    #[arg(long)]
+    pub force: bool,
+}
+
+#[derive(Args)]
+pub struct UninstallPkgArgs {
+    /// Package name to remove
+    pub name: String,
+}
+
+pub async fn run_install(args: InstallPkgArgs) -> Result<()> {
+    if args.names.is_empty() {
+        bail!("provide at least one package name — e.g. `lx install eza`");
+    }
+
+    let taps_path = paths::taps_config_path();
+    let list = load_taps(&taps_path)?;
+    let merged = merge_tap_indexes(&list)?;
+
+    for name in &args.names {
+        let tapped = match merged.iter().find(|t| t.entry.name == *name) {
+            Some(t) => t,
+            None => {
+                eprintln!("package '{name}' not found in any tap");
+                continue;
+            }
+        };
+
+        // Trust warning for community packages.
+        if tapped.trust == TrustTier::Community {
+            println!(
+                "  {} '{name}' is from community tap '{}' — unverified",
+                tapped.trust.badge(),
+                tapped.tap_name
+            );
+            print!("  continue? [y/N] ");
+            std::io::Write::flush(&mut std::io::stdout())?;
+            let mut input = String::new();
+            std::io::stdin().read_line(&mut input)?;
+            if !input.trim().eq_ignore_ascii_case("y") {
+                println!("  skipped '{name}'");
+                continue;
+            }
+        }
+
+        let entry = &tapped.entry;
+        match entry.package_type {
+            PackageType::Tool => install_tool(name, entry, args.force)?,
+            PackageType::Plugin => install_plugin(name, entry, args.force).await?,
+            PackageType::Theme => {
+                println!("  theme install for '{name}' — coming in a future update");
+            }
+            PackageType::Intro => {
+                println!("  intro install for '{name}' — coming in a future update");
+            }
+            PackageType::Bundle => {
+                println!("  bundle install for '{name}' — coming in a future update");
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn install_tool(
+    name: &str,
+    entry: &lynx_registry::schema::RegistryEntry,
+    force: bool,
+) -> Result<()> {
+    let config = lynx_config::load()?;
+    if config.enabled_plugins.contains(&name.to_string()) && !force {
+        println!("  '{name}' is already installed — use --force to reinstall");
+        return Ok(());
+    }
+
+    println!("  installing tool '{name}'...");
+    install_tool_via_pm(entry)?;
+
+    // Auto-generate plugin.
+    let plugins_dir = paths::installed_plugins_dir();
+    generate_tool_plugin(entry, &plugins_dir)?;
+
+    // Enable the plugin.
+    mutate_config_transaction(&format!("install-tool-{name}"), |cfg| {
+        if !cfg.enabled_plugins.contains(&name.to_string()) {
+            cfg.enabled_plugins.push(name.to_string());
+        }
+        Ok(())
+    })?;
+
+    println!("  ✓ installed '{name}' — restart your shell to activate");
+    Ok(())
+}
+
+async fn install_plugin(
+    name: &str,
+    entry: &lynx_registry::schema::RegistryEntry,
+    force: bool,
+) -> Result<()> {
+    if entry.bundled {
+        mutate_config_transaction(&format!("install-plugin-{name}"), |cfg| {
+            if !cfg.enabled_plugins.contains(&name.to_string()) {
+                cfg.enabled_plugins.push(name.to_string());
+            }
+            Ok(())
+        })?;
+        println!("  ✓ enabled bundled plugin '{name}'");
+        return Ok(());
+    }
+
+    use lynx_registry::fetch::{fetch_plugin, FetchOptions};
+    let n = name.to_string();
+    tokio::task::spawn_blocking(move || {
+        fetch_plugin(
+            &n,
+            &FetchOptions {
+                force,
+                refresh_index: true,
+                ..Default::default()
+            },
+        )
+    })
+    .await??;
+
+    mutate_config_transaction(&format!("install-plugin-{name}"), |cfg| {
+        if !cfg.enabled_plugins.contains(&name.to_string()) {
+            cfg.enabled_plugins.push(name.to_string());
+        }
+        Ok(())
+    })?;
+
+    println!("  ✓ installed plugin '{name}'");
+    Ok(())
+}
+
+pub async fn run_uninstall(args: UninstallPkgArgs) -> Result<()> {
+    let name = &args.name;
+    let plugins_dir = paths::installed_plugins_dir();
+    uninstall_tool(name, &plugins_dir)?;
+
+    let config = lynx_config::load()?;
+    if config.enabled_plugins.iter().any(|p| p == name) {
+        mutate_config_transaction(&format!("uninstall-{name}"), |cfg| {
+            cfg.enabled_plugins.retain(|p| p != name);
+            Ok(())
+        })?;
+        println!("disabled '{name}' in config");
+    }
+
+    Ok(())
+}

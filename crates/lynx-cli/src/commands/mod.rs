@@ -19,6 +19,7 @@ pub mod profile;
 pub mod prompt;
 pub mod rollback;
 pub mod sync;
+pub mod install;
 pub mod tap;
 pub mod task;
 pub mod nerd_font;
@@ -57,5 +58,7 @@ pub async fn dispatch(cli: Cli) -> Result<()> {
         Command::Diag(args) => diag::run(args).await,
         Command::Intro(args) => intro::run(args).await,
         Command::Tap(args) => tap::run(args).await,
+        Command::Install(args) => install::run_install(args).await,
+        Command::Remove(args) => install::run_uninstall(args).await,
     }
 }
