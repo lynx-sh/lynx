@@ -456,28 +456,51 @@ async fn cmd_convert(source: &str, name: Option<&str>, force: bool) -> Result<()
     let content = lynx_convert::fetch::fetch_content(&resolved)
         .context("failed to fetch theme content")?;
 
-    // Parse.
-    let ir = lynx_convert::omz::parse(&content);
-
-    // Emit TOML.
-    let toml_str = lynx_convert::emit::to_lynx_toml(&ir, &theme_name);
+    // Auto-detect format: JSON = OMP, anything else = OMZ.
+    let is_omp = content.trim_start().starts_with('{');
 
     // Write.
     std::fs::create_dir_all(user_theme_dir())?;
-    std::fs::write(&out_path, &toml_str)?;
 
-    // Print summary.
-    println!("Converted OMZ theme → {}", out_path.display());
-    println!("  Segments (left):  {}", ir.left.join(", "));
-    if !ir.right.is_empty() {
-        println!("  Segments (right): {}", ir.right.join(", "));
-    }
-    if ir.two_line {
-        println!("  Two-line layout detected");
-    }
-    if !ir.notes.is_empty() {
-        for note in &ir.notes {
-            println!("  ⚠ {note}");
+    if is_omp {
+        // Oh-My-Posh JSON theme.
+        let theme = lynx_convert::omp::parse(&content)
+            .map_err(|e| anyhow::anyhow!(e))?;
+        let toml_str = lynx_convert::emit::omp_to_lynx_toml(&theme, &theme_name);
+        std::fs::write(&out_path, &toml_str)?;
+
+        println!("Converted OMP theme → {}", out_path.display());
+        if theme.two_line {
+            println!("  Layout: two-line");
+        }
+        let seg_count = theme.top.len() + theme.top_right.len() + theme.left.len();
+        println!("  Segments: {seg_count} mapped");
+        if !theme.palette.is_empty() {
+            println!("  Palette: {} colors extracted", theme.palette.len());
+        }
+        if !theme.notes.is_empty() {
+            for note in &theme.notes {
+                println!("  ⚠ {note}");
+            }
+        }
+    } else {
+        // OMZ .zsh-theme file.
+        let ir = lynx_convert::omz::parse(&content);
+        let toml_str = lynx_convert::emit::to_lynx_toml(&ir, &theme_name);
+        std::fs::write(&out_path, &toml_str)?;
+
+        println!("Converted OMZ theme → {}", out_path.display());
+        println!("  Segments (left):  {}", ir.left.join(", "));
+        if !ir.right.is_empty() {
+            println!("  Segments (right): {}", ir.right.join(", "));
+        }
+        if ir.two_line {
+            println!("  Two-line layout detected");
+        }
+        if !ir.notes.is_empty() {
+            for note in &ir.notes {
+                println!("  ⚠ {note}");
+            }
         }
     }
     println!("\nActivate with: lx theme set {theme_name}");
