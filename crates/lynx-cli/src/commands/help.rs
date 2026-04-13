@@ -290,13 +290,6 @@ List workflows:  lx run list",
     },
     // ── Developer ──
     HelpEntry {
-        command: "dev",
-        description: "Developer utilities — sync, build, run",
-        usage: "dev <subcommand>",
-        category: "developer",
-        extra: "",
-    },
-    HelpEntry {
         command: "diag",
         description: "View and manage the diagnostic log",
         usage: "diag [clear]",

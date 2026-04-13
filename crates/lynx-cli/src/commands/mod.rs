@@ -1,7 +1,6 @@
 pub mod benchmark;
 pub mod help;
 pub mod dashboard;
-pub mod dev;
 pub mod intro;
 pub mod diag;
 pub mod config;
@@ -90,7 +89,6 @@ pub async fn dispatch(cli: Cli) -> Result<()> {
         Command::GitState(args) => git::run(args).await,
         Command::KubectlState(args) => kubectl_state::run(args).await,
         Command::RefreshState(args) => refresh_state::run(args).await,
-        Command::Dev(args) => dev::run(args).await,
         Command::Diag(args) => diag::run(args).await,
         Command::Intro(args) => intro::run(args).await,
         Command::Tap(args) => tap::run(args).await,
