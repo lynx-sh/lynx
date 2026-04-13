@@ -201,7 +201,7 @@ fn copy_dir_all(src: &Path, dst: &Path) -> Result<()> {
 }
 
 /// Append the Lynx init line to ~/.zshrc if not already present.
-fn patch_zshrc(home: &Path) -> Result<()> {
+pub(crate) fn patch_zshrc(home: &Path) -> Result<()> {
     let zshrc = home.join(".zshrc");
 
     if zshrc.exists() {

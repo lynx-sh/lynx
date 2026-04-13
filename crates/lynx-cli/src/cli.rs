@@ -79,4 +79,6 @@ pub enum Command {
     Jobs(crate::commands::jobs::JobsArgs),
     /// Execute a workflow
     Run(crate::commands::run::RunArgs),
+    /// Interactive first-run setup wizard — pick theme, plugins, shell integration
+    Onboard(crate::commands::onboard::OnboardArgs),
 }
