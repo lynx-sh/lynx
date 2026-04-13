@@ -90,43 +90,131 @@ pub async fn run(args: RunArgs) -> Result<()> {
         return Ok(());
     }
 
-    // Execute
-    let mode = if args.bg {
-        lynx_workflow::executor::ExecMode::Background
-    } else {
-        lynx_workflow::executor::ExecMode::Foreground
-    };
-
     let log_dir = lynx_core::paths::jobs_dir();
     std::fs::create_dir_all(&log_dir)?;
 
-    println!("Running workflow '{}'...", wf.workflow.name);
-    println!();
-
-    let result =
-        lynx_workflow::executor::execute_workflow(&wf, &params, mode, Some(log_dir)).await?;
-
-    // Print summary
-    println!();
-    for step in &result.steps {
-        let status = match step.status {
-            lynx_workflow::executor::StepStatus::Passed => "\u{2713}",
-            lynx_workflow::executor::StepStatus::Failed => "\u{2717}",
-            lynx_workflow::executor::StepStatus::Skipped => "\u{2014}",
-            lynx_workflow::executor::StepStatus::TimedOut => "\u{23F0}",
-        };
-        println!(
-            "  {status} {}  ({}ms)",
-            step.name, step.duration_ms
-        );
+    // Background mode: use the old non-streaming executor.
+    if args.bg {
+        println!("Running workflow '{}' in background...", wf.workflow.name);
+        let result = lynx_workflow::executor::execute_workflow(
+            &wf,
+            &params,
+            lynx_workflow::executor::ExecMode::Background,
+            Some(log_dir),
+        )
+        .await?;
+        println!("  Job ID: {}", result.job_id);
+        return Ok(());
     }
 
-    println!();
-    if result.success {
-        println!("\u{2713} Workflow completed successfully ({}ms)", result.duration_ms);
+    // Interactive TUI mode: stream output in real time.
+    let step_names: Vec<String> = wf.steps.iter().map(|s| s.name.clone()).collect();
+
+    if lynx_tui::workflow::should_use_tui() {
+        let (exec_tx, exec_rx) = std::sync::mpsc::channel();
+        let (tui_tx, tui_rx) = std::sync::mpsc::channel();
+
+        // Bridge executor events → TUI events on a background thread.
+        std::thread::spawn(move || {
+            while let Ok(ev) = exec_rx.recv() {
+                let tui_ev = map_stream_to_tui(ev);
+                if tui_tx.send(tui_ev).is_err() {
+                    break;
+                }
+            }
+        });
+
+        // Spawn the executor on a background task.
+        let wf_clone = wf.clone();
+        let params_clone = params.clone();
+        let ld = Some(log_dir.clone());
+        let exec_handle = tokio::spawn(async move {
+            lynx_workflow::executor::execute_workflow_streaming(
+                &wf_clone,
+                &params_clone,
+                ld,
+                exec_tx,
+            )
+            .await
+        });
+
+        // Run TUI (blocks until user exits).
+        let tui_colors = super::tui_colors();
+        let action = lynx_tui::workflow::run_workflow_tui(
+            &wf.workflow.name,
+            &step_names,
+            tui_rx,
+            &tui_colors,
+        )?;
+
+        match action {
+            lynx_tui::workflow::WorkflowAction::Completed => {
+                // Workflow finished, user pressed q — print summary.
+                if let Ok(Ok(result)) = exec_handle.await {
+                    print_summary(&result);
+                }
+            }
+            lynx_tui::workflow::WorkflowAction::Background => {
+                println!("Workflow moved to background. Check status with: lx jobs");
+            }
+            lynx_tui::workflow::WorkflowAction::Stopped => {
+                println!("Workflow stopped.");
+                exec_handle.abort();
+            }
+        }
     } else {
-        println!("\u{2717} Workflow failed ({}ms)", result.duration_ms);
-        println!("  Job ID: {}", result.job_id);
+        // Non-interactive fallback: stream to stdout.
+        let (tx, rx) = std::sync::mpsc::channel();
+
+        let wf_clone = wf.clone();
+        let params_clone = params.clone();
+        let ld = Some(log_dir.clone());
+        let exec_handle = tokio::spawn(async move {
+            lynx_workflow::executor::execute_workflow_streaming(
+                &wf_clone,
+                &params_clone,
+                ld,
+                tx,
+            )
+            .await
+        });
+
+        // Print events as they arrive.
+        println!("Running workflow '{}'...\n", wf.workflow.name);
+        loop {
+            match rx.recv() {
+                Ok(lynx_workflow::executor::StreamEvent::StepStarted { name }) => {
+                    println!("\u{25cf} {name}");
+                }
+                Ok(lynx_workflow::executor::StreamEvent::StepOutput { name, line, .. }) => {
+                    println!("  [{name}] {line}");
+                }
+                Ok(lynx_workflow::executor::StreamEvent::StepFinished {
+                    name,
+                    status,
+                    duration_ms,
+                }) => {
+                    let icon = match status {
+                        lynx_workflow::executor::StepStatus::Passed => "\u{2713}",
+                        lynx_workflow::executor::StepStatus::Failed => "\u{2717}",
+                        lynx_workflow::executor::StepStatus::Skipped => "\u{2014}",
+                        lynx_workflow::executor::StepStatus::TimedOut => "\u{23f0}",
+                    };
+                    println!("  {icon} {name} ({duration_ms}ms)");
+                }
+                Ok(lynx_workflow::executor::StreamEvent::Done { success, duration_ms }) => {
+                    println!();
+                    if success {
+                        println!("\u{2713} Workflow completed ({duration_ms}ms)");
+                    } else {
+                        println!("\u{2717} Workflow failed ({duration_ms}ms)");
+                    }
+                    break;
+                }
+                Err(_) => break,
+            }
+        }
+        let _ = exec_handle.await;
     }
 
     Ok(())
@@ -144,6 +232,56 @@ impl lynx_tui::ListItem for WorkflowListEntry {
         format!("{}\n\nRun: lx run {}", self.description, self.name)
     }
     fn category(&self) -> Option<&str> { Some("workflow") }
+}
+
+/// Map executor StreamEvent to TUI WorkflowEvent.
+fn map_stream_to_tui(
+    ev: lynx_workflow::executor::StreamEvent,
+) -> lynx_tui::workflow::WorkflowEvent {
+    use lynx_workflow::executor::{StepStatus, StreamEvent};
+    use lynx_tui::workflow::{WorkflowEvent, WorkflowStepStatus};
+
+    match ev {
+        StreamEvent::StepStarted { name } => WorkflowEvent::StepStarted { name },
+        StreamEvent::StepOutput { name, line, is_stderr } => {
+            WorkflowEvent::StepOutput { name, line, is_stderr }
+        }
+        StreamEvent::StepFinished { name, status, duration_ms } => {
+            let tui_status = match status {
+                StepStatus::Passed => WorkflowStepStatus::Passed,
+                StepStatus::Failed => WorkflowStepStatus::Failed,
+                StepStatus::Skipped => WorkflowStepStatus::Skipped,
+                StepStatus::TimedOut => WorkflowStepStatus::TimedOut,
+            };
+            WorkflowEvent::StepFinished {
+                name,
+                status: tui_status,
+                duration_ms,
+            }
+        }
+        StreamEvent::Done { success, duration_ms } => {
+            WorkflowEvent::Done { success, duration_ms }
+        }
+    }
+}
+
+fn print_summary(result: &lynx_workflow::executor::JobResult) {
+    for step in &result.steps {
+        let status = match step.status {
+            lynx_workflow::executor::StepStatus::Passed => "\u{2713}",
+            lynx_workflow::executor::StepStatus::Failed => "\u{2717}",
+            lynx_workflow::executor::StepStatus::Skipped => "\u{2014}",
+            lynx_workflow::executor::StepStatus::TimedOut => "\u{23f0}",
+        };
+        println!("  {status} {}  ({}ms)", step.name, step.duration_ms);
+    }
+    println!();
+    if result.success {
+        println!("\u{2713} Workflow completed ({}ms)", result.duration_ms);
+    } else {
+        println!("\u{2717} Workflow failed ({}ms)", result.duration_ms);
+        println!("  Job ID: {}", result.job_id);
+    }
 }
 
 fn print_run_help() {

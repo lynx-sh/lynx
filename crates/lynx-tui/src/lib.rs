@@ -16,6 +16,7 @@
 mod item;
 mod list;
 mod preview;
+pub mod workflow;
 
 pub use item::{ListAction, ListItem, TuiColors};
 pub use list::{print_plain, run, show, ListResult};
