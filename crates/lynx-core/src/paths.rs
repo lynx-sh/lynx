@@ -32,8 +32,17 @@ use std::path::PathBuf;
 /// goes through a single place. For Lynx config paths, prefer the
 /// specific helpers (`lynx_dir()`, `config_file()`, etc.) over calling
 /// `home()` directly.
+///
+/// # Panics
+///
+/// Panics if `$HOME` is unset or empty. HOME is a fundamental requirement
+/// for Lynx to function — there is no sensible fallback.
 pub fn home() -> PathBuf {
-    PathBuf::from(std::env::var_os(env_vars::HOME).unwrap_or_default())
+    let val = std::env::var_os(env_vars::HOME).unwrap_or_default();
+    if val.is_empty() {
+        panic!("lynx: HOME environment variable is not set and home directory could not be determined");
+    }
+    PathBuf::from(val)
 }
 
 /// Resolve the Lynx config/install directory.
@@ -222,5 +231,13 @@ mod tests {
     fn cli_bin_uses_home() {
         let _h = HomeGuard::set("/home/testuser");
         assert_eq!(cli_bin(), PathBuf::from("/home/testuser/.local/bin/lx"));
+    }
+
+    #[test]
+    #[should_panic(expected = "HOME environment variable is not set")]
+    fn home_panics_when_unset() {
+        // HomeGuard with empty string simulates missing HOME
+        let _h = HomeGuard::set("");
+        home();
     }
 }

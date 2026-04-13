@@ -1,7 +1,7 @@
 use anyhow::{Context as _, Result};
 use lynx_core::error::LynxError;
 
-use super::open_in_vscode;
+use super::open_in_editor;
 use clap::{Args, Subcommand};
 
 use lynx_config::{load, snapshot::mutate_config_transaction};
@@ -223,7 +223,7 @@ fn cmd_edit(slug: &str) -> Result<()> {
     let snapshot = std::fs::read_to_string(&path)
         .with_context(|| format!("failed to read intro file {path:?}"))?;
 
-    open_in_vscode(&path)?;
+    open_in_editor(&path)?;
 
     // Validate the saved file.
     match lynx_intro::loader::load_user(slug) {
@@ -331,7 +331,7 @@ color = "muted"
     std::fs::write(&path, &template)
         .with_context(|| format!("failed to write new intro '{slug}'"))?;
 
-    open_in_vscode(&path)?;
+    open_in_editor(&path)?;
 
     // Validate after edit.
     match lynx_intro::loader::load_user(slug) {
