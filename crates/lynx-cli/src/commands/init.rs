@@ -172,3 +172,120 @@ fn load_plugin_manifests(plugin_dir: &str, enabled: &[String]) -> Vec<PluginMani
     }
     manifests
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn load_plugin_manifests_empty_list() {
+        let manifests = load_plugin_manifests("/nonexistent", &[]);
+        assert!(manifests.is_empty());
+    }
+
+    #[test]
+    fn load_plugin_manifests_missing_dir_returns_empty() {
+        let manifests = load_plugin_manifests("/nonexistent/dir", &["git".to_string()]);
+        assert!(manifests.is_empty());
+    }
+
+    #[test]
+    fn load_plugin_manifests_invalid_toml_skipped() {
+        let tmp = tempfile::tempdir().unwrap();
+        let plugin_dir = tmp.path().join("test-plugin");
+        std::fs::create_dir_all(&plugin_dir).unwrap();
+        std::fs::write(plugin_dir.join("plugin.toml"), "not valid toml {{{{").unwrap();
+
+        let manifests = load_plugin_manifests(
+            tmp.path().to_str().unwrap(),
+            &["test-plugin".to_string()],
+        );
+        assert!(manifests.is_empty());
+    }
+
+    #[test]
+    fn load_plugin_manifests_valid_manifest_loaded() {
+        let tmp = tempfile::tempdir().unwrap();
+        let plugin_dir = tmp.path().join("git");
+        std::fs::create_dir_all(&plugin_dir).unwrap();
+
+        let manifest = r#"
+[plugin]
+name = "git"
+version = "1.0.0"
+description = "Git integration"
+
+[load]
+lazy = false
+hooks = []
+
+[deps]
+binaries = ["git"]
+plugins = []
+
+[exports]
+functions = ["git_status"]
+aliases = []
+
+[contexts]
+disabled_in = ["agent"]
+"#;
+        std::fs::write(plugin_dir.join("plugin.toml"), manifest).unwrap();
+
+        let manifests = load_plugin_manifests(
+            tmp.path().to_str().unwrap(),
+            &["git".to_string()],
+        );
+        assert_eq!(manifests.len(), 1);
+        assert_eq!(manifests[0].plugin.name, "git");
+    }
+
+    #[test]
+    fn maybe_show_intro_disabled_is_noop() {
+        let mut cfg = lynx_config::schema::LynxConfig::default();
+        cfg.intro.enabled = false;
+        // Should return immediately without panic
+        maybe_show_intro(&cfg, Context::Interactive);
+    }
+
+    #[test]
+    fn maybe_show_intro_non_interactive_is_noop() {
+        let mut cfg = lynx_config::schema::LynxConfig::default();
+        cfg.intro.enabled = true;
+        cfg.intro.active = Some("default".into());
+        // Agent context should skip intro
+        maybe_show_intro(&cfg, Context::Agent);
+    }
+
+    #[test]
+    fn maybe_show_intro_no_active_slug_is_noop() {
+        let mut cfg = lynx_config::schema::LynxConfig::default();
+        cfg.intro.enabled = true;
+        cfg.intro.active = None;
+        maybe_show_intro(&cfg, Context::Interactive);
+    }
+
+    #[test]
+    fn init_args_default_no_context_override() {
+        use clap::Parser;
+        #[derive(Parser)]
+        struct W {
+            #[command(flatten)]
+            args: InitArgs,
+        }
+        let w = W::parse_from(["test"]);
+        assert!(w.args.context.is_none());
+    }
+
+    #[test]
+    fn init_args_context_override() {
+        use clap::Parser;
+        #[derive(Parser)]
+        struct W {
+            #[command(flatten)]
+            args: InitArgs,
+        }
+        let w = W::parse_from(["test", "--context", "agent"]);
+        assert_eq!(w.args.context.as_deref(), Some("agent"));
+    }
+}

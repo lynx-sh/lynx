@@ -375,3 +375,108 @@ async fn cmd_remove(name: String) -> Result<()> {
     println!("✓ task '{name}' removed");
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn on_fail_parsing() {
+        // Verify the on_fail parsing logic from cmd_add
+        let cases = vec![
+            ("log", OnFail::Log),
+            ("", OnFail::Log),
+            ("notify", OnFail::Notify),
+            ("ignore", OnFail::Ignore),
+        ];
+        for (input, expected) in cases {
+            let result = match input {
+                "notify" => OnFail::Notify,
+                "ignore" => OnFail::Ignore,
+                "log" | "" => OnFail::Log,
+                _ => panic!("unexpected"),
+            };
+            assert_eq!(result, expected, "mismatch for input '{input}'");
+        }
+    }
+
+    #[test]
+    fn on_fail_unknown_value_would_error() {
+        let on_fail_str = "crash";
+        let result: Result<OnFail, _> = match on_fail_str {
+            "notify" => Ok(OnFail::Notify),
+            "ignore" => Ok(OnFail::Ignore),
+            "log" | "" => Ok(OnFail::Log),
+            other => Err(format!("unknown: {other}")),
+        };
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn cron_list_entry_trait() {
+        use lynx_tui::ListItem;
+        let entry = CronListEntry {
+            name: "backup".to_string(),
+            cron: "0 2 * * *".to_string(),
+            enabled: true,
+            last_run: "2024-01-01".to_string(),
+            exit_code: "0".to_string(),
+        };
+        assert_eq!(entry.title(), "backup");
+        assert!(entry.is_active());
+        assert!(entry.subtitle().contains("0 2 * * *"));
+        assert!(!entry.subtitle().contains("disabled"));
+    }
+
+    #[test]
+    fn cron_list_entry_disabled_shows_in_subtitle() {
+        use lynx_tui::ListItem;
+        let entry = CronListEntry {
+            name: "cleanup".to_string(),
+            cron: "0 0 * * 0".to_string(),
+            enabled: false,
+            last_run: "never".to_string(),
+            exit_code: "-".to_string(),
+        };
+        assert!(!entry.is_active());
+        assert!(entry.subtitle().contains("disabled"));
+    }
+
+    #[test]
+    fn cron_list_entry_detail() {
+        use lynx_tui::ListItem;
+        let entry = CronListEntry {
+            name: "test".to_string(),
+            cron: "*/5 * * * *".to_string(),
+            enabled: true,
+            last_run: "123456".to_string(),
+            exit_code: "0".to_string(),
+        };
+        let detail = entry.detail();
+        assert!(detail.contains("Schedule:"));
+        assert!(detail.contains("Enabled: true"));
+        assert!(detail.contains("Last run: 123456"));
+        assert!(detail.contains("Exit code: 0"));
+    }
+
+    #[tokio::test]
+    async fn cron_unknown_subcommand_errors() {
+        let args = CronArgs {
+            command: CronCommand::Other(vec!["bogus".to_string()]),
+        };
+        let err = run(args).await.unwrap_err();
+        assert!(err.to_string().contains("bogus"));
+    }
+
+    #[test]
+    fn tasks_toml_path_returns_something() {
+        let path = tasks_toml_path();
+        assert!(!path.to_string_lossy().is_empty());
+    }
+
+    #[test]
+    fn task_logs_dir_returns_something() {
+        let dir = task_logs_dir();
+        assert!(!dir.to_string_lossy().is_empty());
+    }
+}

@@ -69,3 +69,27 @@ pub async fn run(args: EventArgs) -> Result<()> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn event_unknown_subcommand_returns_error() {
+        let args = EventArgs {
+            command: EventCommand::Other(vec!["bogus".to_string()]),
+        };
+        let err = run(args).await.unwrap_err();
+        assert!(err.to_string().contains("bogus"));
+    }
+
+    #[tokio::test]
+    async fn event_unknown_subcommand_empty_returns_error() {
+        let args = EventArgs {
+            command: EventCommand::Other(vec![]),
+        };
+        // Should not panic even with empty args
+        let result = run(args).await;
+        assert!(result.is_err());
+    }
+}

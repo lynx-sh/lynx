@@ -416,6 +416,47 @@ fn print_jobs_examples() {
     );
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn examples_no_command_does_not_error() {
+        let args = ExamplesArgs { command: None };
+        assert!(run(args).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn examples_known_commands_succeed() {
+        let commands = vec![
+            "plugin", "theme", "cron", "task", "event", "config",
+            "doctor", "context", "daemon", "run", "workflow", "jobs",
+            "dashboard",
+        ];
+        for cmd in commands {
+            let args = ExamplesArgs { command: Some(cmd.to_string()) };
+            assert!(run(args).await.is_ok(), "examples for '{cmd}' should succeed");
+        }
+    }
+
+    #[tokio::test]
+    async fn examples_unknown_command_errors() {
+        let args = ExamplesArgs { command: Some("nonexistent".to_string()) };
+        let err = run(args).await.unwrap_err();
+        assert!(err.to_string().contains("nonexistent"));
+    }
+
+    #[test]
+    fn print_quickstart_does_not_panic() {
+        print_quickstart();
+    }
+
+    #[test]
+    fn print_workflow_examples_does_not_panic() {
+        print_workflow_examples();
+    }
+}
+
 fn print_dashboard_examples() {
     println!(
         r#"

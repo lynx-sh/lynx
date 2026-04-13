@@ -95,3 +95,59 @@ fn parse_context(s: &str) -> anyhow::Result<Context> {
         }.into()),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_context_interactive() {
+        assert!(matches!(parse_context("interactive").unwrap(), Context::Interactive));
+    }
+
+    #[test]
+    fn parse_context_agent() {
+        assert!(matches!(parse_context("agent").unwrap(), Context::Agent));
+    }
+
+    #[test]
+    fn parse_context_minimal() {
+        assert!(matches!(parse_context("minimal").unwrap(), Context::Minimal));
+    }
+
+    #[test]
+    fn parse_context_invalid_returns_not_found() {
+        let err = parse_context("bogus").unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("bogus"), "error should contain the invalid name: {msg}");
+        assert!(msg.contains("Context"), "error should mention item type: {msg}");
+    }
+
+    #[test]
+    fn parse_context_empty_string_is_error() {
+        assert!(parse_context("").is_err());
+    }
+
+    #[test]
+    fn parse_context_case_sensitive() {
+        // "Interactive" (uppercase) should NOT match
+        assert!(parse_context("Interactive").is_err());
+        assert!(parse_context("AGENT").is_err());
+    }
+
+    #[test]
+    fn context_str_round_trips() {
+        assert_eq!(context_str(&Context::Interactive), "interactive");
+        assert_eq!(context_str(&Context::Agent), "agent");
+        assert_eq!(context_str(&Context::Minimal), "minimal");
+    }
+
+    #[test]
+    fn default_command_is_status() {
+        // When no subcommand given, should default to Status
+        let cmd = ContextArgs { command: None };
+        // The unwrap_or in run() converts None → Status
+        let resolved = cmd.command.unwrap_or(ContextCommand::Status);
+        assert!(matches!(resolved, ContextCommand::Status));
+    }
+}

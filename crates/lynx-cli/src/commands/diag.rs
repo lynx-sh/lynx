@@ -59,3 +59,68 @@ pub async fn run(args: DiagArgs) -> Result<()> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn diag_args_default_lines_is_50() {
+        // Verify the struct default via clap parsing
+        use clap::Parser;
+        #[derive(Parser)]
+        struct Wrapper {
+            #[command(flatten)]
+            args: DiagArgs,
+        }
+        let w = Wrapper::parse_from(["test"]);
+        assert_eq!(w.args.lines, 50);
+        assert!(w.args.command.is_none());
+    }
+
+    #[test]
+    fn diag_args_custom_lines() {
+        use clap::Parser;
+        #[derive(Parser)]
+        struct Wrapper {
+            #[command(flatten)]
+            args: DiagArgs,
+        }
+        let w = Wrapper::parse_from(["test", "-n", "10"]);
+        assert_eq!(w.args.lines, 10);
+    }
+
+    #[test]
+    fn diag_clear_subcommand_parses() {
+        use clap::Parser;
+        #[derive(Parser)]
+        struct Wrapper {
+            #[command(flatten)]
+            args: DiagArgs,
+        }
+        let w = Wrapper::parse_from(["test", "clear"]);
+        assert!(matches!(w.args.command, Some(DiagCommand::Clear)));
+    }
+
+    #[test]
+    fn diag_path_subcommand_parses() {
+        use clap::Parser;
+        #[derive(Parser)]
+        struct Wrapper {
+            #[command(flatten)]
+            args: DiagArgs,
+        }
+        let w = Wrapper::parse_from(["test", "path"]);
+        assert!(matches!(w.args.command, Some(DiagCommand::Path)));
+    }
+
+    #[tokio::test]
+    async fn diag_unknown_subcommand_returns_error() {
+        let args = DiagArgs {
+            command: Some(DiagCommand::Other(vec!["bogus".to_string()])),
+            lines: 50,
+        };
+        let err = run(args).await.unwrap_err();
+        assert!(err.to_string().contains("bogus"));
+    }
+}

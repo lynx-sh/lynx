@@ -159,3 +159,98 @@ impl lynx_tui::ListItem for BrowseListEntry {
         self.installed
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_type_valid_values() {
+        assert_eq!(parse_type("plugin").unwrap(), PackageType::Plugin);
+        assert_eq!(parse_type("tool").unwrap(), PackageType::Tool);
+        assert_eq!(parse_type("theme").unwrap(), PackageType::Theme);
+        assert_eq!(parse_type("intro").unwrap(), PackageType::Intro);
+        assert_eq!(parse_type("bundle").unwrap(), PackageType::Bundle);
+    }
+
+    #[test]
+    fn parse_type_invalid_returns_helpful_error() {
+        let err = parse_type("bogus").unwrap_err();
+        assert!(err.contains("bogus"));
+        assert!(err.contains("plugin"));
+    }
+
+    #[test]
+    fn parse_type_case_sensitive() {
+        assert!(parse_type("Plugin").is_err());
+        assert!(parse_type("TOOL").is_err());
+    }
+
+    #[test]
+    fn browse_list_entry_title_is_name() {
+        use lynx_tui::ListItem;
+        let entry = BrowseListEntry {
+            name: "fzf".to_string(),
+            description: "fuzzy finder".to_string(),
+            type_label: "tool".to_string(),
+            category: "search".to_string(),
+            tap: "core".to_string(),
+            installed: false,
+            themed: false,
+        };
+        assert_eq!(entry.title(), "fzf");
+        assert_eq!(entry.subtitle(), "fuzzy finder");
+        assert!(!entry.is_active());
+    }
+
+    #[test]
+    fn browse_list_entry_installed_is_active() {
+        use lynx_tui::ListItem;
+        let entry = BrowseListEntry {
+            name: "git".to_string(),
+            description: "git plugin".to_string(),
+            type_label: "plugin".to_string(),
+            category: "vcs".to_string(),
+            tap: "core".to_string(),
+            installed: true,
+            themed: true,
+        };
+        assert!(entry.is_active());
+        let detail = entry.detail();
+        assert!(detail.contains("installed"));
+        assert!(detail.contains("Theme integrated"));
+    }
+
+    #[test]
+    fn browse_list_entry_tags_include_all_metadata() {
+        use lynx_tui::ListItem;
+        let entry = BrowseListEntry {
+            name: "test".to_string(),
+            description: "desc".to_string(),
+            type_label: "plugin".to_string(),
+            category: "dev".to_string(),
+            tap: "community".to_string(),
+            installed: false,
+            themed: false,
+        };
+        let tags = entry.tags();
+        assert!(tags.contains(&"plugin"));
+        assert!(tags.contains(&"dev"));
+        assert!(tags.contains(&"community"));
+    }
+
+    #[test]
+    fn browse_list_entry_category() {
+        use lynx_tui::ListItem;
+        let entry = BrowseListEntry {
+            name: "x".to_string(),
+            description: "".to_string(),
+            type_label: "".to_string(),
+            category: "networking".to_string(),
+            tap: "".to_string(),
+            installed: false,
+            themed: false,
+        };
+        assert_eq!(entry.category(), Some("networking"));
+    }
+}

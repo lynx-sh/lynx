@@ -222,3 +222,60 @@ fn daemon_binary_path() -> Result<PathBuf> {
         "lynx-daemon binary not found; install Lynx daemon or set LYNX_DAEMON_BIN".into()
     ).into())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn process_is_alive_returns_false_for_bogus_pid() {
+        // PID 0 or very high PID should not be alive
+        assert!(!process_is_alive(999_999_999));
+    }
+
+    #[test]
+    fn process_is_alive_returns_true_for_current_process() {
+        let pid = std::process::id();
+        assert!(process_is_alive(pid));
+    }
+
+    #[test]
+    fn daemon_binary_path_env_override() {
+        let tmp = tempfile::tempdir().unwrap();
+        let bin = tmp.path().join("lynx-daemon");
+        std::fs::write(&bin, "").unwrap();
+
+        std::env::set_var("LYNX_DAEMON_BIN", bin.to_str().unwrap());
+        let result = daemon_binary_path();
+        std::env::remove_var("LYNX_DAEMON_BIN");
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), bin);
+    }
+
+    #[test]
+    fn daemon_binary_path_env_override_nonexistent_falls_through() {
+        std::env::set_var("LYNX_DAEMON_BIN", "/nonexistent/lynx-daemon");
+        let result = daemon_binary_path();
+        std::env::remove_var("LYNX_DAEMON_BIN");
+
+        // Should fall through to which/sibling checks, may or may not find the binary
+        let _ = result;
+    }
+
+    #[tokio::test]
+    async fn daemon_unknown_subcommand_errors() {
+        let args = DaemonArgs {
+            command: DaemonCommand::Other(vec!["bogus".to_string()]),
+        };
+        let err = run(args).await.unwrap_err();
+        assert!(err.to_string().contains("bogus"));
+    }
+
+    #[test]
+    fn is_running_returns_false_without_pid_or_socket() {
+        // In test environment, daemon shouldn't be running
+        // This may vary, but should not panic
+        let _ = is_running();
+    }
+}

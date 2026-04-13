@@ -340,6 +340,130 @@ fn print_run_help() {
     );
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn workflow_list_entry_trait() {
+        use lynx_tui::ListItem;
+        let entry = WorkflowListEntry {
+            name: "deploy".to_string(),
+            description: "Deploy to prod".to_string(),
+        };
+        assert_eq!(entry.title(), "deploy");
+        assert_eq!(entry.subtitle(), "Deploy to prod");
+        assert!(entry.detail().contains("lx run deploy"));
+        assert_eq!(entry.category(), Some("workflow"));
+    }
+
+    #[test]
+    fn map_stream_to_tui_step_started() {
+        use lynx_workflow::executor::StreamEvent;
+        let ev = StreamEvent::StepStarted { name: "lint".to_string() };
+        let tui_ev = map_stream_to_tui(ev);
+        assert!(matches!(tui_ev, lynx_tui::workflow::WorkflowEvent::StepStarted { name } if name == "lint"));
+    }
+
+    #[test]
+    fn map_stream_to_tui_step_output() {
+        use lynx_workflow::executor::StreamEvent;
+        let ev = StreamEvent::StepOutput {
+            name: "test".to_string(),
+            line: "ok".to_string(),
+            is_stderr: false,
+        };
+        let tui_ev = map_stream_to_tui(ev);
+        assert!(matches!(tui_ev, lynx_tui::workflow::WorkflowEvent::StepOutput { .. }));
+    }
+
+    #[test]
+    fn map_stream_to_tui_step_finished_all_statuses() {
+        use lynx_workflow::executor::{StreamEvent, StepStatus};
+        use lynx_tui::workflow::{WorkflowEvent, WorkflowStepStatus};
+
+        for (input, expected) in [
+            (StepStatus::Passed, WorkflowStepStatus::Passed),
+            (StepStatus::Failed, WorkflowStepStatus::Failed),
+            (StepStatus::Skipped, WorkflowStepStatus::Skipped),
+            (StepStatus::TimedOut, WorkflowStepStatus::TimedOut),
+        ] {
+            let ev = StreamEvent::StepFinished {
+                name: "s".to_string(),
+                status: input,
+                duration_ms: 100,
+            };
+            let tui_ev = map_stream_to_tui(ev);
+            match tui_ev {
+                WorkflowEvent::StepFinished { status, .. } => assert_eq!(status, expected),
+                _ => panic!("expected StepFinished"),
+            }
+        }
+    }
+
+    #[test]
+    fn map_stream_to_tui_done() {
+        use lynx_workflow::executor::StreamEvent;
+        let ev = StreamEvent::Done { success: true, duration_ms: 500 };
+        let tui_ev = map_stream_to_tui(ev);
+        assert!(matches!(tui_ev, lynx_tui::workflow::WorkflowEvent::Done { success: true, duration_ms: 500 }));
+    }
+
+    #[test]
+    fn parse_key_value_params_valid() {
+        let params = vec!["env=staging".to_string(), "verbose=true".to_string()];
+        let mut provided = HashMap::new();
+        for param in &params {
+            if let Some((k, v)) = param.split_once('=') {
+                provided.insert(k.to_string(), v.to_string());
+            }
+        }
+        assert_eq!(provided.get("env").unwrap(), "staging");
+        assert_eq!(provided.get("verbose").unwrap(), "true");
+    }
+
+    #[test]
+    fn parse_key_value_params_no_equals_not_inserted() {
+        let params = vec!["no-equals-here".to_string()];
+        let mut provided = HashMap::new();
+        for param in &params {
+            if let Some((k, v)) = param.split_once('=') {
+                provided.insert(k.to_string(), v.to_string());
+            }
+        }
+        assert!(provided.is_empty());
+    }
+
+    #[test]
+    fn parse_key_value_params_value_with_equals() {
+        // "key=value=extra" should split at first =
+        let param = "url=https://example.com?a=b";
+        let (k, v) = param.split_once('=').unwrap();
+        assert_eq!(k, "url");
+        assert_eq!(v, "https://example.com?a=b");
+    }
+
+    #[test]
+    fn run_args_defaults() {
+        use clap::Parser;
+        #[derive(Parser)]
+        struct W {
+            #[command(flatten)]
+            args: RunArgs,
+        }
+        let w = W::parse_from(["test"]);
+        assert!(w.args.workflow.is_none());
+        assert!(!w.args.bg);
+        assert!(!w.args.dry_run);
+        assert!(!w.args.yes);
+    }
+
+    #[test]
+    fn print_run_help_does_not_panic() {
+        print_run_help();
+    }
+}
+
 fn cmd_list() -> Result<()> {
     let entries = lynx_workflow::store::list_workflows()?;
     if entries.is_empty() {

@@ -181,3 +181,46 @@ fn timestamp() -> String {
         .unwrap_or(0);
     format!("{ts}")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn timestamp_returns_numeric_string() {
+        let ts = timestamp();
+        assert!(ts.parse::<u64>().is_ok(), "timestamp should be numeric: {ts}");
+        assert!(ts.len() >= 10, "timestamp should be at least 10 digits: {ts}");
+    }
+
+    #[test]
+    fn ensure_git_repo_fails_without_git_dir() {
+        let tmp = tempfile::tempdir().unwrap();
+        let result = ensure_git_repo(tmp.path());
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("not a git repo"), "unexpected error: {msg}");
+    }
+
+    #[test]
+    fn ensure_git_repo_succeeds_with_git_dir() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(tmp.path().join(".git")).unwrap();
+        assert!(ensure_git_repo(tmp.path()).is_ok());
+    }
+
+    #[test]
+    fn config_dir_contains_brand_config_dir() {
+        let dir = config_dir();
+        assert!(dir.to_string_lossy().contains(brand::CONFIG_DIR));
+    }
+
+    #[tokio::test]
+    async fn sync_unknown_subcommand_errors() {
+        let args = SyncArgs {
+            command: SyncCommand::Other(vec!["oops".to_string()]),
+        };
+        let err = run(args).await.unwrap_err();
+        assert!(err.to_string().contains("oops"));
+    }
+}

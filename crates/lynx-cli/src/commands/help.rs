@@ -345,3 +345,67 @@ fn load_tui_colors() -> lynx_tui::TuiColors {
         Err(_) => lynx_tui::TuiColors::default(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn entries_is_not_empty() {
+        assert!(!ENTRIES.is_empty(), "help entries should not be empty");
+    }
+
+    #[test]
+    fn all_entries_have_command_and_description() {
+        for entry in ENTRIES {
+            assert!(!entry.command.is_empty(), "entry has empty command");
+            assert!(!entry.description.is_empty(), "entry {} has empty description", entry.command);
+            assert!(!entry.usage.is_empty(), "entry {} has empty usage", entry.command);
+        }
+    }
+
+    #[test]
+    fn all_entries_have_valid_category() {
+        let valid_cats = ["core", "themes", "plugins", "registry", "shell", "automation", "developer"];
+        for entry in ENTRIES {
+            assert!(
+                valid_cats.contains(&entry.category),
+                "entry {} has unknown category '{}'", entry.command, entry.category
+            );
+        }
+    }
+
+    #[test]
+    fn help_entry_list_item_trait() {
+        use lynx_tui::ListItem;
+        let entry = &ENTRIES[0];
+        assert_eq!(entry.title(), entry.command);
+        assert_eq!(entry.subtitle(), entry.description);
+        assert!(entry.detail().contains("Usage:"));
+        assert_eq!(entry.category(), Some(entry.category));
+    }
+
+    #[test]
+    fn help_entry_detail_includes_extra_when_present() {
+        use lynx_tui::ListItem;
+        // Find an entry with non-empty extra (the "run" command has it)
+        let run_entry = ENTRIES.iter().find(|e| e.command == "run").unwrap();
+        let detail = run_entry.detail();
+        assert!(detail.contains("Workflows"), "run entry detail should contain extended help");
+    }
+
+    #[test]
+    fn no_duplicate_commands() {
+        let mut seen = std::collections::HashSet::new();
+        for entry in ENTRIES {
+            assert!(seen.insert(entry.command), "duplicate help entry for '{}'", entry.command);
+        }
+    }
+
+    #[test]
+    fn load_tui_colors_fallback() {
+        // Should return default colors without panicking even if config is missing
+        let colors = load_tui_colors();
+        let _ = colors;
+    }
+}

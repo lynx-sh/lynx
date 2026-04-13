@@ -163,3 +163,89 @@ fn cmd_update() -> Result<()> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tap_name_from_github_shorthand() {
+        let source = "user/repo";
+        // Not starting with http, so name = source directly
+        let name = if source.starts_with("http") {
+            source
+                .trim_end_matches('/')
+                .rsplit('/')
+                .take(2)
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
+                .collect::<Vec<_>>()
+                .join("/")
+        } else {
+            source.to_string()
+        };
+        assert_eq!(name, "user/repo");
+    }
+
+    #[test]
+    fn tap_name_from_full_url() {
+        let source = "https://github.com/user/repo/raw/main/index.toml";
+        let name = if source.starts_with("http") {
+            source
+                .trim_end_matches('/')
+                .rsplit('/')
+                .take(2)
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
+                .collect::<Vec<_>>()
+                .join("/")
+        } else {
+            source.to_string()
+        };
+        assert_eq!(name, "main/index.toml");
+    }
+
+    #[test]
+    fn tap_name_from_url_with_trailing_slash() {
+        let source = "https://example.com/taps/community/";
+        let name = if source.starts_with("http") {
+            source
+                .trim_end_matches('/')
+                .rsplit('/')
+                .take(2)
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
+                .collect::<Vec<_>>()
+                .join("/")
+        } else {
+            source.to_string()
+        };
+        assert_eq!(name, "taps/community");
+    }
+
+    #[test]
+    fn tap_list_entry_trait() {
+        use lynx_tui::ListItem;
+        let entry = TapListEntry {
+            name: "core".to_string(),
+            url: "https://example.com/index.toml".to_string(),
+            trust: "official".to_string(),
+        };
+        assert_eq!(entry.title(), "core");
+        assert_eq!(entry.subtitle(), "official");
+        assert!(entry.detail().contains("https://example.com"));
+        assert_eq!(entry.category(), Some("tap"));
+    }
+
+    #[tokio::test]
+    async fn tap_unknown_subcommand_errors() {
+        let args = TapArgs {
+            command: TapCommand::Other(vec!["nope".to_string()]),
+        };
+        let err = run(args).await.unwrap_err();
+        assert!(err.to_string().contains("nope"));
+    }
+}

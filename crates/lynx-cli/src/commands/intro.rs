@@ -394,6 +394,89 @@ fn append_logo_to_active_intro(font: &str, text: &str) -> Result<()> {
 }
 
 /// Copy a built-in intro to the user intro directory and return the path.
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn intro_list_entry_trait_active_enabled() {
+        use lynx_tui::ListItem;
+        let entry = IntroListEntry {
+            slug: "default".to_string(),
+            name: "Default".to_string(),
+            kind: "built-in".to_string(),
+            is_current: true,
+            enabled: true,
+        };
+        assert_eq!(entry.title(), "default");
+        assert!(entry.is_active());
+        assert_eq!(entry.category(), Some("intro"));
+        let detail = entry.detail();
+        assert!(detail.contains("active"));
+    }
+
+    #[test]
+    fn intro_list_entry_trait_active_disabled() {
+        use lynx_tui::ListItem;
+        let entry = IntroListEntry {
+            slug: "minimal".to_string(),
+            name: "Minimal".to_string(),
+            kind: "user".to_string(),
+            is_current: true,
+            enabled: false,
+        };
+        let sub = entry.subtitle();
+        assert!(sub.contains("disabled"), "subtitle should note disabled: {sub}");
+    }
+
+    #[test]
+    fn intro_list_entry_not_current() {
+        use lynx_tui::ListItem;
+        let entry = IntroListEntry {
+            slug: "other".to_string(),
+            name: "Other".to_string(),
+            kind: "built-in".to_string(),
+            is_current: false,
+            enabled: true,
+        };
+        assert!(!entry.is_active());
+    }
+
+    #[test]
+    fn cmd_new_rejects_empty_slug() {
+        let result = cmd_new("");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("invalid slug"));
+    }
+
+    #[test]
+    fn cmd_new_rejects_path_traversal() {
+        assert!(cmd_new("../escape").is_err());
+        assert!(cmd_new("foo/bar").is_err());
+        assert!(cmd_new("foo\\bar").is_err());
+    }
+
+    #[test]
+    fn cmd_delete_rejects_builtin() {
+        // Built-in intros should not be deletable
+        let builtins = loader::list_builtin();
+        for slug in &builtins {
+            let result = cmd_delete(slug);
+            assert!(result.is_err(), "built-in '{slug}' should not be deletable");
+            assert!(result.unwrap_err().to_string().contains("built-in"));
+        }
+    }
+
+    #[tokio::test]
+    async fn intro_unknown_subcommand_multi_args_errors() {
+        let args = IntroArgs {
+            command: IntroCommand::Other(vec!["a".to_string(), "b".to_string()]),
+        };
+        let err = run(args).await.unwrap_err();
+        assert!(err.to_string().contains("a"));
+    }
+}
+
 fn copy_builtin_to_user(slug: &str) -> Result<std::path::PathBuf> {
     let intro = loader::load_builtin(slug)
         .ok_or_else(|| anyhow::Error::from(lynx_core::error::LynxError::NotFound {
