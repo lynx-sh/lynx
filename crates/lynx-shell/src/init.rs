@@ -31,8 +31,9 @@ pub struct InitParams<'a> {
     /// Preferred editor binary from config (e.g. `code`, `zed`, `vim`).
     /// When set, exported as `$VISUAL` only if `$VISUAL` is not already set in the environment.
     pub editor: Option<&'a str>,
-    /// Pre-generated zsh completion script from `lx completions zsh`.
-    /// Inlined into the init script so completions are always current.
+    /// Path to the directory containing the `_lx` completion file.
+    /// Added to `$fpath` so compinit finds it, plus conditional `compdef` for
+    /// shells where compinit has already run (e.g. macOS /etc/zshrc).
     pub completions_zsh: Option<&'a str>,
 }
 
@@ -176,12 +177,17 @@ pub fn generate_init_script(params: &InitParams<'_>) -> String {
         }
     }
 
-    // lx tab completions — inline the generated zsh completion function and register
-    // it with compdef so `lx <Tab>` shows subcommands instead of falling back to files.
-    if let Some(completions) = params.completions_zsh {
-        out.push_str(completions);
-        out.push('\n');
-        out.push_str("  compdef _lx lx\n");
+    // lx tab completions — add the completions dir to $fpath so compinit picks up
+    // _lx automatically. Also call compdef conditionally for shells where compinit
+    // has already run (e.g. macOS sources /etc/zshrc before ~/.zshrc).
+    if let Some(completions_dir) = params.completions_zsh {
+        out.push_str(&format!(
+            "  fpath=({} $fpath)\n",
+            shell_quote(completions_dir)
+        ));
+        // compdef is only available after compinit. Use (( $+functions[compdef] )) to
+        // guard so this is safe regardless of where compinit sits in the user's zshrc.
+        out.push_str("  (( $+functions[compdef] )) && compdef _lx lx\n");
     }
 
     // Editor preference from config — exported as $VISUAL only if not already set.

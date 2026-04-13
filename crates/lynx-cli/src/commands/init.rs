@@ -100,13 +100,26 @@ pub fn run(args: InitArgs) -> Result<()> {
 
     let user_paths: Vec<String> = config.paths.iter().map(|p| p.path.clone()).collect();
 
-    // Generate zsh completions inline — always current, no stale file on disk.
+    // Write _lx completion function to $LYNX_DIR/shell/completions/_lx.
+    // Adding that dir to $fpath lets compinit pick it up regardless of whether
+    // compinit has already run. We also conditionally call compdef if it's available.
+    let completions_dir = lynx_core::paths::lynx_dir().join("shell").join("completions");
+    let _ = std::fs::create_dir_all(&completions_dir);
+    let completions_file = completions_dir.join("_lx");
     let completions_zsh = {
         let mut buf = Vec::new();
         let mut cmd = crate::cli::Cli::command();
         generate(Shell::Zsh, &mut cmd, "lx", &mut buf);
         String::from_utf8(buf).unwrap_or_default()
     };
+    // Only write if changed — avoids touching mtime on every shell start.
+    let should_write = std::fs::read_to_string(&completions_file)
+        .map(|existing| existing != completions_zsh)
+        .unwrap_or(true);
+    if should_write {
+        let _ = std::fs::write(&completions_file, &completions_zsh);
+    }
+    let completions_dir_str = completions_dir.to_string_lossy().into_owned();
 
     let script = generate_init_script(&InitParams {
         context: &context,
@@ -122,7 +135,7 @@ pub fn run(args: InitArgs) -> Result<()> {
         user_aliases: &config.aliases,
         user_paths: &user_paths,
         editor: config.editor.as_deref(),
-        completions_zsh: Some(&completions_zsh),
+        completions_zsh: Some(&completions_dir_str),
     });
 
     print!("{script}");
