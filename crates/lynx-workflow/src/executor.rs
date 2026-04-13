@@ -705,6 +705,65 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn streaming_emits_events_for_all_steps() {
+        let mut s1 = make_step("lint", "echo lint-ok");
+        s1.group = Some("checks".into());
+        let mut s2 = make_step("test", "echo test-ok");
+        s2.group = Some("checks".into());
+        let s3 = make_step("build", "echo build-ok");
+
+        let wf = make_workflow(vec![s1, s2, s3]);
+        let (tx, rx) = std::sync::mpsc::channel();
+
+        let result = execute_workflow_streaming(&wf, &HashMap::new(), None, tx)
+            .await
+            .unwrap();
+
+        assert!(result.success);
+        assert_eq!(result.steps.len(), 3);
+
+        // Collect all events.
+        let events: Vec<StreamEvent> = rx.try_iter().collect();
+
+        // Every step must have a StepStarted event.
+        let started: Vec<String> = events
+            .iter()
+            .filter_map(|e| match e {
+                StreamEvent::StepStarted { name } => Some(name.clone()),
+                _ => None,
+            })
+            .collect();
+        assert!(started.contains(&"lint".to_string()), "lint missing StepStarted");
+        assert!(started.contains(&"test".to_string()), "test missing StepStarted");
+        assert!(started.contains(&"build".to_string()), "build missing StepStarted");
+
+        // Every step must have a StepFinished event.
+        let finished: Vec<String> = events
+            .iter()
+            .filter_map(|e| match e {
+                StreamEvent::StepFinished { name, .. } => Some(name.clone()),
+                _ => None,
+            })
+            .collect();
+        assert!(finished.contains(&"lint".to_string()), "lint missing StepFinished");
+        assert!(finished.contains(&"test".to_string()), "test missing StepFinished");
+        assert!(finished.contains(&"build".to_string()), "build missing StepFinished");
+
+        // Build must have output (echo build-ok).
+        let build_output: Vec<&StreamEvent> = events
+            .iter()
+            .filter(|e| matches!(e, StreamEvent::StepOutput { name, .. } if name == "build"))
+            .collect();
+        assert!(!build_output.is_empty(), "build step should have output");
+
+        // Must end with Done.
+        assert!(
+            matches!(events.last(), Some(StreamEvent::Done { success: true, .. })),
+            "last event should be Done"
+        );
+    }
+
+    #[tokio::test]
     async fn condition_passes() {
         let mut step = make_step("cond", "true");
         step.condition = Some("$deploy == yes".into());

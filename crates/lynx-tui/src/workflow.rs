@@ -126,13 +126,22 @@ impl TuiState {
     fn handle_event(&mut self, event: WorkflowEvent) {
         match event {
             WorkflowEvent::StepStarted { name } => {
+                // Auto-advance the step list selection to the running step.
+                if let Some(idx) = self.steps.iter().position(|s| s.name == name) {
+                    self.list_state.select(Some(idx));
+                }
                 if let Some(s) = self.steps.iter_mut().find(|s| s.name == name) {
                     s.status = WorkflowStepStatus::Running;
                 }
-                // Add a visible marker so every step appears in the output pane.
+                // Add a visible separator so every step is clearly visible in output.
+                self.output_lines.push(OutputLine {
+                    step_name: name.clone(),
+                    text: String::new(),
+                    is_stderr: false,
+                });
                 self.output_lines.push(OutputLine {
                     step_name: name,
-                    text: "\u{2500}\u{2500} started".to_string(),
+                    text: "\u{2500}\u{2500}\u{2500} started \u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}".to_string(),
                     is_stderr: false,
                 });
                 if self.auto_scroll {
@@ -514,7 +523,17 @@ fn render_output(
         .iter()
         .map(|line| {
             let prefix_style = Style::default().fg(colors.muted);
-            let text_style = if line.is_stderr {
+
+            // Marker lines (started/finished) render in accent color.
+            let is_marker = line.text.contains("\u{2500}\u{2500}\u{2500}")
+                || line.text.starts_with('\u{2713}')
+                || line.text.starts_with('\u{2717}')
+                || line.text.starts_with('\u{2014}')
+                || line.text.starts_with('\u{23f0}');
+
+            let text_style = if is_marker {
+                Style::default().fg(colors.accent)
+            } else if line.is_stderr {
                 Style::default().fg(colors.warning)
             } else {
                 Style::default()
