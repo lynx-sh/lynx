@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use anyhow::{Context as _, Result};
 use lynx_core::error::LynxError;
 
-use super::open_in_vscode;
+use super::open_in_editor;
 use clap::{Args, Subcommand};
 
 use lynx_config::{load, snapshot::mutate_config_transaction};
@@ -314,7 +314,7 @@ async fn cmd_edit() -> Result<()> {
     let snapshot = std::fs::read_to_string(&path)
         .with_context(|| format!("failed to read theme file {path:?}"))?;
 
-    open_in_vscode(&path)?;
+    open_in_editor(&path)?;
 
     // Validate the saved file.
     match lynx_theme::loader::load_from_path(&path) {

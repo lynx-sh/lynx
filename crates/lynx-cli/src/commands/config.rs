@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use super::open_in_vscode;
+use super::open_in_editor;
 use clap::{Args, Subcommand};
 
 use lynx_config::snapshot::{create as snapshot, mutate_config_transaction};
@@ -68,7 +68,7 @@ fn cmd_edit() -> Result<()> {
 
     let file_existed = path.exists();
     let snapshot_content = std::fs::read_to_string(&path).unwrap_or_default();
-    open_in_vscode(&path)?;
+    open_in_editor(&path)?;
     // VS Code edits in place; re-read to check for changes.
     let after = std::fs::read_to_string(&path).unwrap_or_default();
     if after == snapshot_content && (file_existed || after.is_empty()) {

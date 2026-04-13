@@ -56,20 +56,40 @@ pub(crate) fn tui_colors() -> lynx_tui::TuiColors {
     }
 }
 
-/// Open a file in VS Code (blocking until the window/tab is closed).
-/// Errors with a clear install message if `code` is not in PATH.
-pub(crate) fn open_in_vscode(path: &std::path::Path) -> Result<()> {
-    let status = std::process::Command::new("code")
-        .arg("--wait")
-        .arg(path)
-        .status()
-        .map_err(|_| anyhow::Error::from(lynx_core::error::LynxError::Shell(
-            "VS Code is required to edit this file — install from https://code.visualstudio.com and ensure `code` is in PATH".into()
-        )))?;
+/// Open a file in the user's preferred editor (blocking until the editor exits).
+///
+/// Respects `$VISUAL` first, then `$EDITOR`, falling back to `code` (VS Code).
+/// Passes `--wait` only for GUI editors (`code`, `cursor`) that need it.
+pub(crate) fn open_in_editor(path: &std::path::Path) -> Result<()> {
+    let editor = std::env::var("VISUAL")
+        .or_else(|_| std::env::var("EDITOR"))
+        .unwrap_or_else(|_| "code".to_string());
+
+    let editor_bin = std::path::Path::new(&editor)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or(&editor)
+        .to_string();
+
+    let needs_wait = editor_bin == "code" || editor_bin == "cursor";
+
+    let mut cmd = std::process::Command::new(&editor);
+    if needs_wait {
+        cmd.arg("--wait");
+    }
+    cmd.arg(path);
+
+    let status = cmd.status().map_err(|_| {
+        anyhow::Error::from(LynxError::Shell(
+            format!(
+                "No editor found — set VISUAL or EDITOR env var, or install VS Code (tried: {editor})"
+            )
+        ))
+    })?;
 
     if !status.success() {
         return Err(LynxError::Shell(
-            "VS Code exited with an error — file may not have been saved".into(),
+            format!("Editor `{editor}` exited with an error — file may not have been saved"),
         )
         .into());
     }
@@ -127,6 +147,6 @@ mod tests {
         let _ = colors;
     }
 
-    // Note: open_in_vscode is not unit-testable without mocking Command.
+    // Note: open_in_editor is not unit-testable without mocking Command.
     // It spawns VS Code with --wait which blocks. Tested via integration tests.
 }

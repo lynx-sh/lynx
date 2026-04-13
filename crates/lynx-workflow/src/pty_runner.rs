@@ -107,6 +107,13 @@ pub async fn run_in_pty(
     });
 
     // Apply timeout if configured.
+    //
+    // Because `child` is not Send, it must be waited on inside spawn_blocking.
+    // We capture the child PID *before* moving child into the blocking task so
+    // that, on timeout, we can kill the orphaned process by PID — the only
+    // way to reach it once it has been moved into the task.
+    let child_pid = child.process_id();
+
     let exit_result: Result<i32, ()> = if let Some(timeout_sec) = step.timeout_sec {
         let timeout = std::time::Duration::from_secs(timeout_sec);
         match tokio::time::timeout(timeout, tokio::task::spawn_blocking(move || child.wait()))
@@ -114,6 +121,17 @@ pub async fn run_in_pty(
         {
             Ok(Ok(Ok(status))) => Ok(status.exit_code() as i32),
             _ => {
+                // Kill the orphaned child process by PID before returning.
+                // Dropping pair.master closes the PTY fd, causing read_handle to see
+                // EOF and terminate naturally.
+                if let Some(pid) = child_pid {
+                    // SIGKILL the child so it doesn't run indefinitely.
+                    let _ = std::process::Command::new("kill")
+                        .args(["-9", &pid.to_string()])
+                        .status();
+                    tracing::warn!(step = %step_name, pid = pid, "PTY child killed after timeout");
+                }
+                drop(pair.master);
                 let _ = tx.send(StreamEvent::StepOutput {
                     name: step_name.to_string(),
                     line: format!("timed out after {timeout_sec}s"),
