@@ -121,7 +121,7 @@ pub async fn run(args: ThemeArgs) -> Result<()> {
             cmd_patch("segment.prompt_char.color.fg", &color).await
         }
         ThemeCommand::Segment(seg) => cmd_segment(seg).await,
-        ThemeCommand::Convert { source, name, force } => cmd_convert(&source, name.as_deref(), force).await,
+        ThemeCommand::Convert { source, name, force } => super::theme_convert::run(&source, name.as_deref(), force).await,
         ThemeCommand::Studio => {
             eprintln!("Note: `lx theme studio` is deprecated. Use `lx dashboard` instead.");
             lynx_dashboard::run().await
@@ -142,7 +142,7 @@ async fn cmd_set(name: &str) -> Result<()> {
 
     // Check if theme uses powerline/nerd font glyphs.
     if super::nerd_font::theme_needs_nerd_font(&theme)
-        && !ensure_nerd_font_ready()? {
+        && !super::nerd_font::ensure_nerd_font_ready()? {
             println!("theme not changed");
             return Ok(());
         }
@@ -159,103 +159,6 @@ async fn cmd_set(name: &str) -> Result<()> {
     println!("theme set to '{name}'");
     Ok(())
 }
-
-/// Ensure a Nerd Font is installed AND the terminal is configured to use it.
-/// Returns true if ready to proceed, false if user chose to cancel.
-fn ensure_nerd_font_ready() -> Result<bool> {
-    use super::nerd_font;
-
-    let fonts = nerd_font::find_installed_nerd_fonts();
-    let terminal_ok = nerd_font::terminal_using_nerd_font();
-
-    if terminal_ok {
-        return Ok(true); // Font installed and terminal using it — good to go.
-    }
-
-    if fonts.is_empty() {
-        // No Nerd Font installed at all.
-        println!("⚠ This theme uses powerline glyphs that require a Nerd Font.");
-        println!("  Without one, separator characters will render as □ or ?.");
-        println!();
-        print!("  Download and install a Nerd Font? [y]es / [n]o / [s]kip: ");
-        std::io::Write::flush(&mut std::io::stdout())?;
-
-        let choice = read_line_lower()?;
-        match choice.as_str() {
-            "y" | "yes" => {
-                let family = nerd_font::install_nerd_font()
-                    .context("font installation failed")?;
-                return offer_terminal_config(&family);
-            }
-            "s" | "skip" => return Ok(true),
-            _ => return Ok(false),
-        }
-    }
-
-    // Fonts exist on disk but terminal isn't using one.
-    let first = &fonts[0];
-    println!("⚠ Nerd Font found ({first}) but your terminal isn't using it.");
-    println!("  Powerline glyphs will render as □ until the terminal font is changed.");
-    println!();
-
-    offer_terminal_config(first)
-}
-
-/// Offer to auto-configure the terminal font. Returns true to proceed, false to cancel.
-fn offer_terminal_config(font_family: &str) -> Result<bool> {
-    use super::nerd_font;
-
-    // Detect terminal and offer auto-config if supported.
-    if std::env::var("ITERM_SESSION_ID").is_ok()
-        || std::env::var("TERM_PROGRAM").as_deref() == Ok("iTerm.app")
-    {
-        print!("  Configure iTerm2 to use {font_family}? [y]es / [n]o: ");
-        std::io::Write::flush(&mut std::io::stdout())?;
-
-        let choice = read_line_lower()?;
-        if choice.starts_with('y') {
-            // Read current font size.
-            let size = current_iterm2_font_size().unwrap_or(12);
-            nerd_font::configure_iterm2_font(font_family, size)?;
-            return Ok(true);
-        }
-        // User declined auto-config — tell them how to do it manually.
-        println!("  → iTerm2: Settings → Profiles → Text → Font → \"{font_family}\"");
-    } else {
-        println!("  → Set your terminal font to \"{font_family}\" in terminal preferences.");
-    }
-
-    print!("  Continue setting theme? [y/n]: ");
-    std::io::Write::flush(&mut std::io::stdout())?;
-    let choice = read_line_lower()?;
-    Ok(choice.starts_with('y'))
-}
-
-fn read_line_lower() -> Result<String> {
-    let mut input = String::new();
-    std::io::stdin().read_line(&mut input)?;
-    Ok(input.trim().to_lowercase())
-}
-
-/// Read the current font size from iTerm2 preferences.
-fn current_iterm2_font_size() -> Option<u32> {
-    let output = std::process::Command::new("defaults")
-        .args(["read", "com.googlecode.iterm2", "New Bookmarks"])
-        .output()
-        .ok()?;
-    let text = String::from_utf8_lossy(&output.stdout);
-    for line in text.lines() {
-        let trimmed = line.trim();
-        if trimmed.starts_with("\"Normal Font\"") {
-            // "Normal Font" = "Monaco 12";
-            let val = trimmed.split('=').nth(1)?.trim().trim_matches(';').trim().trim_matches('"');
-            let size_str = val.split_whitespace().last()?;
-            return size_str.parse().ok();
-        }
-    }
-    None
-}
-
 
 async fn cmd_random() -> Result<()> {
     let cfg = load().context("failed to load config")?;
@@ -519,90 +422,6 @@ async fn emit_theme_changed(name: &str) {
     let bus = crate::bus::build_active_bus(&config.active_context, &plugins_dir);
     let data = serde_json::json!({ "theme": name }).to_string();
     bus.emit(Event::new(THEME_CHANGED, data)).await;
-}
-
-async fn cmd_convert(source: &str, name: Option<&str>, force: bool) -> Result<()> {
-    // Resolve source.
-    let resolved = lynx_convert::fetch::resolve_source(source)
-        .context("failed to resolve theme source")?;
-
-    // Derive theme name from source or use provided name.
-    let theme_name = name
-        .map(|n| n.to_string())
-        .unwrap_or_else(|| {
-            let stem = std::path::Path::new(source)
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("converted")
-                .to_string();
-            // Strip .omp / .zsh-theme suffixes from multi-extension filenames
-            // e.g. "atomic.omp" → "atomic", "candy.zsh-theme" → "candy"
-            stem.strip_suffix(".omp")
-                .or_else(|| stem.strip_suffix(".zsh-theme"))
-                .unwrap_or(&stem)
-                .to_string()
-        });
-
-    // Check for existing file.
-    let out_path = user_theme_dir().join(format!("{theme_name}.toml"));
-    if out_path.exists() && !force {
-        return Err(LynxError::Theme(format!("theme '{}' already exists at {}. Use --force to overwrite.", theme_name, out_path.display())).into());
-    }
-
-    // Fetch content.
-    let content = lynx_convert::fetch::fetch_content(&resolved)
-        .context("failed to fetch theme content")?;
-
-    // Auto-detect format: JSON = OMP, anything else = OMZ.
-    let is_omp = content.trim_start().starts_with('{');
-
-    // Write.
-    std::fs::create_dir_all(user_theme_dir())?;
-
-    if is_omp {
-        // Oh-My-Posh JSON theme.
-        let theme = lynx_convert::omp::parse(&content)
-            .map_err(|e| anyhow::anyhow!(e))?;
-        let toml_str = lynx_convert::emit::omp_to_lynx_toml(&theme, &theme_name);
-        std::fs::write(&out_path, &toml_str)?;
-
-        println!("Converted OMP theme → {}", out_path.display());
-        if theme.two_line {
-            println!("  Layout: two-line");
-        }
-        let seg_count = theme.top.len() + theme.top_right.len() + theme.left.len();
-        println!("  Segments: {seg_count} mapped");
-        if !theme.palette.is_empty() {
-            println!("  Palette: {} colors extracted", theme.palette.len());
-        }
-        if !theme.notes.is_empty() {
-            for note in &theme.notes {
-                println!("  ⚠ {note}");
-            }
-        }
-    } else {
-        // OMZ .zsh-theme file.
-        let ir = lynx_convert::omz::parse(&content);
-        let toml_str = lynx_convert::emit::to_lynx_toml(&ir, &theme_name);
-        std::fs::write(&out_path, &toml_str)?;
-
-        println!("Converted OMZ theme → {}", out_path.display());
-        println!("  Segments (left):  {}", ir.left.join(", "));
-        if !ir.right.is_empty() {
-            println!("  Segments (right): {}", ir.right.join(", "));
-        }
-        if ir.two_line {
-            println!("  Two-line layout detected");
-        }
-        if !ir.notes.is_empty() {
-            for note in &ir.notes {
-                println!("  ⚠ {note}");
-            }
-        }
-    }
-    println!("\nActivate with: lx theme set {theme_name}");
-
-    Ok(())
 }
 
 #[cfg(test)]

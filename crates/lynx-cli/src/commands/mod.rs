@@ -29,6 +29,7 @@ pub mod tap;
 pub mod cron;
 pub mod nerd_font;
 pub mod theme;
+mod theme_convert;
 pub mod uninstall;
 pub mod update;
 
