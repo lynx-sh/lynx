@@ -127,24 +127,20 @@ fn signal_daemon_reload() {
     };
     if let Ok(content) = std::fs::read_to_string(&pid_path) {
         if let Ok(pid) = content.trim().parse::<u32>() {
-            // Safety: SIGHUP is always safe to send to our own daemon.
-            unsafe {
-                libc_kill(pid as i32, 1); // SIGHUP = 1
-            }
+            send_signal(pid as i32, 1); // SIGHUP = 1
         }
     }
 }
 
 #[cfg(unix)]
-unsafe fn libc_kill(pid: i32, sig: i32) {
-    // Use inline syscall via std to avoid a libc dep.
+fn send_signal(pid: i32, sig: i32) {
     let _ = std::process::Command::new("kill")
         .args([&format!("-{sig}"), &pid.to_string()])
         .status();
 }
 
 #[cfg(not(unix))]
-unsafe fn libc_kill(_pid: i32, _sig: i32) {}
+fn send_signal(_pid: i32, _sig: i32) {}
 
 // ── subcommand implementations ───────────────────────────────────────────────
 
