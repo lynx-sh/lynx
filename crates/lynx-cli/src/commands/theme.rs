@@ -435,10 +435,16 @@ async fn cmd_convert(source: &str, name: Option<&str>, force: bool) -> Result<()
     let theme_name = name
         .map(|n| n.to_string())
         .unwrap_or_else(|| {
-            std::path::Path::new(source)
+            let stem = std::path::Path::new(source)
                 .file_stem()
                 .and_then(|s| s.to_str())
                 .unwrap_or("converted")
+                .to_string();
+            // Strip .omp / .zsh-theme suffixes from multi-extension filenames
+            // e.g. "atomic.omp" → "atomic", "candy.zsh-theme" → "candy"
+            stem.strip_suffix(".omp")
+                .or_else(|| stem.strip_suffix(".zsh-theme"))
+                .unwrap_or(&stem)
                 .to_string()
         });
 
