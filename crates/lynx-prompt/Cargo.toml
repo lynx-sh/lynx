@@ -1,4 +1,5 @@
 [package]
+description = "Prompt segment engine — evaluator, assembler, caching, and color application"
 name = "lynx-prompt"
 version.workspace = true
 edition.workspace = true

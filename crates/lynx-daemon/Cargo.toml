@@ -1,4 +1,5 @@
 [package]
+description = "Background daemon service management (launchd on macOS, systemd on Linux)"
 name = "lynx-daemon"
 version.workspace = true
 edition.workspace = true

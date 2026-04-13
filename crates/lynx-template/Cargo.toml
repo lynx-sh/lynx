@@ -1,4 +1,5 @@
 [package]
+description = "Lightweight mustache-style template engine for intro and prompt rendering"
 name = "lynx-template"
 version.workspace = true
 edition.workspace = true
