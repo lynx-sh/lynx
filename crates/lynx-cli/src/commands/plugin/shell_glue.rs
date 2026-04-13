@@ -17,14 +17,16 @@ use std::sync::Arc;
 /// in-process and emits plugin:loaded so any registered handlers run.
 pub(super) async fn cmd_exec(name: &str) -> Result<()> {
     let script = generate_exec_script_for_plugin(name)?;
-    print!("{}", script);
+    print!("{script}");
 
     // Activate in-process: register this plugin's hook subscriptions on a
     // short-lived bus, emit plugin:loaded, then exit.
     if let Some(plugin_dir) = resolve_plugin_dir(name) {
         if let Ok(Some(manifest)) = read_plugin_manifest(&plugin_dir) {
             let bus = Arc::new(lynx_events::EventBus::new());
-            let _ = lifecycle::activate(name, &manifest, Arc::clone(&bus));
+            if let Err(e) = lifecycle::activate(name, &manifest, Arc::clone(&bus)) {
+                tracing::warn!("plugin '{name}' activation failed: {e}");
+            }
             bus.emit(Event::new(PLUGIN_LOADED, name)).await;
         }
     }
@@ -33,20 +35,24 @@ pub(super) async fn cmd_exec(name: &str) -> Result<()> {
 }
 
 /// Emit zsh that removes the plugin's exported symbols and clears its load guard.
-pub(super) async fn cmd_unload(name: &str) -> Result<()> {
+pub(super) fn cmd_unload(name: &str) -> Result<()> {
     let script = generate_unload_script_for_plugin(name)?;
-    print!("{}", script);
+    print!("{script}");
     Ok(())
 }
 
 fn generate_exec_script_for_plugin(name: &str) -> Result<String> {
     let resolved_dir = resolve_plugin_dir(name)
-        .ok_or_else(|| anyhow::anyhow!("plugin '{}' not found. Run: lx doctor", name))?;
+        .ok_or_else(|| anyhow::Error::from(lynx_core::error::LynxError::NotFound {
+            item_type: "Plugin".into(),
+            name: name.to_string(),
+            hint: "run `lx doctor` to diagnose".into(),
+        }))?;
 
     let manifest = read_plugin_manifest(&resolved_dir)?
-        .ok_or_else(|| anyhow::anyhow!("plugin '{}' has no plugin.toml", name))?;
+        .ok_or_else(|| anyhow::Error::from(lynx_core::error::LynxError::Manifest(format!("plugin '{name}' has no plugin.toml"))))?;
 
-    generate_exec_script(&manifest, &resolved_dir).map_err(|e| anyhow::anyhow!("{}", e))
+    generate_exec_script(&manifest, &resolved_dir).map_err(|e| anyhow::Error::from(lynx_core::error::LynxError::Plugin(e.to_string())))
 }
 
 fn generate_unload_script_for_plugin(name: &str) -> Result<String> {
@@ -82,7 +88,7 @@ pub(super) fn read_plugin_manifest(plugin_dir: &Path) -> Result<Option<PluginMan
         return Ok(None);
     }
     let content = std::fs::read_to_string(&manifest_path)?;
-    let manifest = lynx_manifest::parse(&content).map_err(|e| anyhow::anyhow!("{}", e))?;
+    let manifest = lynx_manifest::parse(&content).map_err(|e| anyhow::Error::from(lynx_core::error::LynxError::Manifest(e.to_string())))?;
     Ok(Some(manifest))
 }
 
@@ -92,21 +98,20 @@ fn build_unload_script(name: &str, manifest: Option<&PluginManifest>) -> String 
 
     if let Some(manifest) = manifest {
         for func in &manifest.exports.functions {
-            out.push_str(&format!("unfunction {} 2>/dev/null\n", func));
+            out.push_str(&format!("unfunction {func} 2>/dev/null\n"));
         }
         for alias in &manifest.exports.aliases {
-            out.push_str(&format!("unalias {} 2>/dev/null\n", alias));
+            out.push_str(&format!("unalias {alias} 2>/dev/null\n"));
         }
         for hook in &manifest.load.hooks {
             let fn_name = format!("_{}_plugin_{}", name.replace('-', "_"), hook);
             out.push_str(&format!(
-                "add-zsh-hook -d {} {} 2>/dev/null\n",
-                hook, fn_name
+                "add-zsh-hook -d {hook} {fn_name} 2>/dev/null\n"
             ));
         }
     }
 
-    out.push_str(&format!("unset {}\n", guard_var));
+    out.push_str(&format!("unset {guard_var}\n"));
     out
 }
 

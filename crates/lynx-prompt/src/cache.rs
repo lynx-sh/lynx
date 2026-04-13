@@ -30,7 +30,7 @@ impl SegmentCache {
         let mut map = self
             .inner
             .write()
-            .expect("SegmentCache write lock poisoned");
+            .unwrap_or_else(|e| e.into_inner());
         map.insert(
             key.into(),
             CacheEntry {
@@ -43,7 +43,7 @@ impl SegmentCache {
 
     /// Get a cache entry. Returns `None` if not present or stale.
     pub fn get(&self, key: &str) -> Option<Value> {
-        let map = self.inner.read().expect("SegmentCache read lock poisoned");
+        let map = self.inner.read().unwrap_or_else(|e| e.into_inner());
         let entry = map.get(key)?;
         if entry.updated_at.elapsed() > entry.ttl {
             return None;
@@ -53,13 +53,13 @@ impl SegmentCache {
 
     /// Get regardless of staleness (for fallback display).
     pub fn get_stale(&self, key: &str) -> Option<Value> {
-        let map = self.inner.read().expect("SegmentCache read lock poisoned");
+        let map = self.inner.read().unwrap_or_else(|e| e.into_inner());
         map.get(key).map(|e| e.data.clone())
     }
 
     /// Snapshot of all fresh entries as a plain HashMap for passing into RenderContext.
     pub fn snapshot(&self) -> HashMap<String, Value> {
-        let map = self.inner.read().expect("SegmentCache read lock poisoned");
+        let map = self.inner.read().unwrap_or_else(|e| e.into_inner());
         map.iter()
             .map(|(k, e)| (k.clone(), e.data.clone()))
             .collect()

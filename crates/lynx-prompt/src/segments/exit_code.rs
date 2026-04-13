@@ -23,7 +23,7 @@ impl Segment for ExitCodeSegment {
             return None;
         }
         let symbol = cfg.symbol.unwrap_or_else(|| "✘".to_string());
-        Some(RenderedSegment::new(format!("{} {}", symbol, code)))
+        Some(RenderedSegment::new(format!("{symbol} {code}")))
     }
 }
 

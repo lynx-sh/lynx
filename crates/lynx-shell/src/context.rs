@@ -18,7 +18,7 @@ pub enum DetectionMethod {
     DefaultInteractive,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DetectionOutcome {
     pub context: Context,
     pub method: DetectionMethod,
@@ -79,7 +79,7 @@ pub fn detect_context_outcome() -> DetectionOutcome {
 
 fn override_context() -> Option<Context> {
     let val = std::env::var(CONTEXT_OVERRIDE_ENV).ok()?;
-    Context::from_str(val.to_lowercase().as_str())
+    Context::parse(val.to_lowercase().as_str())
 }
 
 #[cfg(test)]

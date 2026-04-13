@@ -106,10 +106,10 @@ impl ServiceBackend for LaunchdBackend {
             .context("launchctl load failed")?;
 
         if !out.status.success() {
-            anyhow::bail!(
+            return Err(lynx_core::error::LynxError::Daemon(format!(
                 "launchctl load failed: {}",
                 String::from_utf8_lossy(&out.stderr)
-            );
+            )).into());
         }
 
         Ok(())
@@ -134,10 +134,10 @@ impl ServiceBackend for LaunchdBackend {
             .context("launchctl start failed")?;
 
         if !out.status.success() {
-            anyhow::bail!(
+            return Err(lynx_core::error::LynxError::Daemon(format!(
                 "launchctl start failed: {}",
                 String::from_utf8_lossy(&out.stderr)
-            );
+            )).into());
         }
         Ok(())
     }
@@ -149,10 +149,10 @@ impl ServiceBackend for LaunchdBackend {
             .context("launchctl stop failed")?;
 
         if !out.status.success() {
-            anyhow::bail!(
+            return Err(lynx_core::error::LynxError::Daemon(format!(
                 "launchctl stop failed: {}",
                 String::from_utf8_lossy(&out.stderr)
-            );
+            )).into());
         }
         Ok(())
     }

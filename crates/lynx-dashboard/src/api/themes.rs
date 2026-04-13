@@ -168,7 +168,7 @@ pub async fn segment_order(
     };
 
     if let Err(e) = set_arr_at(&mut root, dot_path, &req.order) {
-        return (StatusCode::BAD_REQUEST, e.to_string()).into_response();
+        return (StatusCode::BAD_REQUEST, e).into_response();
     }
 
     let patched = match toml::to_string_pretty(&root) {

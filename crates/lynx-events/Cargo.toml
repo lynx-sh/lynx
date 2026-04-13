@@ -1,4 +1,5 @@
 [package]
+description = "Event bus, bridge, and diagnostic logger for shell lifecycle events"
 name = "lynx-events"
 version.workspace = true
 edition.workspace = true

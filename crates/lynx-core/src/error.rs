@@ -72,6 +72,15 @@ pub enum LynxError {
 }
 
 impl LynxError {
+    /// Create a "command not found" error with a hint to run the parent command for help.
+    pub fn unknown_command(command: &str, parent: &str) -> Self {
+        LynxError::NotFound {
+            item_type: "Command".into(),
+            name: command.into(),
+            hint: format!("run `lx {parent}` for help"),
+        }
+    }
+
     /// Wrap an IO error with a file path and generate an appropriate fix hint.
     pub fn io(e: std::io::Error, path: impl Into<PathBuf>) -> Self {
         let path = path.into();

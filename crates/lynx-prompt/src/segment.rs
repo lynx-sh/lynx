@@ -19,7 +19,7 @@ pub struct RenderContext {
 }
 
 /// A rendered segment ready for display.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RenderedSegment {
     /// The display text (may contain ANSI codes).
     pub text: String,

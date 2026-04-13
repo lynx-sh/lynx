@@ -21,13 +21,6 @@ pub struct LoadOrder {
 /// - Plugin dep references that are not in the manifests list are treated as
 ///   satisfied (they may be built-in or provided externally).
 pub fn resolve(manifests: &[PluginManifest]) -> Result<LoadOrder> {
-    // Build name → manifest index map
-    let name_to_idx: HashMap<&str, usize> = manifests
-        .iter()
-        .enumerate()
-        .map(|(i, m)| (m.plugin.name.as_str(), i))
-        .collect();
-
     // Check binary deps — exclude plugins whose required binaries are missing
     let mut excluded: Vec<(String, String)> = Vec::new();
     let mut excluded_names: HashSet<String> = HashSet::new();
@@ -99,8 +92,7 @@ pub fn resolve(manifests: &[PluginManifest]) -> Result<LoadOrder> {
             .collect();
         let cycle_path = find_cycle(&active, &unsorted);
         return Err(LynxError::Plugin(format!(
-            "circular plugin dependency detected: {}",
-            cycle_path
+            "circular plugin dependency detected: {cycle_path}"
         )));
     }
 
@@ -122,9 +114,6 @@ pub fn resolve(manifests: &[PluginManifest]) -> Result<LoadOrder> {
         .filter(|&&n| lazy_set.contains(n))
         .map(|&n| n.to_string())
         .collect();
-
-    // Suppress unused import warning — name_to_idx used for lookup above
-    let _ = name_to_idx;
 
     Ok(LoadOrder {
         eager,

@@ -44,15 +44,15 @@ impl Segment for PromptCharSegment {
         // Priority: error > root > git_repo > default
         let symbol = if is_error {
             cfg.error_symbol
-                .or(cfg.symbol.clone())
+                .or(cfg.symbol)
                 .unwrap_or_else(default_symbol)
         } else if is_root {
             cfg.root_symbol
-                .or(cfg.symbol.clone())
+                .or(cfg.symbol)
                 .unwrap_or_else(default_symbol)
         } else if in_git_repo {
             cfg.in_git_repo_symbol
-                .or(cfg.symbol.clone())
+                .or(cfg.symbol)
                 .unwrap_or_else(default_symbol)
         } else {
             cfg.symbol.unwrap_or_else(default_symbol)

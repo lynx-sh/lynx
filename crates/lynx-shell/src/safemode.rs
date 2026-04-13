@@ -17,10 +17,9 @@ pub fn generate_safemode_script(reason: &str) -> String {
 export LYNX_SAFE_MODE=1
 export LYNX_CONTEXT=minimal
 print -u2 "Lynx: starting in safe mode due to config error:"
-print -u2 "  {reason}"
+print -u2 "  {safe_reason}"
 print -u2 "  Fix: run 'lx doctor' to diagnose, or 'lx config validate' to check your config."
 "#,
-        reason = safe_reason,
     )
 }
 

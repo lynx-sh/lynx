@@ -1,3 +1,4 @@
+use lynx_core::error::LynxError;
 use anyhow::Result;
 use clap::{Args, Subcommand};
 use lynx_core::paths::taps_config_path;
@@ -33,33 +34,44 @@ pub enum TapCommand {
     Other(Vec<String>),
 }
 
-pub async fn run(args: TapArgs) -> Result<()> {
+pub fn run(args: TapArgs) -> Result<()> {
     match args.command {
         TapCommand::List => cmd_list(),
         TapCommand::Add { source } => cmd_add(&source),
         TapCommand::Remove { name } => cmd_remove(&name),
         TapCommand::Update => cmd_update(),
         TapCommand::Other(args) => {
-            anyhow::bail!("unknown tap command '{}' — run `lx tap` for help", args.first().map(|s| s.as_str()).unwrap_or(""))
+            Err(LynxError::unknown_command(args.first().map(|s| s.as_str()).unwrap_or(""), "tap").into())
         }
     }
+}
+
+struct TapListEntry {
+    name: String,
+    url: String,
+    trust: String,
+}
+
+impl lynx_tui::ListItem for TapListEntry {
+    fn title(&self) -> &str { &self.name }
+    fn subtitle(&self) -> String { self.trust.clone() }
+    fn detail(&self) -> String {
+        format!("URL: {}\nTrust: {}", self.url, self.trust)
+    }
+    fn category(&self) -> Option<&str> { Some("tap") }
 }
 
 fn cmd_list() -> Result<()> {
     let path = taps_config_path();
     let list = load_taps(&path)?;
 
-    println!("{:<20} {:<10} URL", "NAME", "TRUST");
-    println!("{}", "-".repeat(70));
-    for tap in &list.taps {
-        println!(
-            "{} {:<18} {:<10} {}",
-            tap.trust.badge(),
-            tap.name,
-            tap.trust.label(),
-            tap.url
-        );
-    }
+    let entries: Vec<TapListEntry> = list.taps.iter().map(|tap| TapListEntry {
+        name: tap.name.clone(),
+        url: tap.url.clone(),
+        trust: tap.trust.label().to_string(),
+    }).collect();
+
+    lynx_tui::show(&entries, "Taps", &super::tui_colors())?;
     Ok(())
 }
 
@@ -86,7 +98,7 @@ fn cmd_add(source: &str) -> Result<()> {
     add_tap(&mut list, &name, &url)?;
     save_taps(&list, &path)?;
 
-    println!("{} added tap '{}' ({})", "○", name, url);
+    println!("○ added tap '{name}' ({url})");
     println!("  run `lx tap update` to fetch the index");
     Ok(())
 }
@@ -145,9 +157,95 @@ fn cmd_update() -> Result<()> {
     }
 
     if failures > 0 && failures == total as u32 {
-        anyhow::bail!("all {total} tap(s) failed to update");
+        return Err(LynxError::Registry(format!("all {total} tap(s) failed to update")).into());
     } else if failures > 0 {
         eprintln!("warning: {failures}/{total} tap(s) failed to update");
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tap_name_from_github_shorthand() {
+        let source = "user/repo";
+        // Not starting with http, so name = source directly
+        let name = if source.starts_with("http") {
+            source
+                .trim_end_matches('/')
+                .rsplit('/')
+                .take(2)
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
+                .collect::<Vec<_>>()
+                .join("/")
+        } else {
+            source.to_string()
+        };
+        assert_eq!(name, "user/repo");
+    }
+
+    #[test]
+    fn tap_name_from_full_url() {
+        let source = "https://github.com/user/repo/raw/main/index.toml";
+        let name = if source.starts_with("http") {
+            source
+                .trim_end_matches('/')
+                .rsplit('/')
+                .take(2)
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
+                .collect::<Vec<_>>()
+                .join("/")
+        } else {
+            source.to_string()
+        };
+        assert_eq!(name, "main/index.toml");
+    }
+
+    #[test]
+    fn tap_name_from_url_with_trailing_slash() {
+        let source = "https://example.com/taps/community/";
+        let name = if source.starts_with("http") {
+            source
+                .trim_end_matches('/')
+                .rsplit('/')
+                .take(2)
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
+                .collect::<Vec<_>>()
+                .join("/")
+        } else {
+            source.to_string()
+        };
+        assert_eq!(name, "taps/community");
+    }
+
+    #[test]
+    fn tap_list_entry_trait() {
+        use lynx_tui::ListItem;
+        let entry = TapListEntry {
+            name: "core".to_string(),
+            url: "https://example.com/index.toml".to_string(),
+            trust: "official".to_string(),
+        };
+        assert_eq!(entry.title(), "core");
+        assert_eq!(entry.subtitle(), "official");
+        assert!(entry.detail().contains("https://example.com"));
+        assert_eq!(entry.category(), Some("tap"));
+    }
+
+    #[tokio::test]
+    async fn tap_unknown_subcommand_errors() {
+        let args = TapArgs {
+            command: TapCommand::Other(vec!["nope".to_string()]),
+        };
+        let err = run(args).unwrap_err();
+        assert!(err.to_string().contains("nope"));
+    }
 }

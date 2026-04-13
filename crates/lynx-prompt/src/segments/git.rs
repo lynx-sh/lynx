@@ -94,7 +94,7 @@ impl Segment for GitStatusSegment {
                 let staged_icon = cfg.staged.as_ref().and_then(|s| s.icon.as_deref()).unwrap_or("+");
                 let modified_icon = cfg.modified.as_ref().and_then(|s| s.icon.as_deref()).unwrap_or("!");
                 let untracked_icon = cfg.untracked.as_ref().and_then(|s| s.icon.as_deref()).unwrap_or("?");
-                let state = git_state_obj(ctx).unwrap();
+                let state = git_state_obj(ctx)?;
                 let staged_val = if state.get("staged").and_then(|v| v.as_bool()).unwrap_or(false) { staged_icon } else { "" };
                 let modified_val = if state.get("modified").and_then(|v| v.as_bool()).unwrap_or(false) { modified_icon } else { "" };
                 let untracked_val = if state.get("untracked").and_then(|v| v.as_bool()).unwrap_or(false) { untracked_icon } else { "" };
@@ -161,12 +161,7 @@ fn git_branch_from_subprocess(dir: &str) -> Option<String> {
     }
 }
 
-fn git_state_obj(ctx: &RenderContext) -> Option<&serde_json::Map<String, serde_json::Value>> {
-    match ctx.cache.get(crate::cache_keys::GIT_STATE)? {
-        serde_json::Value::Object(obj) => Some(obj),
-        _ => None,
-    }
-}
+use super::git_common::git_state_obj;
 
 fn git_state_str<'a>(ctx: &'a RenderContext, key: &str) -> Option<&'a str> {
     git_state_obj(ctx)?.get(key)?.as_str()

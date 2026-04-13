@@ -1,7 +1,8 @@
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
+use lynx_core::error::LynxError;
 use sha2::{Digest, Sha256};
 use tracing::{debug, info};
 
@@ -45,10 +46,7 @@ pub fn fetch_plugin(name: &str, opts: &FetchOptions) -> Result<PathBuf> {
     // 2. Check if already installed.
     let install_dir = plugins_install_dir().join(name);
     if install_dir.exists() && !opts.force {
-        bail!(
-            "plugin '{name}' is already installed at {} — use --force to reinstall",
-            install_dir.display()
-        );
+        return Err(LynxError::AlreadyInstalled(name.to_string()).into());
     }
 
     // 3. Download to a temp dir.
@@ -63,11 +61,10 @@ pub fn fetch_plugin(name: &str, opts: &FetchOptions) -> Result<PathBuf> {
     let actual = sha256_hex(&archive_path).context("failed to compute checksum")?;
     if actual != pv.checksum_sha256 {
         // tmp_dir auto-cleans on drop.
-        bail!(
+        return Err(LynxError::Registry(format!(
             "checksum mismatch for '{name}' v{}: expected {}, got {actual}",
-            pv.version,
-            pv.checksum_sha256
-        );
+            pv.version, pv.checksum_sha256
+        )).into());
     }
     debug!("checksum verified for {name} v{}", pv.version);
 
@@ -155,7 +152,7 @@ fn download_file(url: &str, dest: &Path) -> Result<()> {
         .call()
         .with_context(|| format!("GET {url}"))?;
     if resp.status() >= 400 {
-        bail!("server returned status {} for {url}", resp.status());
+        return Err(LynxError::Registry(format!("server returned status {} for {url}", resp.status())).into());
     }
     let mut reader = resp.into_reader();
     let mut file =
@@ -206,19 +203,19 @@ fn extract_tar_gz(archive: &Path, dest: &Path) -> Result<()> {
 fn validate_plugin_dir(dir: &Path, name: &str) -> Result<()> {
     let manifest_path = dir.join(lynx_core::brand::PLUGIN_MANIFEST);
     if !manifest_path.exists() {
-        bail!(
+        return Err(LynxError::Plugin(format!(
             "extracted plugin '{name}' is missing plugin.toml at {}",
             manifest_path.display()
-        );
+        )).into());
     }
     let content = std::fs::read_to_string(&manifest_path).context("read extracted plugin.toml")?;
     let manifest: lynx_manifest::schema::PluginManifest = toml::from_str(&content)
         .with_context(|| format!("plugin '{name}' has invalid plugin.toml after extraction"))?;
     if manifest.plugin.name != name {
-        bail!(
+        return Err(LynxError::Plugin(format!(
             "plugin '{name}' plugin.toml declares name '{}' — must match",
             manifest.plugin.name
-        );
+        )).into());
     }
     Ok(())
 }
@@ -235,7 +232,7 @@ pub fn checksum_file(path: &Path) -> Result<String> {
 /// Hash input includes relative file paths and file bytes; path order is sorted.
 pub fn checksum_plugin_dir(dir: &Path) -> Result<String> {
     if !dir.exists() {
-        bail!("plugin directory does not exist: {}", dir.display());
+        return Err(LynxError::Plugin(format!("plugin directory does not exist: {}", dir.display())).into());
     }
 
     let mut files = Vec::new();

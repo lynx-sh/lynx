@@ -11,7 +11,7 @@ pub use crate::segments::{
 };
 
 /// Separator rendering mode.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum SeparatorMode {
     /// One global separator style for all gaps (default — preserves existing behavior).
@@ -22,7 +22,7 @@ pub enum SeparatorMode {
 }
 
 /// Configuration for a single separator glyph + color.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct SeparatorGlyph {
     /// The character(s) to render between segments (e.g. " " or "").
     pub char: Option<String>,
@@ -84,7 +84,7 @@ pub struct Theme {
     pub colors: HashMap<String, String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ThemeMeta {
     pub name: String,
     #[serde(default)]
@@ -128,7 +128,7 @@ pub struct SegmentLayout {
 /// char = "─"
 /// color = "$muted"
 /// ```
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FillerConfig {
     /// The character to repeat. Default: "─".
     pub char: String,
@@ -145,7 +145,7 @@ pub struct FillerConfig {
 /// template = "❯ "
 /// fg = "#e0f8ff"
 /// ```
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TransientConfig {
     /// The text to display as the transient prompt.
     pub template: String,
@@ -155,8 +155,80 @@ pub struct TransientConfig {
     pub bg: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct SegmentOrder {
     #[serde(default)]
     pub order: Vec<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn separator_mode_default_is_static() {
+        let mode = SeparatorMode::default();
+        assert_eq!(mode, SeparatorMode::Static);
+    }
+
+    #[test]
+    fn separator_glyph_default() {
+        let g = SeparatorGlyph::default();
+        assert!(g.char.is_none());
+        assert!(g.color.is_none());
+        assert!(g.bg.is_none());
+    }
+
+    #[test]
+    fn separators_default() {
+        let s = Separators::default();
+        assert_eq!(s.mode, SeparatorMode::Static);
+    }
+
+    #[test]
+    fn segment_layout_default() {
+        let l = SegmentLayout::default();
+        assert!(l.left.order.is_empty());
+        assert!(l.right.order.is_empty());
+        assert!(l.top.order.is_empty());
+        assert!(l.top_right.order.is_empty());
+        assert!(!l.spacing);
+        assert!(l.filler.is_none());
+    }
+
+    #[test]
+    fn theme_meta_deserialize() {
+        let toml = r#"
+            name = "test"
+            description = "A test theme"
+            author = "me"
+        "#;
+        let meta: ThemeMeta = toml::from_str(toml).unwrap();
+        assert_eq!(meta.name, "test");
+        assert_eq!(meta.description, "A test theme");
+        assert_eq!(meta.author, "me");
+    }
+
+    #[test]
+    fn segment_order_default_empty() {
+        let so = SegmentOrder::default();
+        assert!(so.order.is_empty());
+    }
+
+    #[test]
+    fn transient_config_deserialize() {
+        let toml = "template = \"> \"\nfg = \"#fff\"\n";
+        let tc: TransientConfig = toml::from_str(toml).unwrap();
+        assert_eq!(tc.template, "> ");
+        assert_eq!(tc.fg.as_deref(), Some("#fff"));
+        assert!(tc.bg.is_none());
+    }
+
+    #[test]
+    fn filler_config_deserialize() {
+        let toml = "char = \"-\"\ncolor = \"#888\"\n";
+        let fc: FillerConfig = toml::from_str(toml).unwrap();
+        assert_eq!(fc.char, "-");
+        assert_eq!(fc.color.as_deref(), Some("#888"));
+    }
 }

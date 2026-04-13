@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
+use lynx_core::error::LynxError;
 use tracing::debug;
 
 use lynx_core::brand;
@@ -64,7 +65,7 @@ pub fn fetch_and_cache_index(url: &str) -> Result<RegistryIndex> {
         .call()
         .with_context(|| format!("HTTP GET failed for {url}"))?;
     if resp.status() >= 400 {
-        anyhow::bail!("registry index returned status {} from {url}", resp.status());
+        return Err(lynx_core::error::LynxError::Registry(format!("registry index returned status {} from {url}", resp.status())).into());
     }
     let body = resp
         .into_string()
@@ -91,8 +92,7 @@ pub fn get_index(refresh: bool, url: Option<&str>) -> Result<RegistryIndex> {
         match fetch_and_cache_index(url) {
             Ok(idx) => return Ok(idx),
             Err(e) => {
-                eprintln!("warning: could not refresh registry index: {e}");
-                eprintln!("         falling back to cached index");
+                tracing::warn!("could not refresh registry index: {e} — falling back to cache");
             }
         }
     }
@@ -140,22 +140,20 @@ pub fn save_lock_to(lock: &LockFile, path: &Path) -> Result<()> {
 pub fn validate_index(idx: &RegistryIndex) -> Result<()> {
     for entry in &idx.plugins {
         if entry.versions.is_empty() {
-            bail!("plugin '{}' has no versions", entry.name);
+            return Err(LynxError::Registry(format!("plugin '{}' has no versions", entry.name)).into());
         }
         if entry.resolve_version(None).is_none() {
-            bail!(
+            return Err(LynxError::Registry(format!(
                 "plugin '{}' latest_version '{}' not found in versions list",
-                entry.name,
-                entry.latest_version
-            );
+                entry.name, entry.latest_version
+            )).into());
         }
         for v in &entry.versions {
             if v.checksum_sha256.is_empty() {
-                bail!(
+                return Err(LynxError::Registry(format!(
                     "plugin '{}' version '{}' has empty checksum_sha256",
-                    entry.name,
-                    v.version
-                );
+                    entry.name, v.version
+                )).into());
             }
         }
     }

@@ -22,7 +22,7 @@ pub struct KubectlStateArgs {}
 /// _lynx_kubectl_state=()
 /// export LYNX_CACHE_KUBECTL_STATE=''
 /// ```
-pub async fn run(_args: KubectlStateArgs) -> Result<()> {
+pub fn run(_args: KubectlStateArgs) -> Result<()> {
     let state = gather_kubectl_state();
     print!("{}", render_zsh(&state));
     Ok(())
@@ -57,7 +57,7 @@ pub(crate) fn gather_kubectl_state() -> KubectlState {
     // Bail if no kubeconfig exists
     let home = std::env::var("HOME").unwrap_or_default();
     let kubeconfig_env = std::env::var("KUBECONFIG").ok();
-    let default_kube = format!("{}/.kube/config", home);
+    let default_kube = format!("{home}/.kube/config");
     let has_config = kubeconfig_env
         .as_deref()
         .map(|p| std::path::Path::new(p).exists())

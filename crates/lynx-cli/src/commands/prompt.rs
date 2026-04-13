@@ -127,7 +127,7 @@ async fn cmd_render(transient: bool) -> Result<()> {
     let columns = ctx.env.get("COLUMNS").and_then(|v| v.parse::<u32>().ok());
     let (left, right, top, top_right, continuation) = evaluate_theme(&segments, theme_ref, &ctx).await;
     let output = render_prompt(&left, &right, &top, &top_right, &continuation, theme_ref, columns, Some(&ctx));
-    print!("{}", output);
+    print!("{output}");
     Ok(())
 }
 
@@ -135,7 +135,7 @@ fn build_render_context_from_env() -> RenderContext {
     let cwd = std::env::var("PWD").unwrap_or_else(|_| "/".into());
     let shell_context = std::env::var(lynx_core::env_vars::LYNX_CONTEXT)
         .ok()
-        .and_then(|v| Context::from_str(&v))
+        .and_then(|v| Context::parse(&v))
         .unwrap_or(Context::Interactive);
     let last_cmd_ms = std::env::var(env_vars::LYNX_LAST_CMD_MS)
         .ok()

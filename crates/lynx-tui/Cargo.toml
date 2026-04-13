@@ -1,0 +1,13 @@
+[package]
+name = "lynx-tui"
+description = "Interactive terminal UI components for Lynx CLI (D-040)"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+lynx-core = { path = "../lynx-core" }
+ratatui = { workspace = true }
+crossterm = { workspace = true }

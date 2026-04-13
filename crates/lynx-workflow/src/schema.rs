@@ -55,7 +55,7 @@ pub struct WorkflowParam {
 }
 
 /// Supported parameter types.
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum ParamType {
     #[default]
@@ -105,7 +105,7 @@ pub struct Step {
 }
 
 /// Built-in runner types and custom runner escape hatch.
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum RunnerType {
     #[default]
@@ -124,7 +124,7 @@ pub enum RunnerType {
 }
 
 /// What to do when a step fails.
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum OnFail {
     /// Abort the entire workflow.
@@ -149,40 +149,39 @@ pub fn parse(content: &str) -> anyhow::Result<Workflow> {
 
 /// Validate a parsed workflow.
 pub fn validate(wf: &Workflow) -> anyhow::Result<()> {
+    use lynx_core::error::LynxError;
+
     if wf.workflow.name.is_empty() {
-        anyhow::bail!("workflow name is required");
+        return Err(LynxError::Workflow("workflow name is required".into()).into());
     }
     if wf.steps.is_empty() {
-        anyhow::bail!("workflow must have at least one step");
+        return Err(LynxError::Workflow("workflow must have at least one step".into()).into());
     }
 
     let mut seen_names = std::collections::HashSet::new();
     for step in &wf.steps {
         if step.name.is_empty() {
-            anyhow::bail!("step name is required");
+            return Err(LynxError::Workflow("step name is required".into()).into());
         }
         if !seen_names.insert(&step.name) {
-            anyhow::bail!("duplicate step name: '{}'", step.name);
+            return Err(LynxError::Workflow(format!("duplicate step name: '{}'", step.name)).into());
         }
         if step.run.is_empty() {
-            anyhow::bail!("step '{}': run is required", step.name);
+            return Err(LynxError::Workflow(format!("step '{}': run is required", step.name)).into());
         }
-        // Validate depends_on references
         for dep in &step.depends_on {
             if !wf.steps.iter().any(|s| &s.name == dep) {
-                anyhow::bail!(
+                return Err(LynxError::Workflow(format!(
                     "step '{}': depends_on '{}' does not exist",
-                    step.name,
-                    dep
-                );
+                    step.name, dep
+                )).into());
             }
         }
     }
 
-    // Validate params
     for param in &wf.workflow.params {
         if param.name.is_empty() {
-            anyhow::bail!("param name is required");
+            return Err(LynxError::Workflow("param name is required".into()).into());
         }
     }
 

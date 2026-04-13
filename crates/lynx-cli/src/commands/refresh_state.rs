@@ -25,10 +25,10 @@ pub struct RefreshStateArgs {}
 ///   eval "$(lx prompt render 2>/dev/null)"
 /// }
 /// ```
-pub async fn run(_args: RefreshStateArgs) -> Result<()> {
+pub fn run(_args: RefreshStateArgs) -> Result<()> {
     let enabled = read_enabled_plugins();
     let output = gather_all(&enabled);
-    print!("{}", output);
+    print!("{output}");
     Ok(())
 }
 

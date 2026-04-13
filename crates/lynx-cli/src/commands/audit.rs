@@ -6,6 +6,7 @@ use anyhow::Result;
 use clap::Args;
 use lynx_config::load as load_config;
 use lynx_core::paths;
+use lynx_tui::ListItem;
 
 #[derive(Args)]
 pub struct AuditArgs {
@@ -13,31 +14,94 @@ pub struct AuditArgs {
     pub name: Option<String>,
 }
 
-pub async fn run(args: AuditArgs) -> Result<()> {
+struct AuditEntry {
+    name: String,
+    source: String,
+    context: String,
+    binaries: String,
+    fn_count: usize,
+    alias_count: usize,
+    description: String,
+    version: String,
+    authors: String,
+    functions: Vec<String>,
+    aliases: Vec<String>,
+    hooks: String,
+    lazy: bool,
+    disabled_in: String,
+    checksum_status: String,
+}
+
+impl lynx_tui::ListItem for AuditEntry {
+    fn title(&self) -> &str {
+        &self.name
+    }
+
+    fn subtitle(&self) -> String {
+        format!("{} · {} fn, {} alias · {}", self.source, self.fn_count, self.alias_count, self.context)
+    }
+
+    fn detail(&self) -> String {
+        let mut lines = vec![
+            format!("Name:        {}", self.name),
+            format!("Version:     {}", self.version),
+            format!("Description: {}", self.description),
+            format!("Authors:     {}", self.authors),
+            String::new(),
+            format!("Source:      {}", self.source),
+            format!("Binaries:    {}", self.binaries),
+            format!("Context:     {}", self.context),
+            format!("Lazy:        {}", self.lazy),
+            format!("Hooks:       {}", self.hooks),
+            format!("Disabled in: {}", self.disabled_in),
+            String::new(),
+            "Exports:".to_string(),
+        ];
+
+        if self.functions.is_empty() {
+            lines.push("  functions: none".to_string());
+        } else {
+            for f in &self.functions {
+                lines.push(format!("  fn  {f}"));
+            }
+        }
+        if self.aliases.is_empty() {
+            lines.push("  aliases:   none".to_string());
+        } else {
+            for a in &self.aliases {
+                lines.push(format!("  alias {a}"));
+            }
+        }
+
+        if !self.checksum_status.is_empty() {
+            lines.push(String::new());
+            lines.push(format!("Checksum:    {}", self.checksum_status));
+        }
+
+        lines.join("\n")
+    }
+
+    fn category(&self) -> Option<&str> {
+        Some("plugin")
+    }
+}
+
+pub fn run(args: AuditArgs) -> Result<()> {
     let config = load_config()?;
     let plugins_dir = paths::installed_plugins_dir();
-
-    if let Some(name) = &args.name {
-        return audit_one(name, &plugins_dir);
-    }
 
     if config.enabled_plugins.is_empty() {
         println!("no plugins enabled");
         return Ok(());
     }
 
-    println!(
-        "{:<22} {:<10} {:<12} {:<10} EXPORTS",
-        "NAME", "SOURCE", "CONTEXT", "BINARIES"
-    );
-    println!("{}", "-".repeat(72));
+    let mut entries: Vec<AuditEntry> = Vec::new();
 
     for name in &config.enabled_plugins {
         let manifest_path = plugins_dir.join(name).join("plugin.toml");
-        if let Ok(content) = std::fs::read_to_string(&manifest_path) {
-            if let Ok(manifest) = lynx_manifest::parse_and_validate(&content) {
-                let p = &manifest.plugin;
-                let source = if manifest_path
+        let (source, manifest) = match std::fs::read_to_string(&manifest_path) {
+            Ok(content) => {
+                let src = if manifest_path
                     .parent()
                     .and_then(|d| d.join(".auto-generated").exists().then_some(()))
                     .is_some()
@@ -46,131 +110,211 @@ pub async fn run(args: AuditArgs) -> Result<()> {
                 } else {
                     "bundled"
                 };
+                match lynx_manifest::parse_and_validate(&content) {
+                    Ok(m) => (src.to_string(), Some(m)),
+                    Err(_) => ("invalid".to_string(), None),
+                }
+            }
+            Err(_) => ("missing".to_string(), None),
+        };
 
-                let bins = if manifest.deps.binaries.is_empty() {
+        let entry = if let Some(manifest) = manifest {
+            let p = &manifest.plugin;
+            let disabled_in = manifest.contexts.disabled_in.join(", ");
+            let context = if disabled_in.is_empty() {
+                "all".to_string()
+            } else {
+                format!("!{disabled_in}")
+            };
+
+            let checksum_status = compute_checksum_status(name, &plugins_dir);
+
+            AuditEntry {
+                name: p.name.clone(),
+                source,
+                context,
+                binaries: if manifest.deps.binaries.is_empty() {
                     "none".to_string()
                 } else {
                     manifest.deps.binaries.join(", ")
-                };
-
-                let disabled_in = manifest
-                    .contexts
-                    .disabled_in
-                    .join(", ");
-                let context = if disabled_in.is_empty() {
-                    "all".to_string()
+                },
+                fn_count: manifest.exports.functions.len(),
+                alias_count: manifest.exports.aliases.len(),
+                description: p.description.clone(),
+                version: p.version.clone(),
+                authors: p.authors.join(", "),
+                functions: manifest.exports.functions.clone(),
+                aliases: manifest.exports.aliases.clone(),
+                hooks: if manifest.load.hooks.is_empty() {
+                    "none".to_string()
                 } else {
-                    format!("!{disabled_in}")
-                };
-
-                let exports_count = manifest.exports.functions.len()
-                    + manifest.exports.aliases.len();
-
-                println!(
-                    "{:<22} {:<10} {:<12} {:<10} {} fn, {} alias",
-                    p.name,
-                    source,
-                    context,
-                    bins,
-                    manifest.exports.functions.len(),
-                    manifest.exports.aliases.len(),
-                );
-
-                let _ = exports_count; // used above inline
-            } else {
-                println!("{:<22} {:<10} invalid manifest", name, "?");
+                    manifest.load.hooks.join(", ")
+                },
+                lazy: manifest.load.lazy,
+                disabled_in: if disabled_in.is_empty() {
+                    "none (loads everywhere)".to_string()
+                } else {
+                    disabled_in
+                },
+                checksum_status,
             }
         } else {
-            println!("{:<22} {:<10} no manifest found", name, "missing");
-        }
+            AuditEntry {
+                name: name.clone(),
+                source,
+                context: "?".to_string(),
+                binaries: "?".to_string(),
+                fn_count: 0,
+                alias_count: 0,
+                description: String::new(),
+                version: String::new(),
+                authors: String::new(),
+                functions: vec![],
+                aliases: vec![],
+                hooks: "?".to_string(),
+                lazy: false,
+                disabled_in: "?".to_string(),
+                checksum_status: String::new(),
+            }
+        };
+
+        entries.push(entry);
     }
 
+    // If a specific plugin was requested, filter to just that one and show detail.
+    if let Some(ref name) = args.name {
+        if let Some(entry) = entries.iter().find(|e| e.name == *name) {
+            println!("{}", entry.detail());
+            return Ok(());
+        }
+        return Err(lynx_core::error::LynxError::NotFound {
+            item_type: "Plugin".into(),
+            name: name.clone(),
+            hint: "run `lx audit` to see enabled plugins".into(),
+        }
+        .into());
+    }
+
+    lynx_tui::show(&entries, "Plugin Audit", &super::tui_colors())?;
     Ok(())
 }
 
-fn audit_one(name: &str, plugins_dir: &std::path::Path) -> Result<()> {
-    let manifest_path = plugins_dir.join(name).join("plugin.toml");
-    let content = std::fs::read_to_string(&manifest_path)
-        .map_err(|_| anyhow::anyhow!("plugin '{name}' not found at {}", manifest_path.display()))?;
-    let manifest = lynx_manifest::parse_and_validate(&content)
-        .map_err(|e| anyhow::anyhow!("invalid manifest for '{name}': {e}"))?;
-
-    let p = &manifest.plugin;
-    println!("name:        {}", p.name);
-    println!("version:     {}", p.version);
-    println!("description: {}", p.description);
-    println!("authors:     {}", p.authors.join(", "));
-    println!();
-
-    println!("binary deps: {}", if manifest.deps.binaries.is_empty() {
-        "none".to_string()
-    } else {
-        manifest.deps.binaries.join(", ")
-    });
-
-    println!("plugin deps: {}", if manifest.deps.plugins.is_empty() {
-        "none".to_string()
-    } else {
-        manifest.deps.plugins.join(", ")
-    });
-
-    println!();
-    println!("exports:");
-    if manifest.exports.functions.is_empty() {
-        println!("  functions: none");
-    } else {
-        for f in &manifest.exports.functions {
-            println!("  fn  {f}");
-        }
+fn compute_checksum_status(name: &str, plugins_dir: &std::path::Path) -> String {
+    let Ok(lock) = lynx_registry::index::load_lock() else {
+        return String::new();
+    };
+    let Some(locked) = lock.find(name) else {
+        return "not tracked (bundled or local install)".to_string();
+    };
+    let Some(ref installed_hash) = locked.installed_checksum_sha256 else {
+        return String::new();
+    };
+    match lynx_registry::fetch::checksum_plugin_dir(&plugins_dir.join(name)) {
+        Ok(hash) if hash == *installed_hash => "✓ verified (matches lynx.lock)".to_string(),
+        Ok(hash) => format!("⚠ MISMATCH — expected: {installed_hash}, actual: {hash}"),
+        Err(_) => "? could not compute".to_string(),
     }
-    if manifest.exports.aliases.is_empty() {
-        println!("  aliases:   none");
-    } else {
-        for a in &manifest.exports.aliases {
-            println!("  alias {a}");
-        }
-    }
+}
 
-    println!();
-    println!("context:");
-    println!("  disabled_in: {}", if manifest.contexts.disabled_in.is_empty() {
-        "none (loads everywhere)".to_string()
-    } else {
-        manifest.contexts.disabled_in.join(", ")
-    });
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    println!("  lazy: {}", manifest.load.lazy);
-    println!("  hooks: {}", if manifest.load.hooks.is_empty() {
-        "none".to_string()
-    } else {
-        manifest.load.hooks.join(", ")
-    });
-
-    // Checksum verification.
-    if let Ok(lock) = lynx_registry::index::load_lock() {
-        if let Some(locked) = lock.find(name) {
-            if let Some(ref installed_hash) = locked.installed_checksum_sha256 {
-                let current = lynx_registry::fetch::checksum_plugin_dir(
-                    &plugins_dir.join(name),
-                );
-                match current {
-                    Ok(hash) if hash == *installed_hash => {
-                        println!("\nchecksum:    ✓ verified (matches lynx.lock)");
-                    }
-                    Ok(hash) => {
-                        println!("\nchecksum:    ⚠ MISMATCH");
-                        println!("  expected:  {installed_hash}");
-                        println!("  actual:    {hash}");
-                    }
-                    Err(_) => {
-                        println!("\nchecksum:    ? could not compute");
-                    }
-                }
-            }
-        } else {
-            println!("\nchecksum:    not tracked (bundled or local install)");
+    fn make_entry(name: &str, source: &str, fns: Vec<String>, aliases: Vec<String>) -> AuditEntry {
+        AuditEntry {
+            name: name.to_string(),
+            source: source.to_string(),
+            context: "all".to_string(),
+            binaries: "none".to_string(),
+            fn_count: fns.len(),
+            alias_count: aliases.len(),
+            description: "test plugin".to_string(),
+            version: "1.0.0".to_string(),
+            authors: "test".to_string(),
+            functions: fns,
+            aliases,
+            hooks: "none".to_string(),
+            lazy: false,
+            disabled_in: "none (loads everywhere)".to_string(),
+            checksum_status: String::new(),
         }
     }
 
-    Ok(())
+    #[test]
+    fn audit_entry_title_is_name() {
+        use lynx_tui::ListItem;
+        let entry = make_entry("git", "bundled", vec!["git_status".into()], vec![]);
+        assert_eq!(entry.title(), "git");
+    }
+
+    #[test]
+    fn audit_entry_subtitle_shows_counts() {
+        use lynx_tui::ListItem;
+        let entry = make_entry("git", "bundled", vec!["a".into(), "b".into()], vec!["g".into()]);
+        let sub = entry.subtitle();
+        assert!(sub.contains("2 fn"), "subtitle should show fn count: {sub}");
+        assert!(sub.contains("1 alias"), "subtitle should show alias count: {sub}");
+    }
+
+    #[test]
+    fn audit_entry_detail_includes_all_fields() {
+        use lynx_tui::ListItem;
+        let entry = make_entry("git", "bundled", vec!["git_status".into()], vec!["gs".into()]);
+        let detail = entry.detail();
+        assert!(detail.contains("Name:"));
+        assert!(detail.contains("Version:"));
+        assert!(detail.contains("fn  git_status"));
+        assert!(detail.contains("alias gs"));
+    }
+
+    #[test]
+    fn audit_entry_detail_empty_exports() {
+        use lynx_tui::ListItem;
+        let entry = make_entry("empty", "bundled", vec![], vec![]);
+        let detail = entry.detail();
+        assert!(detail.contains("functions: none"));
+        assert!(detail.contains("aliases:   none"));
+    }
+
+    #[test]
+    fn audit_entry_detail_with_checksum() {
+        use lynx_tui::ListItem;
+        let mut entry = make_entry("git", "bundled", vec![], vec![]);
+        entry.checksum_status = "��� verified".to_string();
+        let detail = entry.detail();
+        assert!(detail.contains("Checksum:"));
+        assert!(detail.contains("verified"));
+    }
+
+    #[test]
+    fn audit_entry_category_is_plugin() {
+        use lynx_tui::ListItem;
+        let entry = make_entry("x", "bundled", vec![], vec![]);
+        assert_eq!(entry.category(), Some("plugin"));
+    }
+
+    #[test]
+    fn audit_missing_manifest_entry() {
+        // When manifest is missing, entry should have "?" for unknown fields
+        let entry = AuditEntry {
+            name: "broken".to_string(),
+            source: "missing".to_string(),
+            context: "?".to_string(),
+            binaries: "?".to_string(),
+            fn_count: 0,
+            alias_count: 0,
+            description: String::new(),
+            version: String::new(),
+            authors: String::new(),
+            functions: vec![],
+            aliases: vec![],
+            hooks: "?".to_string(),
+            lazy: false,
+            disabled_in: "?".to_string(),
+            checksum_status: String::new(),
+        };
+        use lynx_tui::ListItem;
+        assert_eq!(entry.title(), "broken");
+        assert!(entry.subtitle().contains("missing"));
+    }
 }

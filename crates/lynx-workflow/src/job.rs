@@ -77,7 +77,10 @@ pub fn epoch_ms() -> u64 {
 }
 
 pub fn persist_job_result(result: &JobResult, log_dir: &std::path::Path) {
-    let _ = std::fs::create_dir_all(log_dir);
+    if let Err(e) = std::fs::create_dir_all(log_dir) {
+        tracing::warn!("failed to create job log dir {}: {e}", log_dir.display());
+        return;
+    }
     let path = log_dir.join(format!("{}.json", result.job_id));
     let json = serde_json::json!({
         "workflow": result.workflow_name,
@@ -92,7 +95,9 @@ pub fn persist_job_result(result: &JobResult, log_dir: &std::path::Path) {
             "duration_ms": s.duration_ms,
         })).collect::<Vec<_>>(),
     });
-    let _ = std::fs::write(path, serde_json::to_string_pretty(&json).unwrap_or_default());
+    if let Err(e) = std::fs::write(&path, serde_json::to_string_pretty(&json).unwrap_or_default()) {
+        tracing::warn!("failed to persist job result to {}: {e}", path.display());
+    }
 }
 
 #[cfg(test)]

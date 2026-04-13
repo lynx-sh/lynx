@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::terminal::TermCapability;
 
 /// A color value that can be specified in a theme.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Color {
     /// 24-bit hex color, e.g. "#7aa2f7".

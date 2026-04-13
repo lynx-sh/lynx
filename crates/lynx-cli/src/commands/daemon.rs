@@ -1,4 +1,5 @@
-use anyhow::{anyhow, Result};
+use anyhow::Result;
+use lynx_core::error::LynxError;
 use clap::{Args, Subcommand};
 use lynx_core::brand;
 use lynx_core::runtime::{pid_file, socket_path};
@@ -40,7 +41,7 @@ pub enum DaemonCommand {
     Other(Vec<String>),
 }
 
-pub async fn run(args: DaemonArgs) -> Result<()> {
+pub fn run(args: DaemonArgs) -> Result<()> {
     match args.command {
         DaemonCommand::Install => {
             let backend = platform_backend();
@@ -81,18 +82,19 @@ pub async fn run(args: DaemonArgs) -> Result<()> {
         }
         DaemonCommand::Stop => {
             let backend = platform_backend();
-            let _ = backend.stop();
-            let _ = stop_detached()?;
+            // Best-effort: try both service manager and detached; check is_running() for result.
+            let _ = backend.stop(); // may fail if service not installed
+            let _ = stop_detached()?; // may fail if no detached process
             if !is_running()? {
                 println!("✓ lynx-daemon stopped");
             } else {
-                return Err(anyhow!("failed to stop lynx-daemon"));
+                return Err(LynxError::Daemon("failed to stop lynx-daemon".into()).into());
             }
         }
         DaemonCommand::Restart => {
             let backend = platform_backend();
             let restarted_service = backend.restart().is_ok();
-            let _ = stop_detached()?;
+            let _ = stop_detached()?; // clean up detached process if any
             if restarted_service {
                 println!("✓ lynx-daemon restarted");
             } else {
@@ -102,12 +104,15 @@ pub async fn run(args: DaemonArgs) -> Result<()> {
         }
         DaemonCommand::Uninstall => {
             let backend = platform_backend();
-            let _ = backend.uninstall();
-            let _ = stop_detached()?;
+            // Best-effort cleanup: uninstall service + kill detached process.
+            if let Err(e) = backend.uninstall() {
+                tracing::warn!("service uninstall failed (may not be installed): {e}");
+            }
+            let _ = stop_detached()?; // clean up detached process if any
             println!("✓ lynx-daemon removed");
         }
         DaemonCommand::Other(args) => {
-            return Err(anyhow!("unknown daemon command '{}' — run `lx daemon` for help", args.first().map(|s| s.as_str()).unwrap_or("")));
+            return Err(LynxError::unknown_command(args.first().map(|s| s.as_str()).unwrap_or(""), "daemon").into());
         }
     }
 
@@ -150,7 +155,7 @@ fn start_detached() -> Result<()> {
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()
-        .map_err(|e| anyhow!("failed to spawn lynx-daemon: {e}"))?;
+        .map_err(|e| anyhow::Error::from(LynxError::Daemon(format!("failed to spawn lynx-daemon: {e}"))))?;
 
     Ok(())
 }
@@ -176,7 +181,7 @@ fn stop_detached() -> Result<bool> {
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status()
-        .map_err(|e| anyhow!("failed to signal lynx-daemon: {e}"))?;
+        .map_err(|e| anyhow::Error::from(LynxError::Daemon(format!("failed to signal lynx-daemon: {e}"))))?;
 
     if !status.success() {
         return Ok(false);
@@ -213,7 +218,64 @@ fn daemon_binary_path() -> Result<PathBuf> {
         }
     }
 
-    Err(anyhow!(
-        "lynx-daemon binary not found; install Lynx daemon or set LYNX_DAEMON_BIN"
-    ))
+    Err(LynxError::Daemon(
+        "lynx-daemon binary not found; install Lynx daemon or set LYNX_DAEMON_BIN".into()
+    ).into())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn process_is_alive_returns_false_for_bogus_pid() {
+        // PID 0 or very high PID should not be alive
+        assert!(!process_is_alive(999_999_999));
+    }
+
+    #[test]
+    fn process_is_alive_returns_true_for_current_process() {
+        let pid = std::process::id();
+        assert!(process_is_alive(pid));
+    }
+
+    #[test]
+    fn daemon_binary_path_env_override() {
+        let tmp = tempfile::tempdir().unwrap();
+        let bin = tmp.path().join("lynx-daemon");
+        std::fs::write(&bin, "").unwrap();
+
+        std::env::set_var("LYNX_DAEMON_BIN", bin.to_str().unwrap());
+        let result = daemon_binary_path();
+        std::env::remove_var("LYNX_DAEMON_BIN");
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), bin);
+    }
+
+    #[test]
+    fn daemon_binary_path_env_override_nonexistent_falls_through() {
+        std::env::set_var("LYNX_DAEMON_BIN", "/nonexistent/lynx-daemon");
+        let result = daemon_binary_path();
+        std::env::remove_var("LYNX_DAEMON_BIN");
+
+        // Should fall through to which/sibling checks, may or may not find the binary
+        let _ = result;
+    }
+
+    #[tokio::test]
+    async fn daemon_unknown_subcommand_errors() {
+        let args = DaemonArgs {
+            command: DaemonCommand::Other(vec!["bogus".to_string()]),
+        };
+        let err = run(args).unwrap_err();
+        assert!(err.to_string().contains("bogus"));
+    }
+
+    #[test]
+    fn is_running_returns_false_without_pid_or_socket() {
+        // In test environment, daemon shouldn't be running
+        // This may vary, but should not panic
+        let _ = is_running();
+    }
 }

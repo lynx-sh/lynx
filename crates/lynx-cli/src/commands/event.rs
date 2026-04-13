@@ -1,3 +1,4 @@
+use lynx_core::error::LynxError;
 use anyhow::Result;
 use clap::{Args, Subcommand};
 use lynx_events::{logger, types::Event};
@@ -59,12 +60,35 @@ pub async fn run(args: EventArgs) -> Result<()> {
         EventCommand::Examples => {
             crate::commands::examples::run(crate::commands::examples::ExamplesArgs {
                 command: Some("event".into()),
-            })
-            .await?;
+            })?;
         }
         EventCommand::Other(args) => {
-            anyhow::bail!("unknown event command '{}' — run `lx event` for help", args.first().map(|s| s.as_str()).unwrap_or(""))
+            return Err(LynxError::unknown_command(args.first().map(|s| s.as_str()).unwrap_or(""), "event").into())
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn event_unknown_subcommand_returns_error() {
+        let args = EventArgs {
+            command: EventCommand::Other(vec!["bogus".to_string()]),
+        };
+        let err = run(args).await.unwrap_err();
+        assert!(err.to_string().contains("bogus"));
+    }
+
+    #[tokio::test]
+    async fn event_unknown_subcommand_empty_returns_error() {
+        let args = EventArgs {
+            command: EventCommand::Other(vec![]),
+        };
+        // Should not panic even with empty args
+        let result = run(args).await;
+        assert!(result.is_err());
+    }
 }

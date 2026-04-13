@@ -12,7 +12,7 @@ pub struct MigrateArgs {
     pub dry_run: bool,
 }
 
-pub async fn run(args: MigrateArgs) -> Result<()> {
+pub fn run(args: MigrateArgs) -> Result<()> {
     let mut cfg = load()?;
 
     if args.dry_run {
@@ -38,4 +38,33 @@ pub async fn run(args: MigrateArgs) -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn migrate_args_defaults() {
+        use clap::Parser;
+        #[derive(Parser)]
+        struct W {
+            #[command(flatten)]
+            args: MigrateArgs,
+        }
+        let w = W::parse_from(["test"]);
+        assert!(!w.args.dry_run);
+    }
+
+    #[test]
+    fn migrate_args_dry_run() {
+        use clap::Parser;
+        #[derive(Parser)]
+        struct W {
+            #[command(flatten)]
+            args: MigrateArgs,
+        }
+        let w = W::parse_from(["test", "--dry-run"]);
+        assert!(w.args.dry_run);
+    }
 }

@@ -1,4 +1,5 @@
-use anyhow::{bail, Result};
+use anyhow::{Result};
+use lynx_core::error::LynxError;
 use clap::Args;
 
 #[derive(Args)]
@@ -7,7 +8,7 @@ pub struct ExamplesArgs {
     pub command: Option<String>,
 }
 
-pub async fn run(args: ExamplesArgs) -> Result<()> {
+pub fn run(args: ExamplesArgs) -> Result<()> {
     match args.command.as_deref() {
         Some("plugin") => print_plugin_examples(),
         Some("theme") => print_theme_examples(),
@@ -21,7 +22,7 @@ pub async fn run(args: ExamplesArgs) -> Result<()> {
         Some("jobs") => print_jobs_examples(),
         Some("dashboard") => print_dashboard_examples(),
         Some(other) => {
-            bail!("unknown command '{other}' — try: lx examples plugin, theme, cron, run, jobs, dashboard, event, config, doctor");
+            return Err(LynxError::unknown_command(other, "examples").into());
         }
         None => print_quickstart(),
     }
@@ -287,46 +288,105 @@ fn print_daemon_examples() {
     );
 }
 
-fn print_workflow_examples() {
+pub fn print_workflow_examples() {
     println!(
         r#"
-  lx run — examples
-  ──────────────────
+  lx run — workflow examples
+  ──────────────────────────
 
-  # List available workflows
-  lx run list
+  Workflows are saved recipes — a list of commands you run together.
+  They live as .toml files in ~/.config/lynx/workflows/
 
-  # Run a workflow with parameters
-  lx run deploy env=staging version=1.2.3
+  ── Example 1: Simple — run two commands in sequence ──────────
 
-  # Preview steps without executing
-  lx run deploy --dry-run env=production
+  File: ~/.config/lynx/workflows/check.toml
 
-  # Run in background immediately
-  lx run deploy --bg env=production
+    [workflow]
+    name = "check"
+    description = "Lint and test my project"
 
-  # Skip all confirmation prompts
-  lx run deploy --yes env=production
+    [[step]]
+    name = "lint"
+    run = "cargo clippy --all"
 
-  # Workflow TOML format (~/.config/lynx/workflows/deploy.toml):
-  #   [workflow]
-  #   name = "deploy"
-  #   description = "Deploy to environment"
-  #
-  #   [[workflow.param]]
-  #   name = "env"
-  #   type = "string"
-  #   choices = ["staging", "production"]
-  #
-  #   [[step]]
-  #   name = "build"
-  #   run = "cargo build --release"
-  #
-  #   [[step]]
-  #   name = "deploy"
-  #   runner = "bash"
-  #   run = "./deploy.sh $env"
-  #   confirm = true
+    [[step]]
+    name = "test"
+    run = "cargo nextest run --all"
+
+  Run it:  lx run check
+
+  ── Example 2: Parallel steps — run lint + test at the same time ──
+
+    [[step]]
+    name = "lint"
+    run = "cargo clippy --all"
+    group = "checks"              # <-- same group = parallel
+
+    [[step]]
+    name = "test"
+    run = "cargo nextest run"
+    group = "checks"              # <-- same group = parallel
+
+    [[step]]
+    name = "build"
+    run = "cargo build --release"
+    depends_on = ["lint", "test"] # <-- waits for both to finish
+
+  ── Example 3: Parameters — make a workflow reusable ─────────
+
+    [workflow]
+    name = "deploy"
+    description = "Deploy to an environment"
+
+    [[workflow.param]]
+    name = "env"
+    type = "string"
+    choices = ["staging", "production"]
+
+    [[workflow.param]]
+    name = "skip_tests"
+    type = "bool"
+    default = "false"
+
+    [[step]]
+    name = "build"
+    run = "cargo build --release"
+
+    [[step]]
+    name = "push"
+    runner = "bash"
+    run = "./deploy.sh $env"
+    confirm = true                # <-- asks "are you sure?" first
+
+  Run it:  lx run deploy env=staging
+           lx run deploy env=production skip_tests=true
+
+  ── Example 4: Error handling and timeouts ───────────────────
+
+    [[step]]
+    name = "migrate"
+    run = "diesel migration run"
+    timeout_sec = 120             # kill if it takes > 2 minutes
+    on_fail = "abort"             # stop the whole workflow (default)
+
+    [[step]]
+    name = "seed"
+    run = "cargo run --bin seed"
+    on_fail = "continue"          # keep going even if this fails
+
+    [[step]]
+    name = "health-check"
+    run = "curl -f http://localhost:8080/health"
+    on_fail = "retry"             # try again on failure
+    retry_count = 3               # up to 3 times
+
+  ── Useful commands ──────────────────────────────────────────
+
+  lx run list                     browse available workflows
+  lx run deploy --dry-run         see what would run (no execution)
+  lx run deploy --bg              run in background
+  lx run deploy --yes             skip confirmation prompts
+  lx jobs list                    see running/finished jobs
 "#
     );
 }
@@ -354,6 +414,47 @@ fn print_jobs_examples() {
   lx jobs clean --hours 24
 "#
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn examples_no_command_does_not_error() {
+        let args = ExamplesArgs { command: None };
+        assert!(run(args).is_ok());
+    }
+
+    #[test]
+    fn examples_known_commands_succeed() {
+        let commands = vec![
+            "plugin", "theme", "cron", "task", "event", "config",
+            "doctor", "context", "daemon", "run", "workflow", "jobs",
+            "dashboard",
+        ];
+        for cmd in commands {
+            let args = ExamplesArgs { command: Some(cmd.to_string()) };
+            assert!(run(args).is_ok(), "examples for '{cmd}' should succeed");
+        }
+    }
+
+    #[test]
+    fn examples_unknown_command_errors() {
+        let args = ExamplesArgs { command: Some("nonexistent".to_string()) };
+        let err = run(args).unwrap_err();
+        assert!(err.to_string().contains("nonexistent"));
+    }
+
+    #[test]
+    fn print_quickstart_does_not_panic() {
+        print_quickstart();
+    }
+
+    #[test]
+    fn print_workflow_examples_does_not_panic() {
+        print_workflow_examples();
+    }
 }
 
 fn print_dashboard_examples() {

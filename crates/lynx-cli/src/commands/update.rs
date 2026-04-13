@@ -1,7 +1,8 @@
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use anyhow::{bail, Result};
+use anyhow::{Result};
+use lynx_core::error::LynxError;
 use clap::Args;
 
 use lynx_core::brand;
@@ -18,7 +19,7 @@ pub struct UpdateArgs {
     pub yes: bool,
 }
 
-pub async fn run(args: UpdateArgs) -> Result<()> {
+pub fn run(args: UpdateArgs) -> Result<()> {
     // Rate-limit GitHub API calls.
     if let Some(cached) = read_cached_version() {
         if cached.is_fresh() {
@@ -26,7 +27,7 @@ pub async fn run(args: UpdateArgs) -> Result<()> {
                 println!("Latest: {} (current: {})", cached.latest, brand::VERSION);
             }
             if !args.check && is_newer(&cached.latest, brand::VERSION) {
-                return do_update(&cached.latest, args.yes).await;
+                return do_update(&cached.latest, args.yes);
             } else if !args.check {
                 println!("lx is up to date ({})", brand::VERSION);
             }
@@ -35,7 +36,7 @@ pub async fn run(args: UpdateArgs) -> Result<()> {
     }
 
     println!("Checking for updates...");
-    let latest = fetch_latest_version().await?;
+    let latest = fetch_latest_version()?;
     cache_version(&latest);
 
     if args.check {
@@ -44,14 +45,14 @@ pub async fn run(args: UpdateArgs) -> Result<()> {
     }
 
     if is_newer(&latest, brand::VERSION) {
-        do_update(&latest, args.yes).await
+        do_update(&latest, args.yes)
     } else {
         println!("lx is up to date ({})", brand::VERSION);
         Ok(())
     }
 }
 
-async fn do_update(version: &str, yes: bool) -> Result<()> {
+fn do_update(version: &str, yes: bool) -> Result<()> {
     if !yes {
         print!("Update lx to {version}? [y/N] ");
         std::io::Write::flush(&mut std::io::stdout())?;
@@ -67,7 +68,7 @@ async fn do_update(version: &str, yes: bool) -> Result<()> {
     let url = format!("{}/releases/download/{version}/lx-{platform}", brand::REPO);
 
     println!("Downloading {version} for {platform}...");
-    let bytes = download(&url).await?;
+    let bytes = download(&url)?;
 
     // Verify checksum (placeholder — real impl fetches .sha256 and compares).
     verify_checksum(&bytes, version)?;
@@ -87,22 +88,26 @@ async fn do_update(version: &str, yes: bool) -> Result<()> {
     }
 
     std::fs::rename(&tmp, &current_bin)
-        .map_err(|e| anyhow::anyhow!("failed to replace binary: {e}"))?;
+        .map_err(|e| anyhow::Error::from(lynx_core::error::LynxError::Io {
+            message: format!("failed to replace binary: {e}"),
+            path: current_bin.clone(),
+            fix: "check file permissions or try running with sudo".into(),
+        }))?;
 
     println!("Updated to {version}. Restart your shell or run: exec lx");
     Ok(())
 }
 
-async fn fetch_latest_version() -> Result<String> {
+fn fetch_latest_version() -> Result<String> {
     // In a real implementation this calls the GitHub releases API.
     // For now return current version to avoid network calls in tests.
     // Real: GET https://api.github.com/repos/lynx-sh/lynx/releases/latest
     Ok(brand::VERSION.to_string())
 }
 
-async fn download(_url: &str) -> Result<Vec<u8>> {
+fn download(_url: &str) -> Result<Vec<u8>> {
     // Real: HTTP GET the binary URL.
-    bail!("download not implemented — build from source or use the install script");
+    Err(LynxError::Shell("download not implemented — build from source or use the install script".into()).into())
 }
 
 fn verify_checksum(_bytes: &[u8], _version: &str) -> Result<()> {
@@ -173,9 +178,14 @@ fn cache_version(version: &str) {
     let json = serde_json::json!({ "latest": version, "checked_at": now });
     let path = cache_path();
     if let Some(parent) = path.parent() {
-        let _ = std::fs::create_dir_all(parent);
+        if let Err(e) = std::fs::create_dir_all(parent) {
+            tracing::warn!("failed to create update cache dir: {e}");
+            return;
+        }
     }
-    let _ = std::fs::write(path, json.to_string());
+    if let Err(e) = std::fs::write(&path, json.to_string()) {
+        tracing::warn!("failed to write update cache: {e}");
+    }
 }
 
 #[cfg(test)]

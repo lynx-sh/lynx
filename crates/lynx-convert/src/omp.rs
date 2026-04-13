@@ -102,8 +102,10 @@ struct OmpSegment {
     #[serde(default)]
     powerline_symbol: String,
     #[serde(default)]
+    #[allow(dead_code)] // Accepted from OMP format but not mapped to Lynx
     properties: Option<serde_json::Value>,
     #[serde(default)]
+    #[allow(dead_code)] // Accepted from OMP format but not mapped to Lynx
     options: Option<serde_json::Value>,
 }
 

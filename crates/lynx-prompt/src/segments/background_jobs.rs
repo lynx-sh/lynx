@@ -23,7 +23,7 @@ impl Segment for BackgroundJobsSegment {
             return None;
         }
         let symbol = cfg.symbol.unwrap_or_else(|| "⚙".to_string());
-        Some(RenderedSegment::new(format!("{} {}", symbol, jobs)))
+        Some(RenderedSegment::new(format!("{symbol} {jobs}")))
     }
 }
 

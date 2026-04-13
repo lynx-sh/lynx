@@ -1,4 +1,5 @@
-use anyhow::{bail, Context as _, Result};
+use anyhow::{Context as _, Result};
+use lynx_core::error::LynxError;
 
 use super::open_in_vscode;
 use clap::{Args, Subcommand};
@@ -56,7 +57,7 @@ pub enum IntroCommand {
     },
 }
 
-pub async fn run(args: IntroArgs) -> Result<()> {
+pub fn run(args: IntroArgs) -> Result<()> {
     match args.command {
         IntroCommand::On => cmd_on(),
         IntroCommand::Off => cmd_off(),
@@ -70,7 +71,7 @@ pub async fn run(args: IntroArgs) -> Result<()> {
             if args.len() == 1 {
                 cmd_set(&args[0])
             } else {
-                bail!("unknown intro command '{}' — run `lx intro` for help", args.first().map(|s| s.as_str()).unwrap_or(""))
+                Err(LynxError::unknown_command(args.first().map(|s| s.as_str()).unwrap_or(""), "intro").into())
             }
         }
         IntroCommand::Logo { text, font, list_fonts, append } => {
@@ -113,22 +114,83 @@ fn cmd_set(slug: &str) -> Result<()> {
     Ok(())
 }
 
+/// An intro entry for the interactive list.
+struct IntroListEntry {
+    slug: String,
+    name: String,
+    kind: String,
+    is_current: bool,
+    enabled: bool,
+}
+
+impl lynx_tui::ListItem for IntroListEntry {
+    fn title(&self) -> &str {
+        &self.slug
+    }
+
+    fn subtitle(&self) -> String {
+        let status = if self.is_current && !self.enabled {
+            " (disabled)"
+        } else {
+            ""
+        };
+        format!("{}{status}", self.kind)
+    }
+
+    fn detail(&self) -> String {
+        let mut lines = vec![self.name.clone()];
+        lines.push(format!("Type: {}", self.kind));
+        if self.is_current {
+            let status = if self.enabled { "active" } else { "active (disabled)" };
+            lines.push(format!("Status: {status}"));
+        }
+        lines.join("\n")
+    }
+
+    fn category(&self) -> Option<&str> {
+        Some("intro")
+    }
+
+    fn is_active(&self) -> bool {
+        self.is_current
+    }
+}
+
 fn cmd_list() -> Result<()> {
     let cfg = load().context("failed to load config")?;
     let active = cfg.intro.active.as_deref().unwrap_or("");
-    let enabled_marker = if cfg.intro.enabled { "" } else { " (disabled)" };
+    let enabled = cfg.intro.enabled;
 
-    let entries = loader::list_all();
-    if entries.is_empty() {
+    let raw_entries = loader::list_all();
+    if raw_entries.is_empty() {
         println!("no intros found");
         return Ok(());
     }
 
-    for entry in entries {
-        let active_marker = if entry.slug == active { "* " } else { "  " };
-        let kind = if entry.is_builtin { "built-in" } else { "user" };
-        println!("{active_marker}{} ({kind}){}", entry.slug, if entry.slug == active { enabled_marker } else { "" });
+    let entries: Vec<IntroListEntry> = raw_entries
+        .iter()
+        .map(|e| IntroListEntry {
+            slug: e.slug.clone(),
+            name: e.name.clone(),
+            kind: if e.is_builtin { "built-in".into() } else { "user".into() },
+            is_current: e.slug == active,
+            enabled,
+        })
+        .collect();
+
+    // Load TUI colors from active theme.
+    let tui_colors = match lynx_theme::loader::load(&cfg.active_theme) {
+        Ok(theme) => lynx_tui::TuiColors::from_palette(&theme.colors),
+        Err(_) => lynx_tui::TuiColors::default(),
+    };
+
+    if let Some(idx) = lynx_tui::show(&entries, "Intros", &tui_colors)? {
+        let selected = &entries[idx].slug;
+        if selected != active {
+            cmd_set(selected)?;
+        }
     }
+
     Ok(())
 }
 
@@ -156,7 +218,7 @@ fn cmd_edit(slug: &str) -> Result<()> {
         Err(e) => {
             std::fs::write(&path, &snapshot)
                 .context("CRITICAL: failed to restore intro snapshot")?;
-            bail!("intro validation failed — changes reverted: {e}");
+            return Err(LynxError::Config(format!("intro validation failed — changes reverted: {e}")).into());
         }
     }
     Ok(())
@@ -165,12 +227,12 @@ fn cmd_edit(slug: &str) -> Result<()> {
 fn cmd_delete(slug: &str) -> Result<()> {
     // Only user intros can be deleted.
     if loader::list_builtin().contains(&slug) {
-        bail!("cannot delete built-in intro '{slug}' — built-ins are read-only");
+        return Err(LynxError::Config(format!("cannot delete built-in intro '{slug}' — built-ins are read-only")).into());
     }
 
     let path = user_intro_dir().join(format!("{slug}.toml"));
     if !path.exists() {
-        bail!("intro '{slug}' not found in user intro directory");
+        return Err(LynxError::NotFound { item_type: "Intro".into(), name: slug.to_string(), hint: "run `lx intro list` to see available intros".into() }.into());
     }
 
     std::fs::remove_file(&path)
@@ -195,7 +257,7 @@ fn cmd_delete(slug: &str) -> Result<()> {
 fn cmd_new(slug: &str) -> Result<()> {
     // Validate slug is a safe identifier.
     if slug.contains('/') || slug.contains('\\') || slug.contains("..") || slug.is_empty() {
-        bail!("invalid slug '{slug}': use only letters, numbers, hyphens, and underscores");
+        return Err(LynxError::Config(format!("invalid slug '{slug}': use only letters, numbers, hyphens, and underscores")).into());
     }
 
     let user_dir = user_intro_dir();
@@ -203,7 +265,7 @@ fn cmd_new(slug: &str) -> Result<()> {
 
     let path = user_dir.join(format!("{slug}.toml"));
     if path.exists() {
-        bail!("intro '{slug}' already exists — use `lx intro edit {slug}` to modify it");
+        return Err(LynxError::Config(format!("intro '{slug}' already exists — use `lx intro edit {slug}` to modify it")).into());
     }
 
     let template = format!(
@@ -245,7 +307,7 @@ color = "muted"
                 lynx_core::diag::warn("intro", &format!("failed to clean up invalid intro file {path:?}: {rm_err}"));
                 eprintln!("warning: could not remove invalid intro file: {rm_err}");
             }
-            bail!("intro validation failed — file removed: {e}");
+            return Err(LynxError::Config(format!("intro validation failed — file removed: {e}")).into());
         }
     }
     Ok(())
@@ -255,7 +317,7 @@ fn cmd_preview(slug: Option<&str>) -> Result<()> {
     let cfg = load().context("failed to load config")?;
     let target = slug
         .or(cfg.intro.active.as_deref())
-        .ok_or_else(|| anyhow::anyhow!("no intro specified and no active intro set — use `lx intro set <slug>` first"))?;
+        .ok_or_else(|| anyhow::Error::from(lynx_core::error::LynxError::Config("no intro specified and no active intro set".into())))?;
 
     let intro = loader::load(target)
         .with_context(|| format!("failed to load intro '{target}'"))?;
@@ -264,7 +326,7 @@ fn cmd_preview(slug: Option<&str>) -> Result<()> {
     let tokens = lynx_intro::build_token_map(&env);
     let rendered = lynx_intro::render_intro(&intro, &tokens);
 
-    print!("{}", rendered);
+    print!("{rendered}");
     Ok(())
 }
 
@@ -284,7 +346,7 @@ fn cmd_logo(text: &str, font: &str, list_fonts: bool, append: bool) -> Result<()
         append_logo_to_active_intro(font, text)?;
         println!("logo appended to active intro");
     } else {
-        print!("{}", ascii);
+        print!("{ascii}");
     }
     Ok(())
 }
@@ -293,7 +355,7 @@ fn cmd_logo(text: &str, font: &str, list_fonts: bool, append: bool) -> Result<()
 fn append_logo_to_active_intro(font: &str, text: &str) -> Result<()> {
     let cfg = load().context("failed to load config")?;
     let slug = cfg.intro.active.as_deref()
-        .ok_or_else(|| anyhow::anyhow!("no active intro — use `lx intro set <slug>` first"))?;
+        .ok_or_else(|| anyhow::Error::from(lynx_core::error::LynxError::Config("no active intro — use `lx intro set <slug>` first".into())))?;
 
     // Ensure it's in user dir (copy built-in if needed).
     let user_dir = user_intro_dir();
@@ -332,9 +394,96 @@ fn append_logo_to_active_intro(font: &str, text: &str) -> Result<()> {
 }
 
 /// Copy a built-in intro to the user intro directory and return the path.
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn intro_list_entry_trait_active_enabled() {
+        use lynx_tui::ListItem;
+        let entry = IntroListEntry {
+            slug: "default".to_string(),
+            name: "Default".to_string(),
+            kind: "built-in".to_string(),
+            is_current: true,
+            enabled: true,
+        };
+        assert_eq!(entry.title(), "default");
+        assert!(entry.is_active());
+        assert_eq!(entry.category(), Some("intro"));
+        let detail = entry.detail();
+        assert!(detail.contains("active"));
+    }
+
+    #[test]
+    fn intro_list_entry_trait_active_disabled() {
+        use lynx_tui::ListItem;
+        let entry = IntroListEntry {
+            slug: "minimal".to_string(),
+            name: "Minimal".to_string(),
+            kind: "user".to_string(),
+            is_current: true,
+            enabled: false,
+        };
+        let sub = entry.subtitle();
+        assert!(sub.contains("disabled"), "subtitle should note disabled: {sub}");
+    }
+
+    #[test]
+    fn intro_list_entry_not_current() {
+        use lynx_tui::ListItem;
+        let entry = IntroListEntry {
+            slug: "other".to_string(),
+            name: "Other".to_string(),
+            kind: "built-in".to_string(),
+            is_current: false,
+            enabled: true,
+        };
+        assert!(!entry.is_active());
+    }
+
+    #[test]
+    fn cmd_new_rejects_empty_slug() {
+        let result = cmd_new("");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("invalid slug"));
+    }
+
+    #[test]
+    fn cmd_new_rejects_path_traversal() {
+        assert!(cmd_new("../escape").is_err());
+        assert!(cmd_new("foo/bar").is_err());
+        assert!(cmd_new("foo\\bar").is_err());
+    }
+
+    #[test]
+    fn cmd_delete_rejects_builtin() {
+        // Built-in intros should not be deletable
+        let builtins = loader::list_builtin();
+        for slug in &builtins {
+            let result = cmd_delete(slug);
+            assert!(result.is_err(), "built-in '{slug}' should not be deletable");
+            assert!(result.unwrap_err().to_string().contains("built-in"));
+        }
+    }
+
+    #[tokio::test]
+    async fn intro_unknown_subcommand_multi_args_errors() {
+        let args = IntroArgs {
+            command: IntroCommand::Other(vec!["a".to_string(), "b".to_string()]),
+        };
+        let err = run(args).unwrap_err();
+        assert!(err.to_string().contains("a"));
+    }
+}
+
 fn copy_builtin_to_user(slug: &str) -> Result<std::path::PathBuf> {
     let intro = loader::load_builtin(slug)
-        .ok_or_else(|| anyhow::anyhow!("intro '{slug}' not found in built-ins"))?;
+        .ok_or_else(|| anyhow::Error::from(lynx_core::error::LynxError::NotFound {
+            item_type: "Intro".into(),
+            name: slug.to_string(),
+            hint: "run `lx intro list` to see available intros".into(),
+        }))?;
 
     let user_dir = user_intro_dir();
     std::fs::create_dir_all(&user_dir)

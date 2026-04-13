@@ -2,7 +2,7 @@ use lynx_manifest::schema::PluginManifest;
 use std::collections::HashMap;
 
 /// The lifecycle stage a plugin is currently in.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PluginState {
     Pending,
     Declared,
@@ -88,5 +88,96 @@ impl PluginRegistry {
             .filter(|e| &e.state == state)
             .map(|e| e.manifest.plugin.name.clone())
             .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use lynx_manifest::schema::*;
+
+    fn test_manifest(name: &str) -> PluginManifest {
+        PluginManifest {
+            schema_version: 1,
+            plugin: PluginMeta {
+                name: name.to_string(),
+                version: "1.0.0".to_string(),
+                description: String::new(),
+                authors: vec![],
+            },
+            load: LoadConfig::default(),
+            deps: DepsConfig::default(),
+            exports: ExportsConfig::default(),
+            contexts: ContextsConfig::default(),
+            state: StateConfig::default(),
+            shell: ShellConfig::default(),
+        }
+    }
+
+    #[test]
+    fn plugin_state_checks() {
+        assert!(PluginState::Active.is_active());
+        assert!(!PluginState::Pending.is_active());
+        assert!(PluginState::Failed { reason: "x".into() }.is_failed());
+        assert!(!PluginState::Active.is_failed());
+        assert!(PluginState::Excluded { reason: "x".into() }.is_excluded());
+        assert!(!PluginState::Resolved.is_excluded());
+    }
+
+    #[test]
+    fn plugin_entry_new_starts_declared() {
+        let entry = PluginEntry::new(test_manifest("git"));
+        assert_eq!(entry.state, PluginState::Declared);
+        assert!(entry.load_time_ms.is_none());
+        assert!(entry.plugin_dir.is_none());
+    }
+
+    #[test]
+    fn registry_insert_and_get() {
+        let mut reg = PluginRegistry::new();
+        reg.insert(PluginEntry::new(test_manifest("git")));
+        assert!(reg.get("git").is_some());
+        assert!(reg.get("missing").is_none());
+    }
+
+    #[test]
+    fn registry_set_state() {
+        let mut reg = PluginRegistry::new();
+        reg.insert(PluginEntry::new(test_manifest("git")));
+        reg.set_state("git", PluginState::Active);
+        assert!(reg.get("git").unwrap().state.is_active());
+    }
+
+    #[test]
+    fn registry_set_state_nonexistent_is_noop() {
+        let mut reg = PluginRegistry::new();
+        reg.set_state("missing", PluginState::Active); // should not panic
+    }
+
+    #[test]
+    fn registry_names_in_state() {
+        let mut reg = PluginRegistry::new();
+        reg.insert(PluginEntry::new(test_manifest("a")));
+        reg.insert(PluginEntry::new(test_manifest("b")));
+        reg.set_state("a", PluginState::Active);
+        let active = reg.names_in_state(&PluginState::Active);
+        assert_eq!(active, vec!["a"]);
+    }
+
+    #[test]
+    fn registry_all_iterates_all_entries() {
+        let mut reg = PluginRegistry::new();
+        reg.insert(PluginEntry::new(test_manifest("x")));
+        reg.insert(PluginEntry::new(test_manifest("y")));
+        assert_eq!(reg.all().count(), 2);
+    }
+
+    #[test]
+    fn registry_get_mut() {
+        let mut reg = PluginRegistry::new();
+        reg.insert(PluginEntry::new(test_manifest("git")));
+        let entry = reg.get_mut("git").unwrap();
+        entry.load_time_ms = Some(42);
+        assert_eq!(reg.get("git").unwrap().load_time_ms, Some(42));
     }
 }

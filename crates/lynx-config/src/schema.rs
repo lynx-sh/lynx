@@ -29,14 +29,15 @@ fn default_theme() -> String {
     "default".to_string()
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct SyncConfig {
     pub remote: Option<String>,
 }
 
 /// Intro display configuration, stored under `[intro]` in `config.toml`.
 /// Disabled by default — user must opt in via `lx intro on`.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct IntroConfig {
     /// Whether the intro is enabled. Default: false.
     #[serde(default)]
@@ -46,11 +47,73 @@ pub struct IntroConfig {
     pub active: Option<String>,
 }
 
-impl Default for IntroConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            active: None,
-        }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_config_values() {
+        let cfg = LynxConfig::default();
+        assert_eq!(cfg.schema_version, CURRENT_SCHEMA_VERSION);
+        assert_eq!(cfg.active_theme, "default");
+        assert_eq!(cfg.active_context, Context::Interactive);
+        assert!(cfg.enabled_plugins.is_empty());
+        assert!(cfg.sync.remote.is_none());
+        assert!(!cfg.intro.enabled);
+        assert!(cfg.intro.active.is_none());
+    }
+
+    #[test]
+    fn config_deserialize_minimal() {
+        let toml = "";
+        let cfg: LynxConfig = toml::from_str(toml).unwrap();
+        assert_eq!(cfg.active_theme, "default");
+        assert_eq!(cfg.schema_version, CURRENT_SCHEMA_VERSION);
+    }
+
+    #[test]
+    fn config_deserialize_full() {
+        let toml = r#"
+            schema_version = 1
+            active_theme = "nord"
+            active_context = "agent"
+            enabled_plugins = ["git", "fzf"]
+
+            [sync]
+            remote = "git@github.com:user/dotfiles.git"
+
+            [intro]
+            enabled = true
+            active = "default"
+        "#;
+        let cfg: LynxConfig = toml::from_str(toml).unwrap();
+        assert_eq!(cfg.active_theme, "nord");
+        assert_eq!(cfg.active_context, Context::Agent);
+        assert_eq!(cfg.enabled_plugins, vec!["git", "fzf"]);
+        assert_eq!(cfg.sync.remote.as_deref(), Some("git@github.com:user/dotfiles.git"));
+        assert!(cfg.intro.enabled);
+        assert_eq!(cfg.intro.active.as_deref(), Some("default"));
+    }
+
+    #[test]
+    fn config_serialize_roundtrip() {
+        let cfg = LynxConfig::default();
+        let toml_str = toml::to_string_pretty(&cfg).unwrap();
+        let back: LynxConfig = toml::from_str(&toml_str).unwrap();
+        assert_eq!(cfg, back);
+    }
+
+    #[test]
+    fn intro_config_default() {
+        let ic = IntroConfig::default();
+        assert!(!ic.enabled);
+        assert!(ic.active.is_none());
+    }
+
+    #[test]
+    fn sync_config_default() {
+        let sc = SyncConfig::default();
+        assert!(sc.remote.is_none());
     }
 }
+

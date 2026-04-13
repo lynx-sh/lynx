@@ -4,14 +4,15 @@
 // with inline comments that explain each field so new contributors don't need
 // to read the full protocol docs to get started.
 
-use anyhow::{bail, Result};
+use anyhow::{Result};
+use lynx_core::error::LynxError;
 use lynx_plugin::namespace::scaffold_convention_comment;
 use std::path::PathBuf;
 
-pub(super) async fn cmd_new(name: &str) -> Result<()> {
+pub(super) fn cmd_new(name: &str) -> Result<()> {
     let dir = PathBuf::from(name);
     if dir.exists() {
-        bail!("directory '{}' already exists.", name);
+        return Err(LynxError::Plugin(format!("directory '{name}' already exists")).into());
     }
 
     std::fs::create_dir_all(dir.join("shell"))?;
@@ -41,8 +42,7 @@ aliases   = []           # example: ["g", "gs"] — only loaded in interactive c
 # Aliases are never loaded in agent or minimal contexts (D-010).
 # Add "interactive" here to also skip functions in non-interactive shells.
 disabled_in = ["agent", "minimal"]
-"#,
-        name = name
+"#
     );
     std::fs::write(dir.join(lynx_core::brand::PLUGIN_MANIFEST), toml)?;
 
@@ -51,7 +51,6 @@ disabled_in = ["agent", "minimal"]
          # Sources functions and aliases; actual logic lives in functions.zsh.\n\
          source \"${{LYNX_PLUGIN_DIR}}/{name}/shell/functions.zsh\"\n\
          source \"${{LYNX_PLUGIN_DIR}}/{name}/shell/aliases.zsh\"\n",
-        name = name,
     );
     std::fs::write(dir.join("shell/init.zsh"), init_zsh)?;
 
@@ -89,7 +88,7 @@ disabled_in = ["agent", "minimal"]
     );
     std::fs::write(dir.join("shell/aliases.zsh"), aliases_zsh)?;
 
-    println!("Created plugin '{}' at ./{}/", name, name);
+    println!("Created plugin '{name}' at ./{name}/");
     println!();
     println!("  Structure:");
     println!("    {name}/plugin.toml          — manifest (edit exports + deps)");
@@ -102,4 +101,70 @@ disabled_in = ["agent", "minimal"]
     println!("    lx plugin list               — verify it's loaded");
     println!("    lx doctor                    — check for issues");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn scaffold_refuses_existing_directory() {
+        let tmp = tempfile::tempdir().unwrap();
+        let existing = tmp.path().join("existing-plugin");
+        std::fs::create_dir_all(&existing).unwrap();
+
+        // Change to temp dir so the relative path resolves
+        let _orig = std::env::current_dir().unwrap();
+        std::env::set_current_dir(tmp.path()).unwrap();
+
+        let result = cmd_new("existing-plugin");
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("already exists"), "unexpected error: {msg}");
+
+        std::env::set_current_dir(_orig).unwrap();
+    }
+
+    #[test]
+    fn scaffold_creates_all_files() {
+        let tmp = tempfile::tempdir().unwrap();
+        let _orig = std::env::current_dir().unwrap();
+        std::env::set_current_dir(tmp.path()).unwrap();
+
+        let result = cmd_new("test-scaffold");
+        assert!(result.is_ok(), "scaffold failed: {:?}", result.err());
+
+        let dir = tmp.path().join("test-scaffold");
+        assert!(dir.join(lynx_core::brand::PLUGIN_MANIFEST).exists());
+        assert!(dir.join("shell/init.zsh").exists());
+        assert!(dir.join("shell/functions.zsh").exists());
+        assert!(dir.join("shell/aliases.zsh").exists());
+
+        // Verify manifest is valid TOML
+        let content = std::fs::read_to_string(dir.join(lynx_core::brand::PLUGIN_MANIFEST)).unwrap();
+        let parsed: toml::Value = toml::from_str(&content).unwrap();
+        assert_eq!(parsed["plugin"]["name"].as_str().unwrap(), "test-scaffold");
+
+        std::env::set_current_dir(_orig).unwrap();
+    }
+
+    #[test]
+    fn scaffold_zsh_files_are_valid_syntax() {
+        let tmp = tempfile::tempdir().unwrap();
+        let _orig = std::env::current_dir().unwrap();
+        std::env::set_current_dir(tmp.path()).unwrap();
+
+        cmd_new("zsh-check").unwrap();
+
+        let dir = tmp.path().join("zsh-check");
+        let init = std::fs::read_to_string(dir.join("shell/init.zsh")).unwrap();
+        let funcs = std::fs::read_to_string(dir.join("shell/functions.zsh")).unwrap();
+        let aliases = std::fs::read_to_string(dir.join("shell/aliases.zsh")).unwrap();
+
+        lynx_test_utils::assert_valid_zsh(&init);
+        lynx_test_utils::assert_valid_zsh(&funcs);
+        lynx_test_utils::assert_valid_zsh(&aliases);
+
+        std::env::set_current_dir(_orig).unwrap();
+    }
 }

@@ -20,14 +20,14 @@ pub struct InitArgs {
     pub context: Option<String>,
 }
 
-pub async fn run(args: InitArgs) -> Result<()> {
+pub fn run(args: InitArgs) -> Result<()> {
     // If config fails to load, emit safe mode instead of crashing the shell.
     let config = match load_config() {
         Ok(cfg) => cfg,
         Err(e) => {
             diag::error("init", &format!("config load failed: {e}"));
             let script = generate_safemode_script(&e.to_string());
-            print!("{}", script);
+            print!("{script}");
             return Ok(());
         }
     };
@@ -38,7 +38,7 @@ pub async fn run(args: InitArgs) -> Result<()> {
         Some("minimal") => Context::Minimal,
         Some("interactive") => Context::Interactive,
         Some(other) => {
-            let msg = format!("unknown context '{}', falling back to auto-detect", other);
+            let msg = format!("unknown context '{other}', falling back to auto-detect");
             diag::warn("init", &msg);
             detected
         }
@@ -55,7 +55,7 @@ pub async fn run(args: InitArgs) -> Result<()> {
     let enabled_plugins: Vec<String> = match lynx_depgraph::depgraph::resolve(&manifests) {
         Ok(order) => {
             for (name, bin) in &order.excluded {
-                let msg = format!("plugin '{}' excluded — missing binary '{}'", name, bin);
+                let msg = format!("plugin '{name}' excluded — missing binary '{bin}'");
                 diag::warn("init", &msg);
             }
             order.eager.into_iter().chain(order.lazy).collect()
@@ -79,7 +79,7 @@ pub async fn run(args: InitArgs) -> Result<()> {
             theme.autosuggestions.to_autosuggest_style(),
         ),
         Err(e) => {
-            diag::warn("init", &format!("theme '{}' failed to load: {e}", theme_name));
+            diag::warn("init", &format!("theme '{theme_name}' failed to load: {e}"));
             (None, None, None, None, None)
         }
     };
@@ -109,7 +109,7 @@ pub async fn run(args: InitArgs) -> Result<()> {
         zle_hook_plugins,
     });
 
-    print!("{}", script);
+    print!("{script}");
     Ok(())
 }
 
@@ -151,9 +151,9 @@ fn maybe_show_intro(config: &lynx_config::schema::LynxConfig, context: Context) 
         let rendered = lynx_intro::render_intro(&intro, &tokens);
         // MUST use eprint! — lx init output is eval'd by the shell.
         // Stdout gets executed as zsh; stderr goes directly to the terminal.
-        eprint!("{}", rendered);
+        eprint!("{rendered}");
     } else {
-        diag::warn("init", &format!("intro '{}' failed to load — skipping", slug));
+        diag::warn("init", &format!("intro '{slug}' failed to load — skipping"));
     }
 }
 
@@ -162,13 +162,130 @@ fn maybe_show_intro(config: &lynx_config::schema::LynxConfig, context: Context) 
 fn load_plugin_manifests(plugin_dir: &str, enabled: &[String]) -> Vec<PluginManifest> {
     let mut manifests = Vec::new();
     for name in enabled {
-        let toml_path = format!("{}/{}/plugin.toml", plugin_dir, name);
+        let toml_path = format!("{plugin_dir}/{name}/plugin.toml");
         if let Ok(content) = std::fs::read_to_string(&toml_path) {
             match lynx_manifest::parse_and_validate(&content) {
                 Ok(m) => manifests.push(m),
-                Err(e) => diag::warn("init", &format!("skipping plugin '{}': invalid manifest: {}", name, e)),
+                Err(e) => diag::warn("init", &format!("skipping plugin '{name}': invalid manifest: {e}")),
             }
         } // plugin dir missing or no manifest — silently skip (expected for optional plugins)
     }
     manifests
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn load_plugin_manifests_empty_list() {
+        let manifests = load_plugin_manifests("/nonexistent", &[]);
+        assert!(manifests.is_empty());
+    }
+
+    #[test]
+    fn load_plugin_manifests_missing_dir_returns_empty() {
+        let manifests = load_plugin_manifests("/nonexistent/dir", &["git".to_string()]);
+        assert!(manifests.is_empty());
+    }
+
+    #[test]
+    fn load_plugin_manifests_invalid_toml_skipped() {
+        let tmp = tempfile::tempdir().unwrap();
+        let plugin_dir = tmp.path().join("test-plugin");
+        std::fs::create_dir_all(&plugin_dir).unwrap();
+        std::fs::write(plugin_dir.join("plugin.toml"), "not valid toml {{{{").unwrap();
+
+        let manifests = load_plugin_manifests(
+            tmp.path().to_str().unwrap(),
+            &["test-plugin".to_string()],
+        );
+        assert!(manifests.is_empty());
+    }
+
+    #[test]
+    fn load_plugin_manifests_valid_manifest_loaded() {
+        let tmp = tempfile::tempdir().unwrap();
+        let plugin_dir = tmp.path().join("git");
+        std::fs::create_dir_all(&plugin_dir).unwrap();
+
+        let manifest = r#"
+[plugin]
+name = "git"
+version = "1.0.0"
+description = "Git integration"
+
+[load]
+lazy = false
+hooks = []
+
+[deps]
+binaries = ["git"]
+plugins = []
+
+[exports]
+functions = ["git_status"]
+aliases = []
+
+[contexts]
+disabled_in = ["agent"]
+"#;
+        std::fs::write(plugin_dir.join("plugin.toml"), manifest).unwrap();
+
+        let manifests = load_plugin_manifests(
+            tmp.path().to_str().unwrap(),
+            &["git".to_string()],
+        );
+        assert_eq!(manifests.len(), 1);
+        assert_eq!(manifests[0].plugin.name, "git");
+    }
+
+    #[test]
+    fn maybe_show_intro_disabled_is_noop() {
+        let mut cfg = lynx_config::schema::LynxConfig::default();
+        cfg.intro.enabled = false;
+        // Should return immediately without panic
+        maybe_show_intro(&cfg, Context::Interactive);
+    }
+
+    #[test]
+    fn maybe_show_intro_non_interactive_is_noop() {
+        let mut cfg = lynx_config::schema::LynxConfig::default();
+        cfg.intro.enabled = true;
+        cfg.intro.active = Some("default".into());
+        // Agent context should skip intro
+        maybe_show_intro(&cfg, Context::Agent);
+    }
+
+    #[test]
+    fn maybe_show_intro_no_active_slug_is_noop() {
+        let mut cfg = lynx_config::schema::LynxConfig::default();
+        cfg.intro.enabled = true;
+        cfg.intro.active = None;
+        maybe_show_intro(&cfg, Context::Interactive);
+    }
+
+    #[test]
+    fn init_args_default_no_context_override() {
+        use clap::Parser;
+        #[derive(Parser)]
+        struct W {
+            #[command(flatten)]
+            args: InitArgs,
+        }
+        let w = W::parse_from(["test"]);
+        assert!(w.args.context.is_none());
+    }
+
+    #[test]
+    fn init_args_context_override() {
+        use clap::Parser;
+        #[derive(Parser)]
+        struct W {
+            #[command(flatten)]
+            args: InitArgs,
+        }
+        let w = W::parse_from(["test", "--context", "agent"]);
+        assert_eq!(w.args.context.as_deref(), Some("agent"));
+    }
 }

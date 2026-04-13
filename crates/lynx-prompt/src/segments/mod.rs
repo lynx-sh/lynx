@@ -1,3 +1,4 @@
+pub(crate) mod git_common;
 pub mod aws_profile;
 pub mod background_jobs;
 pub mod battery;

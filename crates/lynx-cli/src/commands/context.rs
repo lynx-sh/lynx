@@ -1,3 +1,4 @@
+use lynx_core::error::LynxError;
 use anyhow::Result;
 use clap::{Args, Subcommand};
 
@@ -31,7 +32,7 @@ pub async fn run(args: ContextArgs) -> Result<()> {
             if args.len() == 1 {
                 cmd_set(&args[0]).await
             } else {
-                anyhow::bail!("unknown context command '{}' — run `lx context` for help", args.first().map(|s| s.as_str()).unwrap_or(""))
+                Err(LynxError::unknown_command(args.first().map(|s| s.as_str()).unwrap_or(""), "context").into())
             }
         }
     }
@@ -87,9 +88,66 @@ fn parse_context(s: &str) -> anyhow::Result<Context> {
         "interactive" => Ok(Context::Interactive),
         "agent" => Ok(Context::Agent),
         "minimal" => Ok(Context::Minimal),
-        other => anyhow::bail!(
-            "unknown context '{}' — valid: interactive, agent, minimal",
-            other
-        ),
+        other => Err(LynxError::NotFound {
+            item_type: "Context".into(),
+            name: other.to_string(),
+            hint: "valid contexts: interactive, agent, minimal".into(),
+        }.into()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_context_interactive() {
+        assert!(matches!(parse_context("interactive").unwrap(), Context::Interactive));
+    }
+
+    #[test]
+    fn parse_context_agent() {
+        assert!(matches!(parse_context("agent").unwrap(), Context::Agent));
+    }
+
+    #[test]
+    fn parse_context_minimal() {
+        assert!(matches!(parse_context("minimal").unwrap(), Context::Minimal));
+    }
+
+    #[test]
+    fn parse_context_invalid_returns_not_found() {
+        let err = parse_context("bogus").unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("bogus"), "error should contain the invalid name: {msg}");
+        assert!(msg.contains("Context"), "error should mention item type: {msg}");
+    }
+
+    #[test]
+    fn parse_context_empty_string_is_error() {
+        assert!(parse_context("").is_err());
+    }
+
+    #[test]
+    fn parse_context_case_sensitive() {
+        // "Interactive" (uppercase) should NOT match
+        assert!(parse_context("Interactive").is_err());
+        assert!(parse_context("AGENT").is_err());
+    }
+
+    #[test]
+    fn context_str_round_trips() {
+        assert_eq!(context_str(&Context::Interactive), "interactive");
+        assert_eq!(context_str(&Context::Agent), "agent");
+        assert_eq!(context_str(&Context::Minimal), "minimal");
+    }
+
+    #[test]
+    fn default_command_is_status() {
+        // When no subcommand given, should default to Status
+        let cmd = ContextArgs { command: None };
+        // The unwrap_or in run() converts None → Status
+        let resolved = cmd.command.unwrap_or(ContextCommand::Status);
+        assert!(matches!(resolved, ContextCommand::Status));
     }
 }

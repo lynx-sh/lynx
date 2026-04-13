@@ -6,7 +6,8 @@
 
 use std::path::Path;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
+use lynx_core::error::LynxError;
 use serde::{Deserialize, Serialize};
 
 use lynx_core::brand;
@@ -17,7 +18,7 @@ use crate::schema::{RegistryEntry, RegistryIndex};
 // ── Trust tiers ─────────────────────────────────────────────────────────────
 
 /// Trust level for a tap — determines the badge shown to users.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum TrustTier {
     /// Curated by Lynx maintainers.
@@ -107,7 +108,7 @@ pub fn save_taps(list: &TapList, path: &Path) -> Result<()> {
 /// Add a community tap. Returns error if name already exists.
 pub fn add_tap(list: &mut TapList, name: &str, url: &str) -> Result<()> {
     if list.taps.iter().any(|t| t.name == name) {
-        bail!("tap '{name}' already exists");
+        return Err(lynx_core::error::LynxError::Registry(format!("tap '{name}' already exists")).into());
     }
     list.taps.push(TapConfig {
         name: name.to_string(),
@@ -120,12 +121,16 @@ pub fn add_tap(list: &mut TapList, name: &str, url: &str) -> Result<()> {
 /// Remove a tap by name. Refuses to remove the official tap.
 pub fn remove_tap(list: &mut TapList, name: &str) -> Result<()> {
     if name == "official" {
-        bail!("cannot remove the official tap");
+        return Err(LynxError::Registry("cannot remove the official tap".into()).into());
     }
     let before = list.taps.len();
     list.taps.retain(|t| t.name != name);
     if list.taps.len() == before {
-        bail!("tap '{name}' not found");
+        return Err(LynxError::NotFound {
+            item_type: "Tap".into(),
+            name: name.into(),
+            hint: "run `lx tap list` to see available taps".into(),
+        }.into());
     }
     Ok(())
 }
@@ -168,10 +173,7 @@ pub fn merge_tap_indexes(list: &TapList) -> Result<Vec<TappedEntry>> {
         let idx = match fetch_tap_index(&tap.url) {
             Ok(idx) => idx,
             Err(e) => {
-                eprintln!(
-                    "warning: failed to fetch tap '{}': {e}",
-                    tap.name
-                );
+                tracing::warn!("failed to fetch tap '{}': {e}", tap.name);
                 continue;
             }
         };
@@ -240,7 +242,7 @@ fn fetch_tap_index(url: &str) -> Result<RegistryIndex> {
         .call()
         .with_context(|| format!("HTTP GET failed for {url}"))?;
     if resp.status() >= 400 {
-        bail!("registry returned status {} from {url}", resp.status());
+        return Err(LynxError::Registry(format!("registry returned status {} from {url}", resp.status())).into());
     }
     let body = resp.into_string().context("failed to read response")?;
     parse_index(&body)

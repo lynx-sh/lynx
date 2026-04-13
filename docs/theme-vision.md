@@ -39,7 +39,7 @@ Lynx themes eliminate that.
 | **Visual theme builder** | None | `lx theme studio` — local WYSIWYG in the browser |
 | **Safety** | No rollback | Snapshot → validate → rollback on every mutation |
 
-### Themes are data, not code (D-024)
+### Themes are data, not code
 
 OMZ themes are zsh programs. Every theme is different code — nothing is
 composable, toolable, or AI-editable. Starship moved to pure TOML. Lynx
@@ -90,13 +90,13 @@ Themer:      $accent in segment config      ← palette variable refs (H-051)
 AI agent:    lx theme patch ... <any above> ← CLI mutation (H-060)
 ```
 
-**Named colors are first-class (D-019).** `"blue"` on a TrueColor terminal
+**Named colors are first-class.** `"blue"` on a TrueColor terminal
 renders as a curated `#` hex value, not xterm index 4. The named registry
 covers: `black`, `white`, `red`, `green`, `blue`, `yellow`, `magenta`, `cyan`,
 `grey`, `orange`, `pink`, `purple`, and `light-*` / `dark-*` / `bright-*`
 variants of each.
 
-**Palette variables are canonical (D-015).** Hardcoded hex in segment configs
+**Palette variables are canonical.** Hardcoded hex in segment configs
 is a violation. All color values live in `[colors]`. Segments reference them
 by name. The whole theme recolors by changing `[colors]` only.
 
@@ -117,7 +117,7 @@ Standard semantic palette keys (used by built-in segments and `[ls_colors]`):
 ## The CLI Customization Surface
 
 Three layers, same validated pipeline underneath. All write TOML, all snapshot
-and rollback on failure (D-020):
+and rollback on failure:
 
 ### Shorthands — humans
 
@@ -160,10 +160,10 @@ lx theme studio
 Opens a local web UI in the browser. Live prompt preview, drag-and-drop
 segment ordering, color pickers backed by the named color registry,
 one-click apply. Ships embedded in the binary — no npm, no build step,
-no external CDN (D-022). Output is identical TOML to hand-authored themes.
+no external CDN. Output is identical TOML to hand-authored themes.
 
 `lx theme studio` is the blessed tool for humans creating themes from scratch.
-`lx theme patch` is for automation and quick surgical changes (D-021).
+`lx theme patch` is for automation and quick surgical changes.
 
 ---
 
@@ -206,8 +206,8 @@ order = ["cmd_duration", "context_badge"]
 # plain = " "                                       # fallback if no glyph font
 
 # ── Segment config ────────────────────────────────────────────────────
-# Every segment accepts: show_in, hide_in (D-017)
-# Every segment owns its typed config — no shared flat struct (D-018)
+# Every segment accepts: show_in, hide_in
+# Every segment owns its typed config — no shared flat struct
 
 [segment.dir]
 max_depth        = 3
@@ -304,16 +304,9 @@ Priority order. Each issue has full context in `pt issue H-XXX`.
 
 ---
 
-## Decisions (authoritative source: `pt decisions themes`)
+## Decisions
 
-| ID | Rule |
-|---|---|
-| D-015 | Palette vars are canonical — no hardcoded hex in segment configs |
-| D-016 | Theme owns the full shell visual environment, not just the prompt |
-| D-017 | Universal `show_in` / `hide_in` on every segment — no ad-hoc per-segment logic |
-| D-018 | Segments own typed config — no shared flat `SegmentConfig` struct |
-| D-019 | Named colors are backed by curated hex, not ANSI index aliases |
-| D-020 | `lx theme patch` is the AI/automation interface; shorthands are for humans |
-| D-021 | `lx theme studio` is the blessed human authoring tool; patch is for automation |
-| D-022 | Studio frontend is a single embedded HTML file — no npm, no build step |
-| D-024 | Themes are data not code — format strings and `custom_*` templates, never executable zsh |
+For the full list of theme-related architectural decisions, run:
+```bash
+pt decisions themes
+```

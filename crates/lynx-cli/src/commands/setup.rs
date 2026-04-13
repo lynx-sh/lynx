@@ -1,3 +1,4 @@
+use lynx_core::error::LynxError;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
@@ -20,7 +21,7 @@ pub struct SetupArgs {
     pub source: Option<String>,
 }
 
-pub async fn run(args: SetupArgs) -> Result<()> {
+pub fn run(args: SetupArgs) -> Result<()> {
     let home = home_dir()?;
 
     let lynx_dir: PathBuf = args
@@ -51,10 +52,10 @@ pub async fn run(args: SetupArgs) -> Result<()> {
             .with_context(|| format!("failed to copy shell/ from {}", shell_src.display()))?;
         println!("  ✓ shell/   → {}/shell/", lynx_dir.display());
     } else {
-        anyhow::bail!(
+        return Err(LynxError::Config(format!(
             "shell/ not found at {} — run lx setup from the Lynx source directory or pass --source",
             shell_src.display()
-        );
+        )).into());
     }
 
     if plugins_src.exists() {
@@ -155,10 +156,9 @@ fn resolve_source_dir(explicit: Option<&str>) -> Result<PathBuf> {
         return Ok(cwd);
     }
 
-    anyhow::bail!(
-        "Cannot locate Lynx source files (shell/ and plugins/).\n\
-         Run from the Lynx source directory or pass --source <path>."
-    )
+    Err(LynxError::Config(
+        "Cannot locate Lynx source files (shell/ and plugins/). Run from the Lynx source directory or pass --source <path>.".into()
+    ).into())
 }
 
 /// Snapshot the target directory to ~/.config/lynx/.snapshots/<timestamp> if it already exists.
@@ -175,6 +175,7 @@ fn snapshot_if_exists(lynx_dir: &Path) {
         // Best-effort: copy config.toml if it exists
         let cfg = lynx_dir.join("config.toml");
         if cfg.exists() {
+            // Best-effort backup — failure is non-critical
             let _ = std::fs::copy(&cfg, snap_dir.join("config.toml"));
         }
         println!("  ✓ snapshot → {}", snap_dir.display());
@@ -255,7 +256,7 @@ enabled = true
 fn home_dir() -> Result<PathBuf> {
     std::env::var_os("HOME")
         .map(PathBuf::from)
-        .ok_or_else(|| anyhow::anyhow!("$HOME not set"))
+        .ok_or_else(|| anyhow::Error::from(lynx_core::error::LynxError::Shell("$HOME not set".into())))
 }
 
 #[cfg(test)]

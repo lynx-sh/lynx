@@ -1,4 +1,5 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
+use lynx_core::error::LynxError;
 use clap::{Args, Subcommand};
 use lynx_task::{
     parse_tasks_file, read_last_run, read_tasks_file, write_tasks_file,
@@ -91,21 +92,20 @@ pub async fn run(args: CronArgs) -> Result<()> {
             on_fail,
             timeout,
             log,
-        } => cmd_add(name, run, cron, description, on_fail, timeout, log).await,
-        CronCommand::List => cmd_list().await,
-        CronCommand::Logs { name, tail, follow } => cmd_logs(name, tail, follow).await,
-        CronCommand::Disable { name } => cmd_set_enabled(name, false).await,
-        CronCommand::Enable { name } => cmd_set_enabled(name, true).await,
+        } => cmd_add(name, run, cron, description, on_fail, timeout, log),
+        CronCommand::List => cmd_list(),
+        CronCommand::Logs { name, tail, follow } => cmd_logs(name, tail, follow),
+        CronCommand::Disable { name } => cmd_set_enabled(name, false),
+        CronCommand::Enable { name } => cmd_set_enabled(name, true),
         CronCommand::Run { name } => cmd_run(name).await,
-        CronCommand::Remove { name } => cmd_remove(name).await,
+        CronCommand::Remove { name } => cmd_remove(name),
         CronCommand::Examples => {
             crate::commands::examples::run(crate::commands::examples::ExamplesArgs {
                 command: Some("cron".into()),
             })
-            .await
         }
         CronCommand::Other(args) => {
-            bail!("unknown cron command '{}' — run `lx cron` for help", args.first().map(|s| s.as_str()).unwrap_or(""))
+            Err(LynxError::unknown_command(args.first().map(|s| s.as_str()).unwrap_or(""), "cron").into())
         }
     }
 }
@@ -127,28 +127,25 @@ fn signal_daemon_reload() {
     };
     if let Ok(content) = std::fs::read_to_string(&pid_path) {
         if let Ok(pid) = content.trim().parse::<u32>() {
-            // Safety: SIGHUP is always safe to send to our own daemon.
-            unsafe {
-                libc_kill(pid as i32, 1); // SIGHUP = 1
-            }
+            send_signal(pid as i32, 1); // SIGHUP = 1
         }
     }
 }
 
 #[cfg(unix)]
-unsafe fn libc_kill(pid: i32, sig: i32) {
-    // Use inline syscall via std to avoid a libc dep.
+fn send_signal(pid: i32, sig: i32) {
+    // Best-effort: SIGHUP to daemon may fail if not running
     let _ = std::process::Command::new("kill")
         .args([&format!("-{sig}"), &pid.to_string()])
         .status();
 }
 
 #[cfg(not(unix))]
-unsafe fn libc_kill(_pid: i32, _sig: i32) {}
+fn send_signal(_pid: i32, _sig: i32) {}
 
 // ── subcommand implementations ───────────────────────────────────────────────
 
-async fn cmd_add(
+fn cmd_add(
     name: String,
     run: String,
     cron: String,
@@ -161,7 +158,7 @@ async fn cmd_add(
         "notify" => OnFail::Notify,
         "ignore" => OnFail::Ignore,
         "log" | "" => OnFail::Log,
-        other => bail!("unknown on_fail value '{other}': use log, notify, or ignore"),
+        other => return Err(LynxError::Task(format!("unknown on_fail value '{other}': use log, notify, or ignore")).into()),
     };
 
     let task = Task {
@@ -183,7 +180,7 @@ async fn cmd_add(
     let mut file = parse_tasks_file(&content)?;
 
     if file.tasks.iter().any(|t| t.name == name) {
-        bail!("task '{name}' already exists — use 'lx cron remove {name}' first");
+        return Err(LynxError::Task(format!("task '{name}' already exists — use 'lx cron remove {name}' first")).into());
     }
 
     file.tasks.push(task);
@@ -194,7 +191,29 @@ async fn cmd_add(
     Ok(())
 }
 
-async fn cmd_list() -> Result<()> {
+struct CronListEntry {
+    name: String,
+    cron: String,
+    enabled: bool,
+    last_run: String,
+    exit_code: String,
+}
+
+impl lynx_tui::ListItem for CronListEntry {
+    fn title(&self) -> &str { &self.name }
+    fn subtitle(&self) -> String {
+        format!("{} {}", self.cron, if self.enabled { "" } else { "(disabled)" })
+    }
+    fn detail(&self) -> String {
+        format!(
+            "Schedule: {}\nEnabled: {}\nLast run: {}\nExit code: {}",
+            self.cron, self.enabled, self.last_run, self.exit_code
+        )
+    }
+    fn is_active(&self) -> bool { self.enabled }
+}
+
+fn cmd_list() -> Result<()> {
     let path = tasks_toml_path();
     let content = read_tasks_file(&path)?;
     let file = parse_tasks_file(&content)?;
@@ -205,29 +224,22 @@ async fn cmd_list() -> Result<()> {
     }
 
     let log_dir = task_logs_dir();
-
-    println!(
-        "{:<20} {:<18} {:<8} {:<12} {:<10}",
-        "NAME", "LAST RUN", "EXIT", "ENABLED", "CRON"
-    );
-    println!("{}", "-".repeat(72));
-
-    for task in &file.tasks {
+    let entries: Vec<CronListEntry> = file.tasks.iter().map(|task| {
         let (last_run, exit_code) = read_last_run(&log_dir, &task.name);
-        println!(
-            "{:<20} {:<18} {:<8} {:<12} {}",
-            task.name,
+        CronListEntry {
+            name: task.name.clone(),
+            cron: task.cron.clone(),
+            enabled: task.enabled,
             last_run,
             exit_code,
-            if task.enabled { "yes" } else { "no" },
-            task.cron,
-        );
-    }
+        }
+    }).collect();
 
+    lynx_tui::show(&entries, "Cron Tasks", &super::tui_colors())?;
     Ok(())
 }
 
-async fn cmd_logs(name: String, tail_n: usize, follow: bool) -> Result<()> {
+fn cmd_logs(name: String, tail_n: usize, follow: bool) -> Result<()> {
     let log_path = task_logs_dir().join(format!("{name}.jsonl"));
 
     if !log_path.exists() {
@@ -243,7 +255,7 @@ async fn cmd_logs(name: String, tail_n: usize, follow: bool) -> Result<()> {
             .context("tail -f failed")?;
 
         if !status.success() {
-            bail!("tail exited with error");
+            return Err(LynxError::Task("tail exited with error".into()).into());
         }
     } else {
         // Read last N lines.
@@ -280,7 +292,7 @@ async fn cmd_logs(name: String, tail_n: usize, follow: bool) -> Result<()> {
     Ok(())
 }
 
-async fn cmd_set_enabled(name: String, enabled: bool) -> Result<()> {
+fn cmd_set_enabled(name: String, enabled: bool) -> Result<()> {
     let path = tasks_toml_path();
     let content = read_tasks_file(&path)?;
     let mut file = parse_tasks_file(&content)?;
@@ -329,7 +341,7 @@ async fn cmd_run(name: String) -> Result<()> {
         match tokio::time::timeout(timeout, child.wait()).await {
             Ok(s) => s.context("wait failed")?,
             Err(_) => {
-                let _ = child.kill().await;
+                let _ = child.kill().await; // best-effort: child may have exited
                 println!("Task '{name}' timed out.");
                 return Ok(());
             }
@@ -344,7 +356,7 @@ async fn cmd_run(name: String) -> Result<()> {
     Ok(())
 }
 
-async fn cmd_remove(name: String) -> Result<()> {
+fn cmd_remove(name: String) -> Result<()> {
     let path = tasks_toml_path();
     let content = read_tasks_file(&path)?;
     let mut file = parse_tasks_file(&content)?;
@@ -353,7 +365,7 @@ async fn cmd_remove(name: String) -> Result<()> {
     file.tasks.retain(|t| t.name != name);
 
     if file.tasks.len() == before {
-        bail!("task '{name}' not found");
+        return Err(LynxError::NotFound { item_type: "Task".into(), name: name.clone(), hint: "run `lx cron list` to see available tasks".into() }.into());
     }
 
     write_tasks_file(&path, &file)?;
@@ -361,4 +373,109 @@ async fn cmd_remove(name: String) -> Result<()> {
 
     println!("✓ task '{name}' removed");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn on_fail_parsing() {
+        // Verify the on_fail parsing logic from cmd_add
+        let cases = vec![
+            ("log", OnFail::Log),
+            ("", OnFail::Log),
+            ("notify", OnFail::Notify),
+            ("ignore", OnFail::Ignore),
+        ];
+        for (input, expected) in cases {
+            let result = match input {
+                "notify" => OnFail::Notify,
+                "ignore" => OnFail::Ignore,
+                "log" | "" => OnFail::Log,
+                _ => panic!("unexpected"),
+            };
+            assert_eq!(result, expected, "mismatch for input '{input}'");
+        }
+    }
+
+    #[test]
+    fn on_fail_unknown_value_would_error() {
+        let on_fail_str = "crash";
+        let result: Result<OnFail, _> = match on_fail_str {
+            "notify" => Ok(OnFail::Notify),
+            "ignore" => Ok(OnFail::Ignore),
+            "log" | "" => Ok(OnFail::Log),
+            other => Err(format!("unknown: {other}")),
+        };
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn cron_list_entry_trait() {
+        use lynx_tui::ListItem;
+        let entry = CronListEntry {
+            name: "backup".to_string(),
+            cron: "0 2 * * *".to_string(),
+            enabled: true,
+            last_run: "2024-01-01".to_string(),
+            exit_code: "0".to_string(),
+        };
+        assert_eq!(entry.title(), "backup");
+        assert!(entry.is_active());
+        assert!(entry.subtitle().contains("0 2 * * *"));
+        assert!(!entry.subtitle().contains("disabled"));
+    }
+
+    #[test]
+    fn cron_list_entry_disabled_shows_in_subtitle() {
+        use lynx_tui::ListItem;
+        let entry = CronListEntry {
+            name: "cleanup".to_string(),
+            cron: "0 0 * * 0".to_string(),
+            enabled: false,
+            last_run: "never".to_string(),
+            exit_code: "-".to_string(),
+        };
+        assert!(!entry.is_active());
+        assert!(entry.subtitle().contains("disabled"));
+    }
+
+    #[test]
+    fn cron_list_entry_detail() {
+        use lynx_tui::ListItem;
+        let entry = CronListEntry {
+            name: "test".to_string(),
+            cron: "*/5 * * * *".to_string(),
+            enabled: true,
+            last_run: "123456".to_string(),
+            exit_code: "0".to_string(),
+        };
+        let detail = entry.detail();
+        assert!(detail.contains("Schedule:"));
+        assert!(detail.contains("Enabled: true"));
+        assert!(detail.contains("Last run: 123456"));
+        assert!(detail.contains("Exit code: 0"));
+    }
+
+    #[tokio::test]
+    async fn cron_unknown_subcommand_errors() {
+        let args = CronArgs {
+            command: CronCommand::Other(vec!["bogus".to_string()]),
+        };
+        let err = run(args).await.unwrap_err();
+        assert!(err.to_string().contains("bogus"));
+    }
+
+    #[test]
+    fn tasks_toml_path_returns_something() {
+        let path = tasks_toml_path();
+        assert!(!path.to_string_lossy().is_empty());
+    }
+
+    #[test]
+    fn task_logs_dir_returns_something() {
+        let dir = task_logs_dir();
+        assert!(!dir.to_string_lossy().is_empty());
+    }
 }

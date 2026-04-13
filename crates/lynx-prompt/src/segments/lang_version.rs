@@ -201,8 +201,8 @@ fn go_version(cwd: &Path) -> Option<String> {
     let content = std::fs::read_to_string(cwd.join("go.mod")).ok()?;
     for line in content.lines() {
         let line = line.trim();
-        if line.starts_with("go ") {
-            return Some(line[3..].trim().to_string());
+        if let Some(ver) = line.strip_prefix("go ") {
+            return Some(ver.trim().to_string());
         }
     }
     None
@@ -296,7 +296,7 @@ fn swift_version(cwd: &Path) -> Option<String> {
     // First line: // swift-tools-version:5.9
     let first = content.lines().next()?;
     if first.contains("swift-tools-version") {
-        return first.split(':').last().map(|s| s.trim().to_string());
+        return first.split(':').next_back().map(|s| s.trim().to_string());
     }
     None
 }
@@ -329,7 +329,7 @@ fn dotnet_version(cwd: &Path) -> Option<String> {
                 .trim_start_matches("<TargetFramework>")
                 .trim_end_matches("</TargetFramework>")
                 .split('-')
-                .last()
+                .next_back()
                 .map(str::to_string);
         }
     }

@@ -1,6 +1,7 @@
 //! Job manager — list, view, kill, and clean workflow job results.
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
+use lynx_core::error::LynxError;
 use std::path::Path;
 
 /// Summary of a completed or running job.
@@ -63,7 +64,9 @@ pub fn kill_job(job_id: &str) -> Result<()> {
     let dir = lynx_core::paths::jobs_dir();
     let pid_path = dir.join(format!("{job_id}.pid"));
     if !pid_path.exists() {
-        bail!("no PID file for job '{job_id}' — it may have already completed");
+        return Err(LynxError::Workflow(format!(
+            "no PID file for job '{job_id}' — it may have already completed"
+        )).into());
     }
     let pid_str = std::fs::read_to_string(&pid_path).context("failed to read PID file")?;
     let pid: u32 = pid_str.trim().parse().context("invalid PID")?;
@@ -89,7 +92,9 @@ pub fn read_job_log(job_id: &str) -> Result<String> {
         if json_path.exists() {
             return std::fs::read_to_string(&json_path).context("failed to read job file");
         }
-        bail!("no log found for job '{job_id}'");
+        return Err(LynxError::Workflow(format!(
+            "no log found for job '{job_id}'"
+        )).into());
     }
     std::fs::read_to_string(&path).context("failed to read job log")
 }

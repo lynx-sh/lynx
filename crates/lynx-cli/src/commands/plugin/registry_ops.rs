@@ -2,7 +2,8 @@
 //
 // All network/IO work is offloaded via spawn_blocking so the async runtime stays unblocked.
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
+use lynx_core::error::LynxError;
 use lynx_config::snapshot::mutate_config_transaction;
 use lynx_registry::fetch::{
     check_for_update, checksum_file, checksum_plugin_dir, fetch_plugin, update_plugin, FetchOptions,
@@ -74,7 +75,11 @@ pub(super) async fn cmd_info(name: &str) -> Result<()> {
     let idx = tokio::task::spawn_blocking(|| get_index(false, None)).await??;
     let entry = idx
         .find(name)
-        .ok_or_else(|| anyhow::anyhow!("plugin '{name}' not found in registry"))?;
+        .ok_or_else(|| anyhow::Error::from(lynx_core::error::LynxError::NotFound {
+            item_type: "Plugin".into(),
+            name: name.to_string(),
+            hint: "run `lx browse` to see available packages".into(),
+        }))?;
 
     let lock = load_lock().unwrap_or_default();
     let installed = lock.find(name);
@@ -117,13 +122,13 @@ pub(super) async fn cmd_update(name: Option<&str>, all: bool) -> Result<()> {
         for plugin_name in &registry_names {
             match update_one(plugin_name).await {
                 Ok(_) => {}
-                Err(e) => println!("warning: failed to update '{}': {e}", plugin_name),
+                Err(e) => println!("warning: failed to update '{plugin_name}': {e}"),
             }
         }
         return Ok(());
     }
 
-    let name = name.ok_or_else(|| anyhow::anyhow!("provide a plugin name or use --all"))?;
+    let name = name.ok_or_else(|| anyhow::Error::from(lynx_core::error::LynxError::Plugin("provide a plugin name or use --all".into())))?;
     update_one(name).await
 }
 
@@ -149,7 +154,7 @@ async fn update_one(name: &str) -> Result<()> {
     Ok(())
 }
 
-pub(super) async fn cmd_checksum(target: &str) -> Result<()> {
+pub(super) fn cmd_checksum(target: &str) -> Result<()> {
     let path = PathBuf::from(target);
     if path.exists() && path.is_file() {
         let digest = checksum_file(&path)?;
@@ -171,17 +176,14 @@ pub(super) async fn cmd_checksum(target: &str) -> Result<()> {
         );
         Ok(())
     } else {
-        bail!(
-            "checksum mismatch for '{}'\nexpected: {}\nactual:   {}\npath:     {}",
-            name,
-            expected,
-            actual,
-            plugin_dir.display()
-        );
+        Err(LynxError::Registry(format!(
+                "checksum mismatch for '{}'\nexpected: {}\nactual:   {}\npath:     {}",
+                name, expected, actual, plugin_dir.display()
+            )).into())
     }
 }
 
-pub(super) async fn cmd_index_validate(path: &str) -> Result<()> {
+pub(super) fn cmd_index_validate(path: &str) -> Result<()> {
     validate_registry_index_path(Path::new(path))?;
     println!("index is valid: {path}");
     Ok(())
@@ -193,24 +195,23 @@ fn verify_installed_plugin_checksum(
 ) -> Result<(String, String, PathBuf)> {
     let locked = lock.find(name).with_context(|| {
         format!(
-            "plugin '{}' not found in lynx.lock (install it from registry first)",
-            name
+            "plugin '{name}' not found in lynx.lock (install it from registry first)"
         )
     })?;
     let expected = locked
         .installed_checksum_sha256
         .as_ref()
         .or(Some(&locked.checksum_sha256))
-        .ok_or_else(|| anyhow::anyhow!("no checksum recorded for '{}'", name))?
+        .ok_or_else(|| anyhow::Error::from(lynx_core::error::LynxError::Plugin(format!("no checksum recorded for '{name}'"))))?
         .to_string();
 
     let plugin_dir = plugins_install_dir().join(name);
     if !plugin_dir.exists() {
-        bail!(
-            "installed plugin directory not found for '{}': {}",
-            name,
-            plugin_dir.display()
-        );
+        return Err(LynxError::NotFound {
+            item_type: "Plugin directory".into(),
+            name: name.to_string(),
+            hint: format!("expected at {}", plugin_dir.display()),
+        }.into());
     }
     let actual = checksum_plugin_dir(&plugin_dir)?;
     Ok((expected, actual, plugin_dir))

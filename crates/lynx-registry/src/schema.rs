@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 /// A specific version entry in the registry for a plugin.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PluginVersion {
     /// Semver version string (e.g. "1.2.3").
     pub version: String,
@@ -16,7 +16,7 @@ pub struct PluginVersion {
 }
 
 /// Package type in the registry.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum PackageType {
     #[default]
@@ -29,7 +29,7 @@ pub enum PackageType {
 }
 
 /// Install commands for tools — one field per package manager.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct InstallMethods {
     /// Homebrew formula name (e.g. "eza", "ripgrep")
     #[serde(default)]
@@ -53,6 +53,7 @@ pub struct InstallMethods {
 
 /// A package entry in the registry index.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct RegistryEntry {
     /// Package name.
     pub name: String,
@@ -91,25 +92,6 @@ pub struct RegistryEntry {
     pub versions: Vec<PluginVersion>,
 }
 
-impl Default for RegistryEntry {
-    fn default() -> Self {
-        Self {
-            name: String::new(),
-            description: String::new(),
-            author: String::new(),
-            package_type: PackageType::default(),
-            category: String::new(),
-            platform: Vec::new(),
-            install: None,
-            replaces: None,
-            theme_integrated: false,
-            bundled: false,
-            packages: Vec::new(),
-            latest_version: String::new(),
-            versions: Vec::new(),
-        }
-    }
-}
 
 impl RegistryEntry {
     /// Resolve a specific version, or the latest if `version` is None.

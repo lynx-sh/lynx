@@ -35,7 +35,7 @@ lx dashboard
 │                                                       │
 │  API Endpoints                                        │
 │  GET  /api/config          → current config           │
-│  POST /api/config/patch    → mutate config (D-007)    │
+│  POST /api/config/patch    → mutate config (snapshot)  │
 │  GET  /api/themes          → list themes              │
 │  POST /api/theme/set       → switch theme             │
 │  POST /api/theme/patch     → WYSIWYG mutation         │

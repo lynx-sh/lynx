@@ -3,7 +3,8 @@
 /// All public functions operate on raw TOML strings (read from / written back to disk).
 /// They do NOT validate the resulting theme — callers must run `load_from_path` and
 /// restore the snapshot on failure (snapshot/validate/rollback pattern, D-007).
-use anyhow::{bail, Result};
+use anyhow::Result;
+use lynx_core::error::LynxError;
 
 // ─── Scalar patch ────────────────────────────────────────────────────────────
 
@@ -14,15 +15,15 @@ use anyhow::{bail, Result};
 /// Intermediate tables are created if absent.
 pub fn apply_patch(content: &str, dot_path: &str, value: &str) -> Result<String> {
     let mut root: toml::Value = toml::from_str(content)
-        .map_err(|e| anyhow::anyhow!("TOML parse error: {e}"))?;
+        .map_err(|e| anyhow::Error::from(LynxError::Theme(format!("TOML parse error: {e}"))))?;
 
     let parts: Vec<&str> = dot_path.split('.').filter(|s| !s.is_empty()).collect();
     if parts.is_empty() {
-        bail!("patch path must not be empty");
+        return Err(LynxError::Theme("patch path must not be empty".into()).into());
     }
 
     set_scalar_at_path(&mut root, &parts, value)?;
-    toml::to_string_pretty(&root).map_err(|e| anyhow::anyhow!("TOML serialise error: {e}"))
+    toml::to_string_pretty(&root).map_err(|e| anyhow::Error::from(LynxError::Theme(format!("TOML serialise error: {e}"))))
 }
 
 fn set_scalar_at_path(node: &mut toml::Value, parts: &[&str], value: &str) -> Result<()> {
@@ -33,7 +34,7 @@ fn set_scalar_at_path(node: &mut toml::Value, parts: &[&str], value: &str) -> Re
                 t.insert(key.to_string(), toml::Value::String(value.to_string()));
                 Ok(())
             }
-            _ => bail!("cannot set key '{key}' on a non-table value"),
+            _ => Err(LynxError::Theme(format!("cannot set key '{key}' on a non-table value")).into()),
         }
     } else {
         match node {
@@ -43,7 +44,7 @@ fn set_scalar_at_path(node: &mut toml::Value, parts: &[&str], value: &str) -> Re
                     .or_insert_with(|| toml::Value::Table(toml::map::Map::new()));
                 set_scalar_at_path(child, &parts[1..], value)
             }
-            _ => bail!("path traverses a non-table value at '{key}'"),
+            _ => Err(LynxError::Theme(format!("path traverses a non-table value at '{key}'")).into()),
         }
     }
 }
@@ -67,15 +68,15 @@ pub enum ArrayOp {
 /// The target value at `dot_path` must be a TOML array of strings.
 pub fn apply_array_op(content: &str, dot_path: &str, op: ArrayOp) -> Result<String> {
     let mut root: toml::Value = toml::from_str(content)
-        .map_err(|e| anyhow::anyhow!("TOML parse error: {e}"))?;
+        .map_err(|e| anyhow::Error::from(LynxError::Theme(format!("TOML parse error: {e}"))))?;
 
     let parts: Vec<&str> = dot_path.split('.').filter(|s| !s.is_empty()).collect();
     if parts.is_empty() {
-        bail!("array path must not be empty");
+        return Err(LynxError::Theme("array path must not be empty".into()).into());
     }
 
     apply_op_at_path(&mut root, &parts, op)?;
-    toml::to_string_pretty(&root).map_err(|e| anyhow::anyhow!("TOML serialise error: {e}"))
+    toml::to_string_pretty(&root).map_err(|e| anyhow::Error::from(LynxError::Theme(format!("TOML serialise error: {e}"))))
 }
 
 fn apply_op_at_path(node: &mut toml::Value, parts: &[&str], op: ArrayOp) -> Result<()> {
@@ -85,20 +86,20 @@ fn apply_op_at_path(node: &mut toml::Value, parts: &[&str], op: ArrayOp) -> Resu
             toml::Value::Table(t) => {
                 let arr = t
                     .get_mut(key)
-                    .ok_or_else(|| anyhow::anyhow!("path '{key}' not found in TOML"))?;
+                    .ok_or_else(|| anyhow::Error::from(LynxError::Theme(format!("path '{key}' not found in TOML"))))?;
                 apply_op_to_array(arr, op)
             }
-            _ => bail!("cannot index non-table at '{key}'"),
+            _ => Err(LynxError::Theme(format!("cannot index non-table at '{key}'")).into()),
         }
     } else {
         match node {
             toml::Value::Table(t) => {
                 let child = t
                     .get_mut(key)
-                    .ok_or_else(|| anyhow::anyhow!("path segment '{key}' not found in TOML"))?;
+                    .ok_or_else(|| anyhow::Error::from(LynxError::Theme(format!("path segment '{key}' not found in TOML"))))?;
                 apply_op_at_path(child, &parts[1..], op)
             }
-            _ => bail!("path traverses non-table at '{key}'"),
+            _ => Err(LynxError::Theme(format!("path traverses non-table at '{key}'")).into()),
         }
     }
 }
@@ -106,7 +107,7 @@ fn apply_op_at_path(node: &mut toml::Value, parts: &[&str], op: ArrayOp) -> Resu
 fn apply_op_to_array(node: &mut toml::Value, op: ArrayOp) -> Result<()> {
     let arr = match node {
         toml::Value::Array(a) => a,
-        _ => bail!("target path does not point to an array"),
+        _ => return Err(LynxError::Theme("target path does not point to an array".into()).into()),
     };
 
     match op {
@@ -166,7 +167,7 @@ impl std::str::FromStr for Side {
         match s.to_ascii_lowercase().as_str() {
             "left" => Ok(Side::Left),
             "right" => Ok(Side::Right),
-            other => bail!("expected 'left' or 'right', got '{other}'"),
+            other => Err(LynxError::Theme(format!("expected 'left' or 'right', got '{other}'")).into()),
         }
     }
 }

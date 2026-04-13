@@ -3,7 +3,8 @@
 //! Resolves packages from all configured taps, detects the type,
 //! and routes to the correct installer.
 
-use anyhow::{bail, Result};
+use anyhow::{Result};
+use lynx_core::error::LynxError;
 use clap::Args;
 use lynx_config::snapshot::mutate_config_transaction;
 use lynx_core::paths;
@@ -29,7 +30,7 @@ pub struct UninstallPkgArgs {
 
 pub async fn run_install(args: InstallPkgArgs) -> Result<()> {
     if args.names.is_empty() {
-        bail!("provide at least one package name — e.g. `lx install eza`");
+        return Err(LynxError::Registry("provide at least one package name — e.g. `lx install eza`".into()).into());
     }
 
     let taps_path = paths::taps_config_path();
@@ -210,10 +211,79 @@ async fn install_plugin(
     Ok(())
 }
 
-pub async fn run_uninstall(args: UninstallPkgArgs) -> Result<()> {
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn install_empty_names_returns_error() {
+        let args = InstallPkgArgs {
+            names: vec![],
+            force: false,
+        };
+        let err = run_install(args).await.unwrap_err();
+        assert!(err.to_string().contains("provide at least one package name"));
+    }
+
+    #[test]
+    fn install_args_defaults() {
+        use clap::Parser;
+        #[derive(Parser)]
+        struct W {
+            #[command(flatten)]
+            args: InstallPkgArgs,
+        }
+        // InstallPkgArgs needs at least names via positional
+        let w = W::parse_from(["test", "fzf"]);
+        assert_eq!(w.args.names, vec!["fzf"]);
+        assert!(!w.args.force);
+    }
+
+    #[test]
+    fn install_args_force_flag() {
+        use clap::Parser;
+        #[derive(Parser)]
+        struct W {
+            #[command(flatten)]
+            args: InstallPkgArgs,
+        }
+        let w = W::parse_from(["test", "--force", "eza"]);
+        assert!(w.args.force);
+    }
+
+    #[test]
+    fn install_args_multiple_names() {
+        use clap::Parser;
+        #[derive(Parser)]
+        struct W {
+            #[command(flatten)]
+            args: InstallPkgArgs,
+        }
+        let w = W::parse_from(["test", "fzf", "eza", "bat"]);
+        assert_eq!(w.args.names, vec!["fzf", "eza", "bat"]);
+    }
+
+    #[test]
+    fn uninstall_args_parses() {
+        use clap::Parser;
+        #[derive(Parser)]
+        struct W {
+            #[command(flatten)]
+            args: UninstallPkgArgs,
+        }
+        let w = W::parse_from(["test", "fzf"]);
+        assert_eq!(w.args.name, "fzf");
+    }
+}
+
+pub fn run_uninstall(args: UninstallPkgArgs) -> Result<()> {
     let name = &args.name;
     let plugins_dir = paths::installed_plugins_dir();
-    uninstall_tool(name, &plugins_dir)?;
+    let result = uninstall_tool(name, &plugins_dir)?;
+    if result.plugin_removed {
+        println!("removed Lynx plugin for '{name}'");
+    }
+    println!("system binary preserved — to remove it: {}", result.system_uninstall_hint);
 
     let config = lynx_config::load()?;
     if config.enabled_plugins.iter().any(|p| p == name) {

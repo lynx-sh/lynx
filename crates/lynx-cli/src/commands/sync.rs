@@ -1,7 +1,8 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use anyhow::{bail, Context as _, Result};
+use anyhow::{Context as _, Result};
+use lynx_core::error::LynxError;
 use clap::{Args, Subcommand};
 
 use lynx_config::snapshot::mutate_config_transaction;
@@ -29,14 +30,14 @@ pub enum SyncCommand {
     Other(Vec<String>),
 }
 
-pub async fn run(args: SyncArgs) -> Result<()> {
+pub fn run(args: SyncArgs) -> Result<()> {
     match args.command {
         SyncCommand::Init { remote } => cmd_init(&remote),
         SyncCommand::Push => cmd_push(),
         SyncCommand::Pull => cmd_pull(),
         SyncCommand::Status => cmd_status(),
         SyncCommand::Other(args) => {
-            bail!("unknown sync command '{}' — run `lx sync` for help", args.first().map(|s| s.as_str()).unwrap_or(""))
+            Err(LynxError::unknown_command(args.first().map(|s| s.as_str()).unwrap_or(""), "sync").into())
         }
     }
 }
@@ -147,7 +148,7 @@ fn cmd_status() -> Result<()> {
 
 fn ensure_git_repo(dir: &Path) -> Result<()> {
     if !dir.join(".git").exists() {
-        bail!("config dir is not a git repo — run: lx sync init <remote>");
+        return Err(LynxError::Config("config dir is not a git repo — run: lx sync init <remote>".into()).into());
     }
     Ok(())
 }
@@ -159,7 +160,7 @@ fn git(dir: &Path, args: &[&str]) -> Result<()> {
         .status()
         .context("failed to run git")?;
     if !status.success() {
-        bail!("git {} failed", args.join(" "));
+        return Err(LynxError::Shell(format!("git {} failed", args.join(" "))).into());
     }
     Ok(())
 }
@@ -179,4 +180,47 @@ fn timestamp() -> String {
         .map(|d| d.as_secs())
         .unwrap_or(0);
     format!("{ts}")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn timestamp_returns_numeric_string() {
+        let ts = timestamp();
+        assert!(ts.parse::<u64>().is_ok(), "timestamp should be numeric: {ts}");
+        assert!(ts.len() >= 10, "timestamp should be at least 10 digits: {ts}");
+    }
+
+    #[test]
+    fn ensure_git_repo_fails_without_git_dir() {
+        let tmp = tempfile::tempdir().unwrap();
+        let result = ensure_git_repo(tmp.path());
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("not a git repo"), "unexpected error: {msg}");
+    }
+
+    #[test]
+    fn ensure_git_repo_succeeds_with_git_dir() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(tmp.path().join(".git")).unwrap();
+        assert!(ensure_git_repo(tmp.path()).is_ok());
+    }
+
+    #[test]
+    fn config_dir_contains_brand_config_dir() {
+        let dir = config_dir();
+        assert!(dir.to_string_lossy().contains(brand::CONFIG_DIR));
+    }
+
+    #[tokio::test]
+    async fn sync_unknown_subcommand_errors() {
+        let args = SyncArgs {
+            command: SyncCommand::Other(vec!["oops".to_string()]),
+        };
+        let err = run(args).unwrap_err();
+        assert!(err.to_string().contains("oops"));
+    }
 }

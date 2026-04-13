@@ -1,4 +1,5 @@
-use anyhow::{bail, Result};
+use anyhow::Result;
+use lynx_core::error::LynxError;
 use std::path::Path;
 
 /// Resolved source for a theme file.
@@ -19,12 +20,12 @@ pub fn resolve_source(input: &str) -> Result<Source> {
     if input.starts_with("https://") || input.starts_with("http://") {
         let url = normalize_github_url(input);
         if !url.starts_with("https://") {
-            bail!("only HTTPS URLs are supported for security");
+            return Err(LynxError::Theme("only HTTPS URLs are supported for security".into()).into());
         }
         return Ok(Source::Remote(url));
     }
 
-    bail!("not a valid file path or URL: {input}");
+    Err(LynxError::Theme(format!("not a valid file path or URL: {input}")).into())
 }
 
 /// Convert GitHub blob URLs to raw.githubusercontent.com URLs.

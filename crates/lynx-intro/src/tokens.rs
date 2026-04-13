@@ -48,7 +48,7 @@ pub fn build_token_map(env: &HashMap<String, String>) -> HashMap<String, String>
     map.insert("cpu_cores".into(), cpus.len().to_string());
 
     let usage = sys.global_cpu_usage();
-    map.insert("cpu_usage".into(), format!("{:.1}%", usage));
+    map.insert("cpu_usage".into(), format!("{usage:.1}%"));
 
     // --- Memory ---
     let used = sys.used_memory();
@@ -60,7 +60,7 @@ pub fn build_token_map(env: &HashMap<String, String>) -> HashMap<String, String>
     } else {
         0
     };
-    map.insert("mem_pct".into(), format!("{}%", pct));
+    map.insert("mem_pct".into(), format!("{pct}%"));
 
     // --- Lynx ---
     map.insert("lynx_version".into(), env!("CARGO_PKG_VERSION").to_string());
@@ -72,9 +72,9 @@ fn format_uptime(secs: u64) -> String {
     let hours = secs / 3600;
     let minutes = (secs % 3600) / 60;
     if hours > 0 {
-        format!("{}h {}m", hours, minutes)
+        format!("{hours}h {minutes}m")
     } else {
-        format!("{}m", minutes)
+        format!("{minutes}m")
     }
 }
 

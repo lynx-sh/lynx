@@ -7,7 +7,8 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
+use lynx_core::error::LynxError;
 use tracing::info;
 
 use crate::schema::{InstallMethods, RegistryEntry};
@@ -15,7 +16,7 @@ use crate::schema::{InstallMethods, RegistryEntry};
 // ── Package manager detection ───────────────────────────────────────────────
 
 /// Detected package manager on the system.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PackageManager {
     Brew,
     Apt,
@@ -98,7 +99,7 @@ pub fn install_tool_via_pm(entry: &RegistryEntry) -> Result<String> {
     let install = entry
         .install
         .as_ref()
-        .ok_or_else(|| anyhow::anyhow!("package '{}' has no install methods defined", entry.name))?;
+        .ok_or_else(|| LynxError::Registry(format!("package '{}' has no install methods defined", entry.name)))?;
 
     let pm = detect_package_manager();
 
@@ -111,12 +112,10 @@ pub fn install_tool_via_pm(entry: &RegistryEntry) -> Result<String> {
             .with_context(|| format!("failed to run: {} {}", cmd, args.join(" ")))?;
 
         if !status.success() {
-            bail!(
+            return Err(LynxError::Registry(format!(
                 "{} {} failed with exit code {}",
-                cmd,
-                args.join(" "),
-                status.code().unwrap_or(-1)
-            );
+                cmd, args.join(" "), status.code().unwrap_or(-1)
+            )).into());
         }
 
         // Verify the binary exists after install.
@@ -124,10 +123,7 @@ pub fn install_tool_via_pm(entry: &RegistryEntry) -> Result<String> {
         if lynx_core::paths::find_binary(binary_name).is_none() {
             // Some tools install under a different name — check the entry name too.
             if lynx_core::paths::find_binary(&entry.name).is_none() {
-                eprintln!(
-                    "warning: '{}' installed but binary '{}' not found on PATH",
-                    entry.name, binary_name
-                );
+                tracing::warn!("'{}' installed but binary '{}' not found on PATH", entry.name, binary_name);
             }
         }
 
@@ -140,11 +136,10 @@ pub fn install_tool_via_pm(entry: &RegistryEntry) -> Result<String> {
         return install_tool_via_url(url, &entry.name);
     }
 
-    bail!(
+    Err(LynxError::Registry(format!(
         "no install method available for '{}' on {} — try installing manually",
-        entry.name,
-        pm.label()
-    )
+        entry.name, pm.label()
+    )).into())
 }
 
 /// Download a tool binary from a URL to ~/.local/bin/.
@@ -160,7 +155,7 @@ fn install_tool_via_url(url: &str, name: &str) -> Result<String> {
         .call()
         .with_context(|| format!("GET {url}"))?;
     if resp.status() >= 400 {
-        bail!("server returned status {} for {url}", resp.status());
+        return Err(LynxError::Registry(format!("server returned status {} for {url}", resp.status())).into());
     }
 
     let mut reader = resp.into_reader();
@@ -188,7 +183,7 @@ fn install_tool_via_url(url: &str, name: &str) -> Result<String> {
 pub fn install_theme(name: &str, url: &str, force: bool) -> Result<PathBuf> {
     let dest = lynx_core::paths::themes_dir().join(format!("{name}.toml"));
     if dest.exists() && !force {
-        bail!("theme '{name}' already exists at {} — use --force to overwrite", dest.display());
+        return Err(LynxError::AlreadyInstalled(format!("theme '{name}'")).into());
     }
 
     let body = download_text(url)
@@ -196,7 +191,7 @@ pub fn install_theme(name: &str, url: &str, force: bool) -> Result<PathBuf> {
 
     // Validate before writing.
     if let Err(e) = toml::from_str::<toml::Value>(&body) {
-        bail!("downloaded theme '{name}' is invalid TOML: {e}");
+        return Err(LynxError::Theme(format!("downloaded theme '{name}' is invalid TOML: {e}")).into());
     }
 
     if let Some(parent) = dest.parent() {
@@ -214,14 +209,14 @@ pub fn install_intro(name: &str, url: &str, force: bool) -> Result<PathBuf> {
     let intros_dir = lynx_core::paths::lynx_dir().join("intros");
     let dest = intros_dir.join(format!("{name}.toml"));
     if dest.exists() && !force {
-        bail!("intro '{name}' already exists at {} — use --force to overwrite", dest.display());
+        return Err(LynxError::AlreadyInstalled(format!("intro '{name}'")).into());
     }
 
     let body = download_text(url)
         .with_context(|| format!("failed to download intro '{name}' from {url}"))?;
 
     if let Err(e) = toml::from_str::<toml::Value>(&body) {
-        bail!("downloaded intro '{name}' is invalid TOML: {e}");
+        return Err(LynxError::Theme(format!("downloaded intro '{name}' is invalid TOML: {e}")).into());
     }
 
     std::fs::create_dir_all(&intros_dir).context("create intros dir")?;
@@ -237,25 +232,35 @@ fn download_text(url: &str) -> Result<String> {
         .call()
         .with_context(|| format!("GET {url}"))?;
     if resp.status() >= 400 {
-        bail!("server returned status {} for {url}", resp.status());
+        return Err(LynxError::Registry(format!("server returned status {} for {url}", resp.status())).into());
     }
     resp.into_string().context("read response body")
 }
 
 // ── Uninstall ───────────────────────────────────────────────────────────────
 
+/// Result of uninstalling a tool's Lynx integration.
+pub struct UninstallResult {
+    /// Whether the plugin directory was removed.
+    pub plugin_removed: bool,
+    /// Command the user should run to remove the system binary.
+    pub system_uninstall_hint: String,
+}
+
 /// Remove the auto-generated Lynx plugin for a tool.
-/// Does NOT remove the system binary — prints instructions instead.
-pub fn uninstall_tool(name: &str, plugins_dir: &Path) -> Result<()> {
+/// Does NOT remove the system binary — returns a hint for the caller to display.
+pub fn uninstall_tool(name: &str, plugins_dir: &Path) -> Result<UninstallResult> {
     let plugin_dir = plugins_dir.join(name);
-    if plugin_dir.exists() {
+    let plugin_removed = if plugin_dir.exists() {
         std::fs::remove_dir_all(&plugin_dir)
             .with_context(|| format!("failed to remove plugin dir {}", plugin_dir.display()))?;
-        println!("removed Lynx plugin for '{name}'");
-    }
+        true
+    } else {
+        false
+    };
 
     let pm = detect_package_manager();
-    let uninstall_hint = match pm {
+    let system_uninstall_hint = match pm {
         PackageManager::Brew => format!("brew uninstall {name}"),
         PackageManager::Apt => format!("sudo apt remove {name}"),
         PackageManager::Dnf => format!("sudo dnf remove {name}"),
@@ -263,8 +268,11 @@ pub fn uninstall_tool(name: &str, plugins_dir: &Path) -> Result<()> {
         PackageManager::Cargo => format!("cargo uninstall {name}"),
         PackageManager::None => format!("manually remove the '{name}' binary"),
     };
-    println!("system binary preserved — to remove it: {uninstall_hint}");
-    Ok(())
+
+    Ok(UninstallResult {
+        plugin_removed,
+        system_uninstall_hint,
+    })
 }
 
 #[cfg(test)]

@@ -24,7 +24,7 @@ pub struct GitStateArgs {}
 /// _lynx_git_state=()
 /// export LYNX_CACHE_GIT_STATE=''
 /// ```
-pub async fn run(_args: GitStateArgs) -> Result<()> {
+pub fn run(_args: GitStateArgs) -> Result<()> {
     let state = gather_git_state();
     print!("{}", render_zsh(&state));
     Ok(())
