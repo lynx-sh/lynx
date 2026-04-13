@@ -36,6 +36,12 @@ use crate::cli::{Cli, Command};
 use anyhow::Result;
 use lynx_core::error::LynxError;
 
+/// Extract the subcommand name from an external-subcommand args vec.
+/// Returns the first element as `&str`, or `""` if the vec is empty.
+pub(crate) fn unknown_subcmd_name(args: &[String]) -> &str {
+    args.first().map(|s| s.as_str()).unwrap_or("")
+}
+
 /// Load TUI colors from the active theme. Falls back to defaults.
 pub(crate) fn tui_colors() -> lynx_tui::TuiColors {
     let Ok(cfg) = lynx_config::load() else {

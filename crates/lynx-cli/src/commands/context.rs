@@ -34,7 +34,7 @@ pub async fn run(args: ContextArgs) -> Result<()> {
                 cmd_set(&args[0]).await
             } else {
                 Err(LynxError::unknown_command(
-                    args.first().map(|s| s.as_str()).unwrap_or(""),
+                    super::unknown_subcmd_name(&args),
                     "context",
                 )
                 .into())

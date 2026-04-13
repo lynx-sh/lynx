@@ -130,7 +130,7 @@ pub async fn run(args: PluginArgs) -> Result<()> {
             })
         }
         PluginCommand::Other(args) => Err(LynxError::unknown_command(
-            args.first().map(|s| s.as_str()).unwrap_or(""),
+            super::unknown_subcmd_name(&args),
             "plugin",
         )
         .into()),
