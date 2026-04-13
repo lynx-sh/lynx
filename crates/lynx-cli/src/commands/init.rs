@@ -136,6 +136,7 @@ pub fn run(args: InitArgs) -> Result<()> {
         user_paths: &user_paths,
         editor: config.editor.as_deref(),
         completions_zsh: Some(&completions_dir_str),
+        bare_subcommands: config.shell.bare_subcommands,
     });
 
     print!("{script}");
