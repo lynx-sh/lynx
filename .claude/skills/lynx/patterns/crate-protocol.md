@@ -15,14 +15,11 @@ pt decisions arch      # check for architectural constraints
 
 ### Verify Before Adding
 ```bash
-# Check the dep doesn't create a cycle
-cargo build -p lynx-<new-crate>
-
-# Check workspace version exists
-grep "<dep-name>" Cargo.toml   # must exist in [workspace.dependencies]
+cargo build -p lynx-<new-crate>        # confirms no dep cycle
+grep "<dep-name>" Cargo.toml           # must exist in [workspace.dependencies]
 ```
 
-If the workspace dependency doesn't exist, add it to root `Cargo.toml` `[workspace.dependencies]` first.
+If the workspace dep doesn't exist, add it to root `Cargo.toml` `[workspace.dependencies]` first.
 
 ## File Organization (D-042)
 

@@ -78,10 +78,10 @@ Color is suppressed when `NO_COLOR` is set or `TERM=dumb` or stdout is not a ter
 
 ## Wiring mandate
 
-After adding any new error path, run:
+After adding any new error path:
 ```bash
-cargo nextest run -p lynx-core   # verify error tests pass
-cargo nextest run -p lynx-cli    # verify build + CLI tests pass
+cargo nextest run -p lynx-core
+cargo nextest run -p lynx-cli
 ```
 
-Do NOT close a phase or issue that adds user-facing error paths without migrating those paths to `LynxError::*`.
+Do not close a phase or issue that adds user-facing error paths without migrating them to `LynxError::*`.

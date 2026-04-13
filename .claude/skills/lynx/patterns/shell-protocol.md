@@ -23,8 +23,7 @@ If your change adds conditional logic, string manipulation, array operations, or
 
 ## Verification
 
-After any shell change:
 ```bash
-bats tests/integration/shell/   # shell integration tests
-cargo nextest run -p lynx-shell  # Rust-side shell tests
+bats tests/integration/shell/
+cargo nextest run -p lynx-shell
 ```

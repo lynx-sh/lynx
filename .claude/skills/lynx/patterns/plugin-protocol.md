@@ -31,6 +31,6 @@ Every plugin lives in `plugins/<name>/` with:
 ## Verification
 
 ```bash
-cargo nextest run -p lynx-plugin   # plugin system tests
-cargo nextest run -p lynx-cli      # CLI integration
+cargo nextest run -p lynx-plugin
+cargo nextest run -p lynx-cli
 ```

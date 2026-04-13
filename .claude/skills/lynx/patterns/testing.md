@@ -1,37 +1,29 @@
 # Testing — Lynx
 
-## Universal Rules
-- **NEVER `run_in_background` for `cargo nextest` or `cargo build`** — background produces empty output, wastes tokens re-running.
-- **Full suite (`cargo nextest run --all`) runs ONCE per session** — at the very end, as final verification. No "baseline" full runs.
-- **During work: targeted tests only** — `cargo nextest run -p lynx-<crate>` for the crate you changed.
+## Rules
+- **Never `run_in_background` for cargo commands** — background produces empty output.
+- **Final verification: `lx run lynx-ai-verify`** — once per session, at the end. No baseline runs.
+- **During work: targeted only** — `cargo nextest run -p lynx-<crate>` for the crate you changed.
 
-## During Work — Targeted Tests
+## During Work
 
 ```bash
-# Test the crate you're changing
-cargo nextest run -p lynx-prompt
-
-# Test a specific function/module
-cargo nextest run -p lynx-prompt -E 'test(assemble)'
-
-# After touching shell integration
-bats tests/integration/shell/
+cargo nextest run -p lynx-prompt                      # crate under change
+cargo nextest run -p lynx-prompt -E 'test(assemble)'  # single test/module
+bats tests/integration/shell/                         # after any shell/ change
 ```
-
-Always foreground, `timeout: 300000`.
 
 ## Before Touching Code
 
-Run the targeted test(s) for the area you're about to change. If they fail before you start: stop, alert the architect.
+Run the targeted test(s) for the area you're changing. If they fail before you start: stop, alert the architect.
 
-## Final Verification (task end, once)
+## Final Verification (once, at task end)
 
 ```bash
-cargo nextest run --all          # all crates
-cargo clippy --all               # zero warnings policy
+lx run lynx-ai-verify   # clippy + full suite — errors only
 ```
 
-If either fails: fix before closing. Do not close the task.
+Fix any failure before closing. Do not close the task with a red gate.
 
 ## Test Locations
 
@@ -43,5 +35,5 @@ If either fails: fix before closing. Do not close the task.
 ## Writing Tests
 
 - Tests live in `#[cfg(test)] mod tests` at the bottom of the file they test
-- Test names: `fn test_<what>_<case>()` or descriptive snake_case
-- Use `lynx-test-utils` for shared test helpers — never duplicate test infrastructure
+- Use descriptive snake_case names
+- Use `lynx-test-utils` for shared helpers — never duplicate test infrastructure
