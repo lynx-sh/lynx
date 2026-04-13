@@ -36,7 +36,7 @@ pub fn run(args: SyncArgs) -> Result<()> {
         SyncCommand::Pull => cmd_pull(),
         SyncCommand::Status => cmd_status(),
         SyncCommand::Other(args) => Err(LynxError::unknown_command(
-            args.first().map(|s| s.as_str()).unwrap_or(""),
+            super::unknown_subcmd_name(&args),
             "sync",
         )
         .into()),

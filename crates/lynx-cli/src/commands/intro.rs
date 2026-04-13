@@ -72,7 +72,7 @@ pub fn run(args: IntroArgs) -> Result<()> {
                 cmd_set(&args[0])
             } else {
                 Err(LynxError::unknown_command(
-                    args.first().map(|s| s.as_str()).unwrap_or(""),
+                    super::unknown_subcmd_name(&args),
                     "intro",
                 )
                 .into())

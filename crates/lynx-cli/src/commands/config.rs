@@ -48,7 +48,7 @@ pub fn run(args: ConfigArgs) -> Result<()> {
         }
         ConfigCommand::Other(args) => Err(LynxError::NotFound {
             item_type: "Command".into(),
-            name: args.first().map(|s| s.as_str()).unwrap_or("").into(),
+            name: super::unknown_subcmd_name(&args).into(),
             hint: "run `lx config` for help".into(),
         }
         .into()),

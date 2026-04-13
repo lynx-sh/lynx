@@ -39,7 +39,7 @@ pub fn run(args: TapArgs) -> Result<()> {
         TapCommand::Remove { name } => cmd_remove(&name),
         TapCommand::Update => cmd_update(),
         TapCommand::Other(args) => Err(LynxError::unknown_command(
-            args.first().map(|s| s.as_str()).unwrap_or(""),
+            super::unknown_subcmd_name(&args),
             "tap",
         )
         .into()),
@@ -85,24 +85,47 @@ fn cmd_list() -> Result<()> {
     Ok(())
 }
 
+/// Derive a tap name from a source string.
+/// - `"user/repo"` shorthand → `"user/repo"`
+/// - GitHub URL (github.com or raw.githubusercontent.com) → `"user/repo"` from path segments 0+1
+/// - Other full URL → `"host/last-segment"` (file extension stripped)
+fn extract_tap_name(source: &str) -> String {
+    if !source.starts_with("http") {
+        return source.to_string();
+    }
+
+    // Strip scheme to get "host/path..."
+    let without_scheme = source
+        .trim_start_matches("https://")
+        .trim_start_matches("http://")
+        .trim_end_matches('/');
+
+    let parts: Vec<&str> = without_scheme.split('/').filter(|s| !s.is_empty()).collect();
+
+    let host = parts.first().copied().unwrap_or("");
+    let path_parts = &parts[1..];
+
+    // GitHub: github.com/user/repo/... or raw.githubusercontent.com/user/repo/...
+    if host == "github.com" || host == "raw.githubusercontent.com" {
+        if path_parts.len() >= 2 {
+            return format!("{}/{}", path_parts[0], path_parts[1]);
+        }
+    }
+
+    // Fallback: host + last meaningful segment (strip file extension)
+    if let Some(last) = path_parts.last() {
+        let stem = last.split('.').next().unwrap_or(last);
+        return format!("{host}/{stem}");
+    }
+
+    host.to_string()
+}
+
 fn cmd_add(source: &str) -> Result<()> {
     let path = taps_config_path();
     let mut list = load_taps(&path)?;
 
-    // Derive name from source: "user/repo" → "user/repo", full URL → last two path segments.
-    let name = if source.starts_with("http") {
-        source
-            .trim_end_matches('/')
-            .rsplit('/')
-            .take(2)
-            .collect::<Vec<_>>()
-            .into_iter()
-            .rev()
-            .collect::<Vec<_>>()
-            .join("/")
-    } else {
-        source.to_string()
-    };
+    let name = extract_tap_name(source);
 
     let url = resolve_tap_url(source);
     add_tap(&mut list, &name, &url)?;
@@ -180,60 +203,39 @@ mod tests {
 
     #[test]
     fn tap_name_from_github_shorthand() {
-        let source = "user/repo";
-        // Not starting with http, so name = source directly
-        let name = if source.starts_with("http") {
-            source
-                .trim_end_matches('/')
-                .rsplit('/')
-                .take(2)
-                .collect::<Vec<_>>()
-                .into_iter()
-                .rev()
-                .collect::<Vec<_>>()
-                .join("/")
-        } else {
-            source.to_string()
-        };
-        assert_eq!(name, "user/repo");
+        assert_eq!(extract_tap_name("user/repo"), "user/repo");
     }
 
     #[test]
-    fn tap_name_from_full_url() {
-        let source = "https://github.com/user/repo/raw/main/index.toml";
-        let name = if source.starts_with("http") {
-            source
-                .trim_end_matches('/')
-                .rsplit('/')
-                .take(2)
-                .collect::<Vec<_>>()
-                .into_iter()
-                .rev()
-                .collect::<Vec<_>>()
-                .join("/")
-        } else {
-            source.to_string()
-        };
-        assert_eq!(name, "main/index.toml");
+    fn tap_name_from_full_github_url() {
+        assert_eq!(
+            extract_tap_name("https://github.com/user/repo/raw/main/index.toml"),
+            "user/repo"
+        );
+    }
+
+    #[test]
+    fn tap_name_from_raw_githubusercontent_url() {
+        assert_eq!(
+            extract_tap_name("https://raw.githubusercontent.com/user/repo/main/index.toml"),
+            "user/repo"
+        );
+    }
+
+    #[test]
+    fn tap_name_from_other_url_strips_extension() {
+        assert_eq!(
+            extract_tap_name("https://example.com/taps/community/index.toml"),
+            "example.com/index"
+        );
     }
 
     #[test]
     fn tap_name_from_url_with_trailing_slash() {
-        let source = "https://example.com/taps/community/";
-        let name = if source.starts_with("http") {
-            source
-                .trim_end_matches('/')
-                .rsplit('/')
-                .take(2)
-                .collect::<Vec<_>>()
-                .into_iter()
-                .rev()
-                .collect::<Vec<_>>()
-                .join("/")
-        } else {
-            source.to_string()
-        };
-        assert_eq!(name, "taps/community");
+        assert_eq!(
+            extract_tap_name("https://example.com/taps/community/"),
+            "example.com/community"
+        );
     }
 
     #[test]
