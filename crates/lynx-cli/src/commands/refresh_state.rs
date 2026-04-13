@@ -1,9 +1,14 @@
 use anyhow::Result;
 use clap::Args;
+use std::io::Read;
+use std::path::Path;
 use std::process::{Command, Stdio};
+use std::time::{Duration, Instant};
 
 use super::git;
 use super::kubectl_state;
+
+const COMMUNITY_GATHER_TIMEOUT: Duration = Duration::from_millis(200);
 
 #[derive(Args)]
 pub struct RefreshStateArgs {}
@@ -95,6 +100,10 @@ fn gather_all(enabled: &[String]) -> String {
 /// Read a community plugin's plugin.toml, run its `state.gather` command if set,
 /// and return its stdout for eval. Returns None if no gather command or on failure.
 fn gather_community_plugin(plugin_name: &str) -> Option<String> {
+    gather_community_plugin_with_timeout(plugin_name, COMMUNITY_GATHER_TIMEOUT)
+}
+
+fn gather_community_plugin_with_timeout(plugin_name: &str, timeout: Duration) -> Option<String> {
     let plugin_dir = lynx_core::paths::installed_plugins_dir().join(plugin_name);
     let manifest_path = plugin_dir.join(lynx_core::brand::PLUGIN_MANIFEST);
     let content = std::fs::read_to_string(&manifest_path).ok()?;
@@ -104,18 +113,43 @@ fn gather_community_plugin(plugin_name: &str) -> Option<String> {
     // Expand $PLUGIN_DIR in the command so plugins can reference their own files.
     let cmd = gather_cmd.replace("$PLUGIN_DIR", &plugin_dir.to_string_lossy());
 
-    let output = Command::new("zsh")
-        .args(["-c", &cmd])
-        .env("PLUGIN_DIR", &plugin_dir)
+    run_command_with_timeout(&cmd, &plugin_dir, timeout)
+}
+
+fn run_command_with_timeout(cmd: &str, plugin_dir: &Path, timeout: Duration) -> Option<String> {
+    let mut child = Command::new("zsh")
+        .args(["-c", cmd])
+        .env("PLUGIN_DIR", plugin_dir)
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
-        .output()
+        .spawn()
         .ok()?;
+    let mut stdout = child.stdout.take()?;
+    let start = Instant::now();
 
-    if output.status.success() {
-        Some(String::from_utf8_lossy(&output.stdout).into_owned())
-    } else {
-        None
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                let mut out = Vec::new();
+                if stdout.read_to_end(&mut out).is_err() {
+                    return None;
+                }
+                return if status.success() {
+                    Some(String::from_utf8_lossy(&out).into_owned())
+                } else {
+                    None
+                };
+            }
+            Ok(None) => {
+                if start.elapsed() >= timeout {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return None;
+                }
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            Err(_) => return None,
+        }
     }
 }
 
@@ -244,5 +278,66 @@ version = "0.1.0"
         let out = gather_community_plugin("bare");
 
         assert!(out.is_none(), "no state.gather should yield None");
+    }
+
+    #[test]
+    fn community_plugin_state_gather_timeout_is_skipped_quickly() {
+        use std::fs;
+        let _lock = env_lock().lock().expect("lock");
+        let _guard = LynxDirGuard::new();
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let plugin_dir = tmp.path().join("plugins").join("slow");
+        fs::create_dir_all(&plugin_dir).expect("create plugin dir");
+        fs::write(
+            plugin_dir.join("plugin.toml"),
+            r#"
+[plugin]
+name    = "slow"
+version = "0.1.0"
+
+[state]
+gather = "sleep 1; echo \"export LYNX_CACHE_SLOW_STATE='ok'\""
+"#,
+        )
+        .expect("write plugin.toml");
+
+        std::env::set_var(lynx_core::env_vars::LYNX_DIR, tmp.path());
+        let start = Instant::now();
+        let out = gather_community_plugin_with_timeout("slow", Duration::from_millis(100));
+        let elapsed = start.elapsed();
+
+        assert!(out.is_none(), "timed out gather must be skipped");
+        assert!(
+            elapsed < Duration::from_millis(700),
+            "timeout should return quickly, elapsed={elapsed:?}"
+        );
+    }
+
+    #[test]
+    fn community_plugin_state_gather_fast_path_still_returns_output() {
+        use std::fs;
+        let _lock = env_lock().lock().expect("lock");
+        let _guard = LynxDirGuard::new();
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let plugin_dir = tmp.path().join("plugins").join("fast");
+        fs::create_dir_all(&plugin_dir).expect("create plugin dir");
+        fs::write(
+            plugin_dir.join("plugin.toml"),
+            r#"
+[plugin]
+name    = "fast"
+version = "0.1.0"
+
+[state]
+gather = "echo \"export LYNX_CACHE_FAST_STATE='ok'\""
+"#,
+        )
+        .expect("write plugin.toml");
+
+        std::env::set_var(lynx_core::env_vars::LYNX_DIR, tmp.path());
+        let out = gather_community_plugin_with_timeout("fast", Duration::from_millis(300))
+            .expect("fast gather should succeed");
+
+        assert!(out.contains("LYNX_CACHE_FAST_STATE"), "got: {out}");
     }
 }
