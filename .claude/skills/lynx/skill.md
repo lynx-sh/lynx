@@ -5,7 +5,7 @@ Rust workspace (`crates/`) → `lx` binary. Thin ~200-line zsh layer evals outpu
 
 ## Universal Execution Contract
 Every task. No exceptions.
-- **How to test:** `cargo nextest run --all` (final verification only — use `-p lynx-<crate>` during work)
+- **How to test:** `lx run lynx-ai-verify` (final verification only — use `cargo nextest run -p lynx-<crate>` during work)
 - **Decisions gate code:** `pt decisions <component>` before implementing anything non-trivial
 - **File issues proactively:** broken code, smells, missing tests → `pt add` immediately with severity
 - **Pre-code checklist:** fill the relevant GATE below and emit it BEFORE writing any code. Blank fields = violation.
@@ -50,8 +50,7 @@ G3 SCOPE AUDIT
 Re-grep:                rg "____" crates/
 Remaining instances:    0 / N — if N > 0: filed as H-XXX
 Bug class investigated: "pattern X" — grepped Y, found N sites → filed / all fixed
-All tests pass:         cargo nextest run --all — PASS
-Clippy clean:           cargo clippy --all -- -D warnings — PASS (0 warnings)
+Verify:                 lx run lynx-ai-verify — PASS
 ```
 `pt fix H-XXX "cause" "fix" "scope: grepped X in crates/, N sites, all fixed"`
 
@@ -99,8 +98,7 @@ Files modified:     ____
 Public API added:   ____ / none
 Error paths:        LynxError::____ / none added
 Tests added:        test_name — verifies ____
-All tests pass:     cargo nextest run --all — PASS
-Clippy clean:       cargo clippy --all -- -D warnings — PASS (0 warnings)
+Verify:             lx run lynx-ai-verify — PASS
 ```
 
 ---
@@ -119,8 +117,7 @@ New files created:      ____ — each owns: ____
 mod.rs / lib.rs updated: yes
 use paths updated:      yes — files: ____
 Public API unchanged:   yes / list intentional changes
-All tests pass:         cargo nextest run --all — PASS
-Clippy clean:           cargo clippy --all -- -D warnings — PASS (0 warnings)
+Verify:                 lx run lynx-ai-verify — PASS
 ```
 Behavioral bugs found during refactor → `pt add`, fix separately. Never mix.
 
@@ -153,8 +150,7 @@ cargo nextest run -p lynx-<X>  # targeted tests during work
 # file issues as you find them — pt add
 
 # END
-cargo nextest run --all                    # final full suite — once only
-cargo clippy --all -- -D warnings          # MUST be clean — 0 warnings, no exceptions
-git commit                                 # commit before pt done
+lx run lynx-ai-verify          # final verification — errors only, no PASS noise
+git commit                     # commit before pt done
 pt done S-XXX success "what was done" "what next agent does first"
 ```
