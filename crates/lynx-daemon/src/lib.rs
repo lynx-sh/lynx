@@ -14,7 +14,7 @@ pub trait ServiceBackend {
     fn status(&self) -> anyhow::Result<ServiceStatus>;
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ServiceStatus {
     Running,
     Stopped,

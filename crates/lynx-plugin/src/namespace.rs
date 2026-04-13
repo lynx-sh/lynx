@@ -8,7 +8,7 @@ pub struct NameViolation {
     pub kind: ViolationKind,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ViolationKind {
     /// Function defined but not in exports.functions.
     UnexportedFunction,

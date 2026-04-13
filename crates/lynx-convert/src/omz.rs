@@ -21,7 +21,7 @@ pub struct SegColor {
 }
 
 /// Complexity tier of the OMZ theme.
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub enum Tier {
     /// Simple PROMPT= assignment with % tokens and $(func) calls.
     #[default]

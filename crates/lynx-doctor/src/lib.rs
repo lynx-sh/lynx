@@ -10,7 +10,7 @@ pub struct Check {
 }
 
 /// Health-check outcome.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Status {
     Pass,
     Warn,

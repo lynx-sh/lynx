@@ -15,7 +15,7 @@ use std::process::Stdio;
 use tracing::info;
 
 /// Execution mode.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ExecMode {
     Foreground,
     Background,
@@ -31,7 +31,7 @@ pub struct StepResult {
 }
 
 /// Step execution status.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StepStatus {
     Passed,
     Failed,

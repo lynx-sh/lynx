@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 /// A specific version entry in the registry for a plugin.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PluginVersion {
     /// Semver version string (e.g. "1.2.3").
     pub version: String,
@@ -16,7 +16,7 @@ pub struct PluginVersion {
 }
 
 /// Package type in the registry.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum PackageType {
     #[default]
@@ -29,7 +29,7 @@ pub enum PackageType {
 }
 
 /// Install commands for tools — one field per package manager.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct InstallMethods {
     /// Homebrew formula name (e.g. "eza", "ripgrep")
     #[serde(default)]
