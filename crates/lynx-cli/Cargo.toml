@@ -38,6 +38,8 @@ tracing-subscriber.workspace = true
 which = "6"
 lynx-intro = { version = "0.1.0", path = "../lynx-intro" }
 ureq.workspace = true
+sha2.workspace = true
+hex.workspace = true
 zip = { version = "2", default-features = false, features = ["deflate"] }
 
 [dev-dependencies]
