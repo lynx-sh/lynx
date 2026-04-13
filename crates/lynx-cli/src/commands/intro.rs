@@ -113,22 +113,83 @@ fn cmd_set(slug: &str) -> Result<()> {
     Ok(())
 }
 
+/// An intro entry for the interactive list.
+struct IntroListEntry {
+    slug: String,
+    name: String,
+    kind: String,
+    is_current: bool,
+    enabled: bool,
+}
+
+impl lynx_tui::ListItem for IntroListEntry {
+    fn title(&self) -> &str {
+        &self.slug
+    }
+
+    fn subtitle(&self) -> String {
+        let status = if self.is_current && !self.enabled {
+            " (disabled)"
+        } else {
+            ""
+        };
+        format!("{}{status}", self.kind)
+    }
+
+    fn detail(&self) -> String {
+        let mut lines = vec![self.name.clone()];
+        lines.push(format!("Type: {}", self.kind));
+        if self.is_current {
+            let status = if self.enabled { "active" } else { "active (disabled)" };
+            lines.push(format!("Status: {status}"));
+        }
+        lines.join("\n")
+    }
+
+    fn category(&self) -> Option<&str> {
+        Some("intro")
+    }
+
+    fn is_active(&self) -> bool {
+        self.is_current
+    }
+}
+
 fn cmd_list() -> Result<()> {
     let cfg = load().context("failed to load config")?;
     let active = cfg.intro.active.as_deref().unwrap_or("");
-    let enabled_marker = if cfg.intro.enabled { "" } else { " (disabled)" };
+    let enabled = cfg.intro.enabled;
 
-    let entries = loader::list_all();
-    if entries.is_empty() {
+    let raw_entries = loader::list_all();
+    if raw_entries.is_empty() {
         println!("no intros found");
         return Ok(());
     }
 
-    for entry in entries {
-        let active_marker = if entry.slug == active { "* " } else { "  " };
-        let kind = if entry.is_builtin { "built-in" } else { "user" };
-        println!("{active_marker}{} ({kind}){}", entry.slug, if entry.slug == active { enabled_marker } else { "" });
+    let entries: Vec<IntroListEntry> = raw_entries
+        .iter()
+        .map(|e| IntroListEntry {
+            slug: e.slug.clone(),
+            name: e.name.clone(),
+            kind: if e.is_builtin { "built-in".into() } else { "user".into() },
+            is_current: e.slug == active,
+            enabled,
+        })
+        .collect();
+
+    // Load TUI colors from active theme.
+    let tui_colors = match lynx_theme::loader::load(&cfg.active_theme) {
+        Ok(theme) => lynx_tui::TuiColors::from_palette(&theme.colors),
+        Err(_) => lynx_tui::TuiColors::default(),
+    };
+
+    if let Some(idx) = lynx_tui::show(&entries, "Intros", &tui_colors)? {
+        let selected = &entries[idx].slug;
+        if selected != active {
+            cmd_set(selected)?;
+        }
     }
+
     Ok(())
 }
 

@@ -26,6 +26,7 @@ lynx-daemon  = { path = "../lynx-daemon" }
 lynx-depgraph = { path = "../lynx-depgraph" }
 lynx-shell    = { path = "../lynx-shell" }
 lynx-registry = { path = "../lynx-registry" }
+lynx-tui      = { path = "../lynx-tui" }
 clap.workspace = true
 owo-colors.workspace = true
 serde_json.workspace = true

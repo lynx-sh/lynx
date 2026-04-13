@@ -101,7 +101,7 @@ pub async fn run(args: ThemeArgs) -> Result<()> {
     match args.command {
         ThemeCommand::Set { name } => cmd_set(&name).await,
         ThemeCommand::Random => cmd_random().await,
-        ThemeCommand::List => cmd_list(),
+        ThemeCommand::List => cmd_list().await,
         ThemeCommand::Edit => cmd_edit().await,
         ThemeCommand::Examples => {
             crate::commands::examples::run(crate::commands::examples::ExamplesArgs {
@@ -276,17 +276,112 @@ async fn cmd_random() -> Result<()> {
     cmd_set(&available[idx]).await
 }
 
-fn cmd_list() -> Result<()> {
+/// A theme entry for the interactive list.
+struct ThemeListEntry {
+    name: String,
+    description: String,
+    author: String,
+    segments: Vec<String>,
+    palette_keys: Vec<String>,
+    is_current: bool,
+}
+
+impl lynx_tui::ListItem for ThemeListEntry {
+    fn title(&self) -> &str {
+        &self.name
+    }
+
+    fn subtitle(&self) -> String {
+        if self.description.is_empty() {
+            String::new()
+        } else {
+            self.description.clone()
+        }
+    }
+
+    fn detail(&self) -> String {
+        let mut lines = Vec::new();
+        if !self.description.is_empty() {
+            lines.push(self.description.clone());
+        }
+        if !self.author.is_empty() {
+            lines.push(format!("Author: {}", self.author));
+        }
+        if !self.segments.is_empty() {
+            lines.push(String::new());
+            lines.push(format!("Segments: {}", self.segments.join(", ")));
+        }
+        if !self.palette_keys.is_empty() {
+            lines.push(String::new());
+            lines.push(format!("Palette: {}", self.palette_keys.join(", ")));
+        }
+        if self.is_current {
+            lines.push(String::new());
+            lines.push("(active theme)".to_string());
+        }
+        lines.join("\n")
+    }
+
+    fn category(&self) -> Option<&str> {
+        Some("theme")
+    }
+
+    fn is_active(&self) -> bool {
+        self.is_current
+    }
+}
+
+async fn cmd_list() -> Result<()> {
     let cfg = load().context("failed to load config")?;
     let current = &cfg.active_theme;
 
-    for name in list() {
-        if &name == current {
-            println!("* {name}");
-        } else {
-            println!("  {name}");
+    let names = list();
+    let entries: Vec<ThemeListEntry> = names
+        .iter()
+        .map(|name| {
+            let (description, author, segments, palette_keys) =
+                match load_theme(name) {
+                    Ok(theme) => {
+                        let desc = theme.meta.description.clone();
+                        let auth = theme.meta.author.clone();
+                        let segs: Vec<String> = theme.segments.top.order.iter()
+                            .chain(theme.segments.left.order.iter())
+                            .chain(theme.segments.right.order.iter())
+                            .cloned()
+                            .collect();
+                        let pal: Vec<String> = {
+                            let mut keys: Vec<String> = theme.colors.keys().cloned().collect();
+                            keys.sort();
+                            keys
+                        };
+                        (desc, auth, segs, pal)
+                    }
+                    Err(_) => (String::new(), String::new(), vec![], vec![]),
+                };
+            ThemeListEntry {
+                name: name.clone(),
+                description,
+                author,
+                segments,
+                palette_keys,
+                is_current: name == current,
+            }
+        })
+        .collect();
+
+    // Load TUI colors from active theme.
+    let tui_colors = match load_theme(current) {
+        Ok(theme) => lynx_tui::TuiColors::from_palette(&theme.colors),
+        Err(_) => lynx_tui::TuiColors::default(),
+    };
+
+    if let Some(idx) = lynx_tui::show(&entries, "Themes", &tui_colors)? {
+        let selected = &entries[idx].name;
+        if selected != current {
+            cmd_set(selected).await?;
         }
     }
+
     Ok(())
 }
 
