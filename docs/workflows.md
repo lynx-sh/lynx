@@ -178,7 +178,13 @@ lx run <name> --bg                  # run immediately in background
 lx run <name> --yes                 # skip all confirmation prompts (CI mode)
 lx run list                         # browse available workflows (TUI)
 lx run examples                     # show full TOML examples
+
+LYNX_NO_TUI=1 lx run <name>        # plain streaming output (no TUI)
 ```
+
+The workflow TUI is automatically disabled for pipes, CI (`CI=true`), AI agent terminals
+(`CLAUDECODE`, `CURSOR_CLI`), and when `[tui] enabled = false` is set in config. Plain
+streaming output is always used in those contexts.
 
 **Flags**
 
@@ -203,7 +209,7 @@ Manage workflow job history and running jobs.
 
 | Subcommand                  | Description                                         |
 |-----------------------------|-----------------------------------------------------|
-| `lx jobs list`              | Browse recent jobs (TUI) with status and duration   |
+| `lx jobs list`              | Browse recent jobs (TUI) with status and duration — plain text when TUI is disabled |
 | `lx jobs view <id>`         | Print full JSON record for a job                    |
 | `lx jobs kill <id>`         | Send kill signal to a running job                   |
 | `lx jobs log <id>`          | Print captured output for a job                     |

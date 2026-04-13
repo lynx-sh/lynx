@@ -23,8 +23,36 @@ Lynx config lives at `~/.config/lynx/config.toml`. All subcommands operate on th
 | `active_theme`   | Theme name (must exist in `themes/`)  | `lx config set active_theme catppuccin` |
 | `active_context` | `interactive` \| `agent` \| `minimal` | `lx config set active_context agent` |
 | `sync.remote`    | Git remote URL (or empty to clear)    | `lx config set sync.remote git@github.com:you/dotfiles.git` |
+| `tui.enabled`    | `true` \| `false` (default: `true`)   | `lx config set tui.enabled false` |
 
-Read-only keys (via `lx config get` only): `schema_version`.
+Read-only keys (via `lx config get` only): `schema_version`, `onboarding_complete`.
+
+### TUI Output Mode
+
+By default, list commands (`lx theme list`, `lx plugin list`, `lx run list`, etc.) and
+workflow execution use an interactive ratatui TUI. You can disable this at three levels:
+
+**Config** — permanent, affects all sessions:
+```toml
+# ~/.config/lynx/config.toml
+[tui]
+enabled = false
+```
+
+**Environment variable** — per-session or per-command:
+```bash
+LYNX_NO_TUI=1 lx theme list   # plain text for this command only
+export LYNX_NO_TUI=1           # plain text for the whole session
+```
+
+**Automatic** — TUI is always disabled when:
+- stdout is not a TTY (pipe, redirect)
+- `LYNX_CONTEXT=agent` is set
+- `CLAUDECODE` or `CURSOR_CLI` is set (AI agent terminals)
+- `CI=true` or `CI=1` is set
+
+When TUI is disabled, all commands fall back to structured plain-text output suitable
+for scripts, CI pipelines, and AI agents.
 
 ### Edit Safety
 

@@ -43,12 +43,18 @@ The installer:
 1. Builds `lx` from source (requires Rust toolchain — installs if missing)
 2. Copies `lx` to `~/.local/bin`
 3. Copies the shell integration layer to `~/.config/lynx/`
-4. Adds one line to your `.zshrc`
+4. Launches `lx onboard` — an interactive TUI wizard to pick your theme, enable plugins, and wire up your shell
 
 Verify:
 ```bash
 lx --version
 lx doctor
+```
+
+To re-run the setup wizard at any time:
+```bash
+lx onboard          # re-open the wizard
+lx onboard --force  # re-run even if already completed
 ```
 
 ### Manual install
@@ -58,9 +64,8 @@ git clone https://github.com/lynx-sh/lynx.git
 cd lynx
 cargo build --release
 cp target/release/lx ~/.local/bin/
-mkdir -p ~/.config/lynx
-cp -r shell themes contexts ~/.config/lynx/
-echo 'source "${HOME}/.config/lynx/shell/init.zsh"' >> ~/.zshrc
+lx setup --source .   # copies shell/, themes/, writes config.toml
+lx onboard            # interactive setup wizard
 ```
 
 ---
@@ -76,8 +81,8 @@ lx doctor     # diagnoses any issues with your install
 ### 2. Pick a theme
 
 ```bash
-lx theme list           # see available themes
-lx theme set tokyo-night # switch to a powerline theme
+lx theme list           # browse themes (interactive TUI)
+lx theme set tokyo-night # switch to a theme
 lx theme convert <url>  # import an OMZ theme
 ```
 

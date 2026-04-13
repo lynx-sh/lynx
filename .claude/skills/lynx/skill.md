@@ -83,6 +83,8 @@ Error paths (D-036):
 List/browse output (D-040):
   Does this command output a list that will grow? yes / no
   If yes — uses InteractiveList TUI:              yes / VIOLATION — raw println! lists are forbidden
+  TUI gate (do NOT add your own): lynx_tui::show() / show_multi() call gate::tui_enabled() internally.
+  Gate checks: TTY + LYNX_NO_TUI + LYNX_CONTEXT=agent + CLAUDECODE + CURSOR_CLI + CI + config [tui] enabled.
 
 Duplicate logic check:
   Functions being added: ____
@@ -135,7 +137,7 @@ Behavioral bugs found during refactor → `pt add`, fix separately. Never mix.
 8. **LynxError for all user-facing errors** (D-036) — never raw `bail!()` for user output. Every error the user sees MUST have a hint line telling them what to do next. Read `patterns/error-protocol.md`.
 9. **Proactive issue filing** — broken code found during work → `pt add` immediately, never silently note and move on
 10. **No production panics** — no `.unwrap()` or `.expect()` in non-test code unless compile-time guaranteed (static regex, const builder)
-11. **TUI for all list output** (D-040) — any command that outputs a list which can grow must use `lynx_tui::InteractiveList`. Raw `println!` loops for list data are forbidden.
+11. **TUI for all list output** (D-040) — any command that outputs a list which can grow must use `lynx_tui::InteractiveList`. Raw `println!` loops for list data are forbidden. The TUI gate (`lynx_tui::gate::tui_enabled`) handles all fallback automatically — TTY check, `LYNX_CONTEXT=agent`, `LYNX_NO_TUI`, `CLAUDECODE`, `CURSOR_CLI`, `CI`, and `[tui] enabled = false` in config. Never add your own TTY check.
 12. **No duplicate logic** — before writing a function, grep for similar implementations. If it exists, reuse it. 4 copies of the same function = P2 issue.
 13. **No silent failures** — `let _ =` on a fallible operation is forbidden unless the failure is genuinely irrelevant (and commented why). At minimum, `tracing::warn!` the failure.
 14. **Zero clippy warnings** — `cargo clippy --all -- -D warnings` must pass before any commit. Warnings are not deferred. Baseline is always 0.
