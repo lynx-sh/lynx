@@ -13,6 +13,7 @@
 //! - `TuiColors` carries accent/success/warning/error/muted
 //! - Falls back to Tokyo Night defaults when colors are missing
 
+pub(crate) mod gate;
 mod item;
 mod list;
 mod preview;

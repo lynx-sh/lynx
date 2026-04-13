@@ -331,18 +331,11 @@ pub fn run_workflow_tui(
     }
 }
 
-/// Check if we should use the workflow TUI (same logic as list TUI).
+/// Check if we should use the workflow TUI.
+///
+/// Delegates to the shared gate — see `crate::gate::tui_enabled` for full check list.
 pub fn should_use_tui() -> bool {
-    use crossterm::tty::IsTty;
-    if !io::stdout().is_tty() {
-        return false;
-    }
-    if let Ok(ctx) = std::env::var(lynx_core::env_vars::LYNX_CONTEXT) {
-        if ctx == "agent" {
-            return false;
-        }
-    }
-    true
+    crate::gate::tui_enabled(None)
 }
 
 // ── Event loop ─────────────────────────────────────────────────────────────

@@ -63,6 +63,11 @@ pub const LYNX_LOG: &str = "LYNX_LOG";
 /// Set to `"1"` to suppress plugin loading failures and start in degraded mode.
 pub const LYNX_SAFE_MODE: &str = "LYNX_SAFE_MODE";
 
+/// Set to `"1"` to disable all interactive TUI output globally.
+/// When set, all commands fall back to plain terminal output regardless of TTY state.
+/// Useful for scripts, CI pipelines, or users who prefer plain output.
+pub const LYNX_NO_TUI: &str = "LYNX_NO_TUI";
+
 /// Set to `"1"` by `lx benchmark` to gate benchmark-only codepaths.
 pub const LYNX_BENCHMARK_MODE: &str = "LYNX_BENCHMARK_MODE";
 

@@ -448,7 +448,7 @@ pub fn show<T: ListItem>(
     title: &str,
     colors: &TuiColors,
 ) -> io::Result<Option<usize>> {
-    if !is_interactive() {
+    if !crate::gate::tui_enabled(None) {
         print_plain(items, title);
         return Ok(None);
     }
@@ -459,18 +459,3 @@ pub fn show<T: ListItem>(
     }
 }
 
-/// Check if we should run interactive mode.
-/// Returns false for pipes, CI, and agent context (D-040).
-fn is_interactive() -> bool {
-    use crossterm::tty::IsTty;
-    if !io::stdout().is_tty() {
-        return false;
-    }
-    // Agent context should get plain text — interactive TUI would block automation.
-    if let Ok(ctx) = std::env::var(lynx_core::env_vars::LYNX_CONTEXT) {
-        if ctx == "agent" {
-            return false;
-        }
-    }
-    true
-}
