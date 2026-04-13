@@ -167,3 +167,110 @@ fn home_dir() -> Result<PathBuf> {
         .map(PathBuf::from)
         .ok_or_else(|| anyhow::Error::from(lynx_core::error::LynxError::Shell("$HOME not set".into())))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn home_dir_returns_value_when_set() {
+        // HOME should be set in the test environment
+        let dir = home_dir().unwrap();
+        assert!(!dir.as_os_str().is_empty());
+    }
+
+    #[test]
+    fn remove_from_zshrc_no_file_is_ok() {
+        let tmp = tempfile::tempdir().unwrap();
+        // No .zshrc exists — should succeed silently
+        let result = remove_from_zshrc(tmp.path());
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn remove_from_zshrc_removes_init_line() {
+        let tmp = tempfile::tempdir().unwrap();
+        let zshrc = tmp.path().join(".zshrc");
+        let content = format!(
+            "# my config\n{}\nexport FOO=bar\n",
+            ZSHRC_INIT_LINE
+        );
+        std::fs::write(&zshrc, &content).unwrap();
+
+        remove_from_zshrc(tmp.path()).unwrap();
+
+        let after = std::fs::read_to_string(&zshrc).unwrap();
+        assert!(!after.contains(ZSHRC_INIT_LINE));
+        assert!(after.contains("my config"));
+        assert!(after.contains("FOO=bar"));
+    }
+
+    #[test]
+    fn remove_from_zshrc_no_init_line_is_noop() {
+        let tmp = tempfile::tempdir().unwrap();
+        let zshrc = tmp.path().join(".zshrc");
+        let content = "export PATH=/usr/bin\n";
+        std::fs::write(&zshrc, content).unwrap();
+
+        remove_from_zshrc(tmp.path()).unwrap();
+
+        let after = std::fs::read_to_string(&zshrc).unwrap();
+        assert_eq!(after, content);
+    }
+
+    #[test]
+    fn remove_from_zshrc_preserves_trailing_newline() {
+        let tmp = tempfile::tempdir().unwrap();
+        let zshrc = tmp.path().join(".zshrc");
+        let content = format!("line1\n{}\nline3\n", ZSHRC_INIT_LINE);
+        std::fs::write(&zshrc, &content).unwrap();
+
+        remove_from_zshrc(tmp.path()).unwrap();
+
+        let after = std::fs::read_to_string(&zshrc).unwrap();
+        assert!(after.ends_with('\n'));
+    }
+
+    #[test]
+    fn list_user_files_does_not_panic_on_missing_dir() {
+        let tmp = tempfile::tempdir().unwrap();
+        // Should not panic even if plugins/themes dirs don't exist
+        list_user_files(tmp.path());
+    }
+
+    #[test]
+    fn list_user_files_lists_entries() {
+        let tmp = tempfile::tempdir().unwrap();
+        let plugins = tmp.path().join("plugins");
+        std::fs::create_dir_all(&plugins).unwrap();
+        std::fs::write(plugins.join("git"), "").unwrap();
+        // Should not panic
+        list_user_files(tmp.path());
+    }
+
+    #[test]
+    fn uninstall_args_defaults() {
+        use clap::Parser;
+        #[derive(Parser)]
+        struct W {
+            #[command(flatten)]
+            args: UninstallArgs,
+        }
+        let w = W::parse_from(["test"]);
+        assert!(!w.args.purge);
+        assert!(!w.args.yes);
+    }
+
+    #[test]
+    fn uninstall_args_purge_yes() {
+        use clap::Parser;
+        #[derive(Parser)]
+        struct W {
+            #[command(flatten)]
+            args: UninstallArgs,
+        }
+        let w = W::parse_from(["test", "--purge", "--yes"]);
+        assert!(w.args.purge);
+        assert!(w.args.yes);
+    }
+}

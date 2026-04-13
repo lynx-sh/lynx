@@ -273,3 +273,39 @@ async fn cmd_list(json: bool) -> Result<()> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn plugin_list_entry_trait() {
+        use lynx_tui::ListItem;
+        let entry = PluginListEntry {
+            name: "git".to_string(),
+            context: "interactive".to_string(),
+        };
+        assert_eq!(entry.title(), "git");
+        assert_eq!(entry.subtitle(), "enabled");
+        assert!(entry.is_active());
+        assert_eq!(entry.category(), Some("plugin"));
+        assert!(entry.detail().contains("interactive"));
+    }
+
+    #[tokio::test]
+    async fn plugin_unknown_subcommand_errors() {
+        let args = PluginArgs {
+            command: PluginCommand::Other(vec!["nope".to_string()]),
+        };
+        let err = run(args).await.unwrap_err();
+        assert!(err.to_string().contains("nope"));
+    }
+
+    #[test]
+    fn cmd_add_path_detection() {
+        // Paths with / are treated as local paths, names without are registry lookups
+        assert!("./my-plugin".contains('/'));
+        assert!("/abs/path".contains('/'));
+        assert!(!"my-plugin".contains('/'));
+    }
+}

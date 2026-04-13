@@ -211,6 +211,71 @@ async fn install_plugin(
     Ok(())
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn install_empty_names_returns_error() {
+        let args = InstallPkgArgs {
+            names: vec![],
+            force: false,
+        };
+        let err = run_install(args).await.unwrap_err();
+        assert!(err.to_string().contains("provide at least one package name"));
+    }
+
+    #[test]
+    fn install_args_defaults() {
+        use clap::Parser;
+        #[derive(Parser)]
+        struct W {
+            #[command(flatten)]
+            args: InstallPkgArgs,
+        }
+        // InstallPkgArgs needs at least names via positional
+        let w = W::parse_from(["test", "fzf"]);
+        assert_eq!(w.args.names, vec!["fzf"]);
+        assert!(!w.args.force);
+    }
+
+    #[test]
+    fn install_args_force_flag() {
+        use clap::Parser;
+        #[derive(Parser)]
+        struct W {
+            #[command(flatten)]
+            args: InstallPkgArgs,
+        }
+        let w = W::parse_from(["test", "--force", "eza"]);
+        assert!(w.args.force);
+    }
+
+    #[test]
+    fn install_args_multiple_names() {
+        use clap::Parser;
+        #[derive(Parser)]
+        struct W {
+            #[command(flatten)]
+            args: InstallPkgArgs,
+        }
+        let w = W::parse_from(["test", "fzf", "eza", "bat"]);
+        assert_eq!(w.args.names, vec!["fzf", "eza", "bat"]);
+    }
+
+    #[test]
+    fn uninstall_args_parses() {
+        use clap::Parser;
+        #[derive(Parser)]
+        struct W {
+            #[command(flatten)]
+            args: UninstallPkgArgs,
+        }
+        let w = W::parse_from(["test", "fzf"]);
+        assert_eq!(w.args.name, "fzf");
+    }
+}
+
 pub async fn run_uninstall(args: UninstallPkgArgs) -> Result<()> {
     let name = &args.name;
     let plugins_dir = paths::installed_plugins_dir();

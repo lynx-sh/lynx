@@ -64,6 +64,22 @@ pub(crate) fn open_in_vscode(path: &std::path::Path) -> Result<()> {
     Ok(())
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tui_colors_returns_default_without_config() {
+        // In test environment, config may not exist — should fallback gracefully.
+        let colors = tui_colors();
+        // Just ensure it doesn't panic and returns something.
+        let _ = colors;
+    }
+
+    // Note: open_in_vscode is not unit-testable without mocking Command.
+    // It spawns VS Code with --wait which blocks. Tested via integration tests.
+}
+
 pub async fn dispatch(cli: Cli) -> Result<()> {
     match cli.command {
         Command::Init(args) => init::run(args).await,

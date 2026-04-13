@@ -215,3 +215,106 @@ fn compute_checksum_status(name: &str, plugins_dir: &std::path::Path) -> String 
         Err(_) => "? could not compute".to_string(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_entry(name: &str, source: &str, fns: Vec<String>, aliases: Vec<String>) -> AuditEntry {
+        AuditEntry {
+            name: name.to_string(),
+            source: source.to_string(),
+            context: "all".to_string(),
+            binaries: "none".to_string(),
+            fn_count: fns.len(),
+            alias_count: aliases.len(),
+            description: "test plugin".to_string(),
+            version: "1.0.0".to_string(),
+            authors: "test".to_string(),
+            functions: fns,
+            aliases,
+            hooks: "none".to_string(),
+            lazy: false,
+            disabled_in: "none (loads everywhere)".to_string(),
+            checksum_status: String::new(),
+        }
+    }
+
+    #[test]
+    fn audit_entry_title_is_name() {
+        use lynx_tui::ListItem;
+        let entry = make_entry("git", "bundled", vec!["git_status".into()], vec![]);
+        assert_eq!(entry.title(), "git");
+    }
+
+    #[test]
+    fn audit_entry_subtitle_shows_counts() {
+        use lynx_tui::ListItem;
+        let entry = make_entry("git", "bundled", vec!["a".into(), "b".into()], vec!["g".into()]);
+        let sub = entry.subtitle();
+        assert!(sub.contains("2 fn"), "subtitle should show fn count: {sub}");
+        assert!(sub.contains("1 alias"), "subtitle should show alias count: {sub}");
+    }
+
+    #[test]
+    fn audit_entry_detail_includes_all_fields() {
+        use lynx_tui::ListItem;
+        let entry = make_entry("git", "bundled", vec!["git_status".into()], vec!["gs".into()]);
+        let detail = entry.detail();
+        assert!(detail.contains("Name:"));
+        assert!(detail.contains("Version:"));
+        assert!(detail.contains("fn  git_status"));
+        assert!(detail.contains("alias gs"));
+    }
+
+    #[test]
+    fn audit_entry_detail_empty_exports() {
+        use lynx_tui::ListItem;
+        let entry = make_entry("empty", "bundled", vec![], vec![]);
+        let detail = entry.detail();
+        assert!(detail.contains("functions: none"));
+        assert!(detail.contains("aliases:   none"));
+    }
+
+    #[test]
+    fn audit_entry_detail_with_checksum() {
+        use lynx_tui::ListItem;
+        let mut entry = make_entry("git", "bundled", vec![], vec![]);
+        entry.checksum_status = "��� verified".to_string();
+        let detail = entry.detail();
+        assert!(detail.contains("Checksum:"));
+        assert!(detail.contains("verified"));
+    }
+
+    #[test]
+    fn audit_entry_category_is_plugin() {
+        use lynx_tui::ListItem;
+        let entry = make_entry("x", "bundled", vec![], vec![]);
+        assert_eq!(entry.category(), Some("plugin"));
+    }
+
+    #[test]
+    fn audit_missing_manifest_entry() {
+        // When manifest is missing, entry should have "?" for unknown fields
+        let entry = AuditEntry {
+            name: "broken".to_string(),
+            source: "missing".to_string(),
+            context: "?".to_string(),
+            binaries: "?".to_string(),
+            fn_count: 0,
+            alias_count: 0,
+            description: String::new(),
+            version: String::new(),
+            authors: String::new(),
+            functions: vec![],
+            aliases: vec![],
+            hooks: "?".to_string(),
+            lazy: false,
+            disabled_in: "?".to_string(),
+            checksum_status: String::new(),
+        };
+        use lynx_tui::ListItem;
+        assert_eq!(entry.title(), "broken");
+        assert!(entry.subtitle().contains("missing"));
+    }
+}
