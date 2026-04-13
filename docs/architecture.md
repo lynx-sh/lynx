@@ -164,6 +164,18 @@ execute_workflow_streaming(..., tx)  // streaming path
 Both paths share the same step scheduling, retry/timeout handling, abort rules,
 and result assembly. The only difference is whether `StreamEvent` messages are emitted.
 
+`execute_workflow_impl` detects context once at startup (`lynx_workflow::context::is_agent_context()`)
+and threads it through every step:
+
+- **Interactive (non-agent):** PTY-spawned child; each output line fires a `StepOutput` event
+  in real time. Falls back to `Stdio::piped()` if PTY allocation fails.
+- **Agent (`CLAUDECODE`, `CURSOR_CLI`, `LYNX_CONTEXT=agent`):** `Stdio::piped()` internally;
+  all `StepOutput` events are suppressed. On step failure, a single `StepOutput` with the last
+  20 stderr lines is emitted so the agent can diagnose the failure.
+
+All step stdout/stderr is buffered into `StepResult.output_lines` / `StepResult.stderr_lines`
+(capped at 10,000 lines per stream) and persisted to the job JSON regardless of context.
+
 ---
 
 ## Config Mutation Protocol

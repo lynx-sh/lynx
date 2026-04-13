@@ -183,8 +183,16 @@ LYNX_NO_TUI=1 lx run <name>        # plain streaming output (no TUI)
 ```
 
 The workflow TUI is automatically disabled for pipes, CI (`CI=true`), AI agent terminals
-(`CLAUDECODE`, `CURSOR_CLI`), and when `[tui] enabled = false` is set in config. Plain
-streaming output is always used in those contexts.
+(`CLAUDECODE`, `CURSOR_CLI`), and when `[tui] enabled = false` is set in config.
+
+**Interactive mode** uses a PTY so programs that buffer output when stdout is piped
+(e.g. `cargo`, `grep`) flush line-by-line. If a PTY cannot be allocated (e.g. in
+containers without `/dev/ptmx`), Lynx falls back to piped I/O automatically.
+
+**Agent mode** (`CLAUDECODE`, `CURSOR_CLI`, or `LYNX_CONTEXT=agent`) suppresses all
+per-line output to avoid flooding the agent's context window. If a step fails, a single
+excerpt of the last 20 stderr lines is emitted so the agent can diagnose the failure.
+`StepStarted` and `StepFinished` events always fire regardless of context.
 
 **Flags**
 
@@ -212,7 +220,7 @@ Manage workflow job history and running jobs.
 | `lx jobs list`              | Browse recent jobs (TUI) with status and duration — plain text when TUI is disabled |
 | `lx jobs view <id>`         | Print full JSON record for a job                    |
 | `lx jobs kill <id>`         | Send kill signal to a running job                   |
-| `lx jobs log <id>`          | Print captured output for a job                     |
+| `lx jobs log <id>`          | Print captured stdout/stderr for a job (always logged, regardless of context) |
 | `lx jobs clean`             | Remove job records older than 72 hours (default)    |
 | `lx jobs clean --hours <N>` | Remove records older than N hours                   |
 
