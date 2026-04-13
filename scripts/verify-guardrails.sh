@@ -198,6 +198,16 @@ elif ! command -v bats >/dev/null 2>&1; then
   echo "  (skipping bats — not installed)"
 fi
 
+# ── 8. Env-var literal drift ─────────────────────────────────────────────────
+
+_hdr "Env-var literal drift"
+
+if bash "$REPO_ROOT/scripts/check-env-vars.sh" 2>&1; then
+  PASS=$((PASS + 1))
+else
+  _fail "env-var literal drift detected — run scripts/check-env-vars.sh for details"
+fi
+
 # ── Summary ───────────────────────────────────────────────────────────────────
 
 echo
