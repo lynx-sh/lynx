@@ -43,10 +43,10 @@ teardown() {
   lx intro on
   run lx intro off
   [ "$status" -eq 0 ]
-  local config
-  config=$(cat "$HOME/.config/lynx/config.toml")
-  # enabled should not be true after off
-  [[ "$config" != *"enabled = true"* ]]
+  local intro_section
+  intro_section=$(awk '/^\[intro\]/{found=1} found && /^\[/{if(!/^\[intro\]/)found=0} found{print}' "$HOME/.config/lynx/config.toml")
+  # [intro] enabled should not be true after off
+  [[ "$intro_section" != *"enabled = true"* ]]
 }
 
 @test "lx intro set with valid slug succeeds and writes active in config" {
