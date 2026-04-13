@@ -291,43 +291,102 @@ fn print_daemon_examples() {
 fn print_workflow_examples() {
     println!(
         r#"
-  lx run — examples
-  ──────────────────
+  lx run — workflow examples
+  ──────────────────────────
 
-  # List available workflows
-  lx run list
+  Workflows are saved recipes — a list of commands you run together.
+  They live as .toml files in ~/.config/lynx/workflows/
 
-  # Run a workflow with parameters
-  lx run deploy env=staging version=1.2.3
+  ── Example 1: Simple — run two commands in sequence ──────────
 
-  # Preview steps without executing
-  lx run deploy --dry-run env=production
+  File: ~/.config/lynx/workflows/check.toml
 
-  # Run in background immediately
-  lx run deploy --bg env=production
+    [workflow]
+    name = "check"
+    description = "Lint and test my project"
 
-  # Skip all confirmation prompts
-  lx run deploy --yes env=production
+    [[step]]
+    name = "lint"
+    run = "cargo clippy --all"
 
-  # Workflow TOML format (~/.config/lynx/workflows/deploy.toml):
-  #   [workflow]
-  #   name = "deploy"
-  #   description = "Deploy to environment"
-  #
-  #   [[workflow.param]]
-  #   name = "env"
-  #   type = "string"
-  #   choices = ["staging", "production"]
-  #
-  #   [[step]]
-  #   name = "build"
-  #   run = "cargo build --release"
-  #
-  #   [[step]]
-  #   name = "deploy"
-  #   runner = "bash"
-  #   run = "./deploy.sh $env"
-  #   confirm = true
+    [[step]]
+    name = "test"
+    run = "cargo nextest run --all"
+
+  Run it:  lx run check
+
+  ── Example 2: Parallel steps — run lint + test at the same time ──
+
+    [[step]]
+    name = "lint"
+    run = "cargo clippy --all"
+    group = "checks"              # <-- same group = parallel
+
+    [[step]]
+    name = "test"
+    run = "cargo nextest run"
+    group = "checks"              # <-- same group = parallel
+
+    [[step]]
+    name = "build"
+    run = "cargo build --release"
+    depends_on = ["lint", "test"] # <-- waits for both to finish
+
+  ── Example 3: Parameters — make a workflow reusable ─────────
+
+    [workflow]
+    name = "deploy"
+    description = "Deploy to an environment"
+
+    [[workflow.param]]
+    name = "env"
+    type = "string"
+    choices = ["staging", "production"]
+
+    [[workflow.param]]
+    name = "skip_tests"
+    type = "bool"
+    default = "false"
+
+    [[step]]
+    name = "build"
+    run = "cargo build --release"
+
+    [[step]]
+    name = "push"
+    runner = "bash"
+    run = "./deploy.sh $env"
+    confirm = true                # <-- asks "are you sure?" first
+
+  Run it:  lx run deploy env=staging
+           lx run deploy env=production skip_tests=true
+
+  ── Example 4: Error handling and timeouts ───────────────────
+
+    [[step]]
+    name = "migrate"
+    run = "diesel migration run"
+    timeout_sec = 120             # kill if it takes > 2 minutes
+    on_fail = "abort"             # stop the whole workflow (default)
+
+    [[step]]
+    name = "seed"
+    run = "cargo run --bin seed"
+    on_fail = "continue"          # keep going even if this fails
+
+    [[step]]
+    name = "health-check"
+    run = "curl -f http://localhost:8080/health"
+    on_fail = "retry"             # try again on failure
+    retry_count = 3               # up to 3 times
+
+  ── Useful commands ──────────────────────────────────────────
+
+  lx run list                     browse available workflows
+  lx run deploy --dry-run         see what would run (no execution)
+  lx run deploy --bg              run in background
+  lx run deploy --yes             skip confirmation prompts
+  lx jobs list                    see running/finished jobs
 "#
     );
 }

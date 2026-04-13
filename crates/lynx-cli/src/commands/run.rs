@@ -6,7 +6,7 @@ use std::collections::HashMap;
 #[derive(Args)]
 pub struct RunArgs {
     /// Workflow name (or 'list' to show available workflows)
-    pub workflow: String,
+    pub workflow: Option<String>,
 
     /// Parameters as key=value pairs
     #[arg(trailing_var_arg = true)]
@@ -26,13 +26,22 @@ pub struct RunArgs {
 }
 
 pub async fn run(args: RunArgs) -> Result<()> {
+    // Bare `lx run` — show help
+    let workflow_name = match args.workflow {
+        Some(name) => name,
+        None => {
+            print_run_help();
+            return Ok(());
+        }
+    };
+
     // Handle 'lx run list'
-    if args.workflow == "list" {
+    if workflow_name == "list" {
         return cmd_list();
     }
 
     // Load workflow
-    let wf = lynx_workflow::store::load_workflow(&args.workflow)?;
+    let wf = lynx_workflow::store::load_workflow(&workflow_name)?;
 
     // Parse key=value params
     let mut provided = HashMap::new();
@@ -127,6 +136,62 @@ impl lynx_tui::ListItem for WorkflowListEntry {
         format!("{}\n\nRun: lx run {}", self.description, self.name)
     }
     fn category(&self) -> Option<&str> { Some("workflow") }
+}
+
+fn print_run_help() {
+    println!(
+        r#"
+  lx run — workflow runner
+  ────────────────────────
+
+  Workflows let you save a sequence of commands as a reusable recipe.
+  Instead of typing the same build/test/deploy steps every time, you
+  write them once in a TOML file and run them with one command.
+
+  Quick start:
+    1. Create a workflow file:
+       ~/.config/lynx/workflows/check.toml
+
+    2. Add your steps:
+
+       [workflow]
+       name = "check"
+       description = "Lint and test my project"
+
+       [[step]]
+       name = "lint"
+       run = "cargo clippy --all"
+
+       [[step]]
+       name = "test"
+       run = "cargo nextest run --all"
+
+    3. Run it:
+       lx run check
+
+  That's it! Lynx runs each step in order and shows you the results.
+
+  Going further:
+    Parallel steps    give steps the same group name
+    Dependencies      depends_on = ["step1", "step2"]
+    Parameters        lx run deploy env=prod
+    Dry run           lx run deploy --dry-run
+    Background        lx run deploy --bg
+    Skip prompts      lx run deploy --yes
+    Different runner  runner = "bash", "python", "node", etc.
+    Retry on fail     on_fail = "retry" + retry_count = 3
+    Timeout           timeout_sec = 300
+    Confirm first     confirm = true
+
+  Commands:
+    lx run <name>          run a workflow
+    lx run <name> --help   see workflow-specific params
+    lx run list            browse available workflows
+    lx examples run        full examples with TOML snippets
+
+  Workflow files live in: ~/.config/lynx/workflows/
+"#
+    );
 }
 
 fn cmd_list() -> Result<()> {
