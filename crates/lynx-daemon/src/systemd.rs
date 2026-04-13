@@ -93,10 +93,10 @@ impl ServiceBackend for SystemdBackend {
             .context("systemctl enable failed")?;
 
         if !out.status.success() {
-            anyhow::bail!(
+            return Err(lynx_core::error::LynxError::Daemon(format!(
                 "systemctl enable failed: {}",
                 String::from_utf8_lossy(&out.stderr)
-            );
+            )).into());
         }
 
         Ok(())
@@ -116,10 +116,10 @@ impl ServiceBackend for SystemdBackend {
     fn start(&self) -> Result<()> {
         let out = self.systemctl(&["start", brand::SYSTEMD_SERVICE])?;
         if !out.status.success() {
-            anyhow::bail!(
+            return Err(lynx_core::error::LynxError::Daemon(format!(
                 "systemctl start failed: {}",
                 String::from_utf8_lossy(&out.stderr)
-            );
+            )).into());
         }
         Ok(())
     }
@@ -127,10 +127,10 @@ impl ServiceBackend for SystemdBackend {
     fn stop(&self) -> Result<()> {
         let out = self.systemctl(&["stop", brand::SYSTEMD_SERVICE])?;
         if !out.status.success() {
-            anyhow::bail!(
+            return Err(lynx_core::error::LynxError::Daemon(format!(
                 "systemctl stop failed: {}",
                 String::from_utf8_lossy(&out.stderr)
-            );
+            )).into());
         }
         Ok(())
     }
@@ -138,10 +138,10 @@ impl ServiceBackend for SystemdBackend {
     fn restart(&self) -> Result<()> {
         let out = self.systemctl(&["restart", brand::SYSTEMD_SERVICE])?;
         if !out.status.success() {
-            anyhow::bail!(
+            return Err(lynx_core::error::LynxError::Daemon(format!(
                 "systemctl restart failed: {}",
                 String::from_utf8_lossy(&out.stderr)
-            );
+            )).into());
         }
         Ok(())
     }
