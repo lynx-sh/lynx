@@ -1,4 +1,5 @@
 pub mod benchmark;
+pub mod help;
 pub mod dashboard;
 pub mod dev;
 pub mod intro;

@@ -209,6 +209,29 @@ async fn cmd_disable(name: &str) -> Result<()> {
     Ok(())
 }
 
+struct PluginListEntry {
+    name: String,
+    context: String,
+}
+
+impl lynx_tui::ListItem for PluginListEntry {
+    fn title(&self) -> &str {
+        &self.name
+    }
+    fn subtitle(&self) -> String {
+        "enabled".to_string()
+    }
+    fn detail(&self) -> String {
+        format!("Status: enabled\nContext: {}", self.context)
+    }
+    fn category(&self) -> Option<&str> {
+        Some("plugin")
+    }
+    fn is_active(&self) -> bool {
+        true
+    }
+}
+
 async fn cmd_list(json: bool) -> Result<()> {
     let config = load_config()?;
     let context_str = format!("{:?}", config.active_context).to_lowercase();
@@ -220,14 +243,32 @@ async fn cmd_list(json: bool) -> Result<()> {
             .map(|p| serde_json::json!({ "name": p, "context": context_str, "status": "enabled" }))
             .collect();
         println!("{}", serde_json::to_string_pretty(&plugins)?);
-    } else if config.enabled_plugins.is_empty() {
-        println!("No plugins installed.");
-    } else {
-        println!("{:<20} {:<12} CONTEXT", "NAME", "STATUS");
-        println!("{}", "-".repeat(44));
-        for p in &config.enabled_plugins {
-            println!("{:<20} {:<12} {}", p, "enabled", context_str);
-        }
+        return Ok(());
     }
+
+    if config.enabled_plugins.is_empty() {
+        println!("No plugins installed.");
+        return Ok(());
+    }
+
+    let entries: Vec<PluginListEntry> = config
+        .enabled_plugins
+        .iter()
+        .map(|p| PluginListEntry {
+            name: p.clone(),
+            context: context_str.clone(),
+        })
+        .collect();
+
+    let tui_colors = match lynx_theme::loader::load(&config.active_theme) {
+        Ok(theme) => lynx_tui::TuiColors::from_palette(&theme.colors),
+        Err(_) => lynx_tui::TuiColors::default(),
+    };
+
+    if let Some(idx) = lynx_tui::show(&entries, "Plugins", &tui_colors)? {
+        let name = &entries[idx].name;
+        println!("  Disable '{name}'? Use: lx plugin disable {name}");
+    }
+
     Ok(())
 }

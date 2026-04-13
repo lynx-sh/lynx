@@ -19,11 +19,15 @@ async fn main() {
             e.kind(),
             ErrorKind::MissingSubcommand | ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand
         ) => {
-            // Walk env args to find the deepest matching subcommand and print its
-            // help to stdout. Fall back to root help if no subcommand matched.
             let args: Vec<String> = std::env::args().skip(1).collect();
-            let root = Cli::command();
-            print_subcommand_help(root, &args)
+            if args.is_empty() || args.first().map(|s| s.as_str()) == Some("help") {
+                // Bare `lx` or `lx help` → interactive help browser.
+                commands::help::show_interactive_help()
+            } else {
+                // `lx theme` etc. → show that subcommand's help inline.
+                let root = Cli::command();
+                print_subcommand_help(root, &args)
+            }
         }
         Err(e) if matches!(e.kind(), ErrorKind::InvalidSubcommand) => {
             // Unknown top-level subcommand — render through our error system
