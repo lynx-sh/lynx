@@ -8,6 +8,7 @@ Every task. No exceptions.
 - **How to test:** `cargo nextest run --all` (final verification only — use `-p lynx-<crate>` during work)
 - **Decisions gate code:** `pt decisions <component>` before implementing anything non-trivial
 - **File issues proactively:** broken code, smells, missing tests → `pt add` immediately with severity
+- **Pre-code checklist:** fill the relevant GATE below and emit it BEFORE writing any code. Blank fields = violation.
 
 ## Task Router
 
@@ -22,8 +23,6 @@ Every task. No exceptions.
 | Plugin work | `patterns/plugin-protocol.md` |
 | Testing questions | `patterns/testing.md` |
 | Block/phase scaffolding | `patterns/phase-protocol.md` |
-
-Gates are fill-in-the-blank audit trails. Copy, fill every field, emit before writing code. Blank = violation.
 
 ---
 
@@ -68,12 +67,28 @@ New crate needed:   no / yes — justified: ____
 Cross-crate deps:   none / lynx-X → lynx-Y — checked crate-protocol.md
 ```
 ```
-G2 RESPONSIBILITY CHECK (D-042)
-For each file being modified or created:
-  File:             ____
-  Single domain:    yes — "it does ____" / no — needs split: ____
-  300+ lines after: yes/no — responsibility still singular: yes/no
-New files created:  ____ — each owns exactly one domain: ____
+G2 PRE-CODE AUDIT
+Responsibility (D-042):
+  For each file modified/created:
+    File:           ____
+    Single domain:  yes — "it does ____" / no — needs split first
+    300+ lines:     yes/no — responsibility still singular: yes/no
+
+Error paths (D-036):
+  New user-facing errors: yes / none
+  If yes — all use LynxError::____: yes / VIOLATION — bail!() is forbidden for user output
+  Hint is actionable:     yes — "run lx ____ to ____"
+
+List/browse output (D-040):
+  Does this command output a list that will grow? yes / no
+  If yes — uses InteractiveList TUI:              yes / VIOLATION — raw println! lists are forbidden
+
+Duplicate logic check:
+  Functions being added: ____
+  Grepped for similar: rg "fn_name\|pattern" crates/ — 0 existing / N existing → reuse ____
+
+Silent failures:
+  Error paths added: ____ — all propagated or logged: yes / VIOLATION — let _ = on fallible ops is forbidden
 ```
 ```
 G3 IMPLEMENTATION
@@ -114,9 +129,12 @@ Behavioral bugs found during refactor → `pt add`, fix separately. Never mix.
 5. **Secret redaction** on all user-facing output that may include config values
 6. **Single-responsibility files** (D-042) — one domain per file, no hard line ceiling. 300 lines = check responsibility, not mandate a split
 7. **`pt decisions <component>`** before implementing non-trivial design
-8. **LynxError for all user-facing errors** (D-036) — never raw `bail!()` for user output
+8. **LynxError for all user-facing errors** (D-036) — never raw `bail!()` for user output. Every error the user sees MUST have a hint line telling them what to do next. Read `patterns/error-protocol.md`.
 9. **Proactive issue filing** — broken code found during work → `pt add` immediately, never silently note and move on
-10. **No production panics** — no `.unwrap()` or `.expect()` in non-test code unless the value is compile-time guaranteed (static regex, const builder). Use `?`, `.ok()`, `.unwrap_or_default()`, or `.unwrap_or_else(|e| e.into_inner())` for mutex locks
+10. **No production panics** — no `.unwrap()` or `.expect()` in non-test code unless compile-time guaranteed (static regex, const builder)
+11. **TUI for all list output** (D-040) — any command that outputs a list which can grow must use `lynx_tui::InteractiveList`. Raw `println!` loops for list data are forbidden.
+12. **No duplicate logic** — before writing a function, grep for similar implementations. If it exists, reuse it. 4 copies of the same function = P2 issue.
+13. **No silent failures** — `let _ =` on a fallible operation is forbidden unless the failure is genuinely irrelevant (and commented why). At minimum, `tracing::warn!` the failure.
 
 ## Session Protocol
 ```bash
@@ -130,6 +148,7 @@ cargo nextest run -p lynx-<X>  # targeted tests during work
 
 # END
 cargo nextest run --all        # final full suite — once only
+cargo clippy --all             # zero warnings — fix any new ones
 git commit                     # commit before pt done
 pt done S-XXX success "what was done" "what next agent does first"
 ```
