@@ -30,6 +30,12 @@ pub struct WorkflowMeta {
     /// Typed parameters the workflow accepts.
     #[serde(rename = "param", default)]
     pub params: Vec<WorkflowParam>,
+    /// Default working directory for all steps. Overridden per-step by `cwd`.
+    /// Supports param substitution (e.g. `path = "$source"`).
+    /// When set, the workflow always runs from this directory regardless of
+    /// where `lx run` is invoked.
+    #[serde(default)]
+    pub path: Option<String>,
 }
 
 /// A typed parameter for parameterized workflows.

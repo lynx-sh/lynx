@@ -29,6 +29,7 @@ fn make_workflow(steps: Vec<Step>) -> Workflow {
             description: String::new(),
             context: None,
             params: vec![],
+            path: None,
         },
         steps,
     }

@@ -107,6 +107,13 @@ async fn execute_workflow_impl(
     let mut step_results = Vec::new();
     let mut aborted = false;
 
+    // Resolve workflow-level path once (supports param substitution).
+    let workflow_path: Option<String> = workflow
+        .workflow
+        .path
+        .as_deref()
+        .map(|p| substitute_params(p, params));
+
     let plan = build_plan(&workflow.steps);
 
     for batch in &plan {
@@ -138,7 +145,7 @@ async fn execute_workflow_impl(
                     name: step.name.clone(),
                 },
             );
-            let result = execute_step(step, params, &mode, stream_tx.clone()).await;
+            let result = execute_step(step, params, &mode, stream_tx.clone(), workflow_path.as_deref()).await;
             emit(
                 &stream_tx,
                 StreamEvent::StepFinished {
@@ -172,10 +179,11 @@ async fn execute_workflow_impl(
                 let mode = mode.clone();
                 let sem = semaphore.clone();
                 let tx = stream_tx.clone();
+                let wf_path = workflow_path.clone();
                 tokio::spawn(async move {
                     // Semaphore is Arc-owned by the enclosing scope — never closed.
                     let _permit = sem.acquire().await.expect("semaphore is never closed");
-                    let result = execute_step(&step, &params, &mode, tx.clone()).await;
+                    let result = execute_step(&step, &params, &mode, tx.clone(), wf_path.as_deref()).await;
                     if let Some(sender) = tx {
                         let _ = sender.send(StreamEvent::StepFinished {
                             name: result.name.clone(),
@@ -249,11 +257,14 @@ fn emit(tx: &Option<std::sync::mpsc::Sender<StreamEvent>>, event: StreamEvent) {
 }
 
 /// Execute a single step.
+/// `workflow_path` is the resolved `[workflow] path` value — used as the cwd
+/// fallback when the step does not specify its own `cwd`.
 async fn execute_step(
     step: &Step,
     params: &HashMap<String, String>,
     mode: &ExecMode,
     stream_tx: Option<std::sync::mpsc::Sender<StreamEvent>>,
+    workflow_path: Option<&str>,
 ) -> StepResult {
     let start = epoch_ms();
 
@@ -315,7 +326,13 @@ async fn execute_step(
             );
         }
 
-        match run_command(&cmd, step, mode, &step.name, stream_tx.as_ref()).await {
+        // Resolve effective cwd: step-level cwd (param-substituted) wins,
+        // then workflow-level path (param-substituted), then none.
+        let step_cwd = step.cwd.as_deref().map(|c| substitute_params(c, params));
+        let resolved_cwd: Option<String> = step_cwd
+            .or_else(|| workflow_path.map(|p| substitute_params(p, params)));
+
+        match run_command(&cmd, step, mode, &step.name, stream_tx.as_ref(), resolved_cwd.as_deref()).await {
             Ok(code) => {
                 if code == 0 {
                     return StepResult {
@@ -360,6 +377,7 @@ async fn run_command(
     _mode: &ExecMode,
     step_name: &str,
     stream_tx: Option<&std::sync::mpsc::Sender<StreamEvent>>,
+    effective_cwd: Option<&str>,
 ) -> Result<i32, ()> {
     let mut command = tokio::process::Command::new(&cmd.binary);
     command.args(&cmd.args);
@@ -372,7 +390,7 @@ async fn run_command(
     for (k, v) in &step.env {
         command.env(k, v);
     }
-    if let Some(ref cwd) = step.cwd {
+    if let Some(cwd) = effective_cwd {
         command.current_dir(cwd);
     }
 
