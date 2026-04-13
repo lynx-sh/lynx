@@ -123,10 +123,7 @@ pub fn install_tool_via_pm(entry: &RegistryEntry) -> Result<String> {
         if lynx_core::paths::find_binary(binary_name).is_none() {
             // Some tools install under a different name — check the entry name too.
             if lynx_core::paths::find_binary(&entry.name).is_none() {
-                eprintln!(
-                    "warning: '{}' installed but binary '{}' not found on PATH",
-                    entry.name, binary_name
-                );
+                tracing::warn!("'{}' installed but binary '{}' not found on PATH", entry.name, binary_name);
             }
         }
 
@@ -242,18 +239,28 @@ fn download_text(url: &str) -> Result<String> {
 
 // ── Uninstall ───────────────────────────────────────────────────────────────
 
+/// Result of uninstalling a tool's Lynx integration.
+pub struct UninstallResult {
+    /// Whether the plugin directory was removed.
+    pub plugin_removed: bool,
+    /// Command the user should run to remove the system binary.
+    pub system_uninstall_hint: String,
+}
+
 /// Remove the auto-generated Lynx plugin for a tool.
-/// Does NOT remove the system binary — prints instructions instead.
-pub fn uninstall_tool(name: &str, plugins_dir: &Path) -> Result<()> {
+/// Does NOT remove the system binary — returns a hint for the caller to display.
+pub fn uninstall_tool(name: &str, plugins_dir: &Path) -> Result<UninstallResult> {
     let plugin_dir = plugins_dir.join(name);
-    if plugin_dir.exists() {
+    let plugin_removed = if plugin_dir.exists() {
         std::fs::remove_dir_all(&plugin_dir)
             .with_context(|| format!("failed to remove plugin dir {}", plugin_dir.display()))?;
-        println!("removed Lynx plugin for '{name}'");
-    }
+        true
+    } else {
+        false
+    };
 
     let pm = detect_package_manager();
-    let uninstall_hint = match pm {
+    let system_uninstall_hint = match pm {
         PackageManager::Brew => format!("brew uninstall {name}"),
         PackageManager::Apt => format!("sudo apt remove {name}"),
         PackageManager::Dnf => format!("sudo dnf remove {name}"),
@@ -261,8 +268,11 @@ pub fn uninstall_tool(name: &str, plugins_dir: &Path) -> Result<()> {
         PackageManager::Cargo => format!("cargo uninstall {name}"),
         PackageManager::None => format!("manually remove the '{name}' binary"),
     };
-    println!("system binary preserved — to remove it: {uninstall_hint}");
-    Ok(())
+
+    Ok(UninstallResult {
+        plugin_removed,
+        system_uninstall_hint,
+    })
 }
 
 #[cfg(test)]

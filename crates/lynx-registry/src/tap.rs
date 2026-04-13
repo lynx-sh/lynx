@@ -173,10 +173,7 @@ pub fn merge_tap_indexes(list: &TapList) -> Result<Vec<TappedEntry>> {
         let idx = match fetch_tap_index(&tap.url) {
             Ok(idx) => idx,
             Err(e) => {
-                eprintln!(
-                    "warning: failed to fetch tap '{}': {e}",
-                    tap.name
-                );
+                tracing::warn!("failed to fetch tap '{}': {e}", tap.name);
                 continue;
             }
         };

@@ -92,8 +92,7 @@ pub fn get_index(refresh: bool, url: Option<&str>) -> Result<RegistryIndex> {
         match fetch_and_cache_index(url) {
             Ok(idx) => return Ok(idx),
             Err(e) => {
-                eprintln!("warning: could not refresh registry index: {e}");
-                eprintln!("         falling back to cached index");
+                tracing::warn!("could not refresh registry index: {e} — falling back to cache");
             }
         }
     }
