@@ -18,7 +18,7 @@ pub struct UninstallArgs {
 }
 
 pub fn run(args: UninstallArgs) -> Result<()> {
-    let home = home_dir()?;
+    let home = lynx_core::paths::home();
 
     println!("Uninstalling Lynx...");
     println!();
@@ -30,7 +30,7 @@ pub fn run(args: UninstallArgs) -> Result<()> {
     stop_daemon();
 
     // 3. Remove lx binary
-    remove_binary(&home);
+    remove_binary();
 
     // 4. Remove runtime dir
     if let Ok(rt) = lynx_core::runtime::runtime_dir() {
@@ -41,7 +41,7 @@ pub fn run(args: UninstallArgs) -> Result<()> {
     }
 
     // 5. Optionally remove config dir
-    let config_dir = home.join(brand::CONFIG_DIR);
+    let config_dir = lynx_core::paths::lynx_dir();
     if args.purge && config_dir.exists() {
         if !args.yes {
             print!(
@@ -133,9 +133,9 @@ fn stop_daemon() {
     }
 }
 
-fn remove_binary(home: &Path) {
+fn remove_binary() {
     let candidates = vec![
-        home.join(".local/bin").join(brand::CLI),
+        lynx_core::paths::cli_bin(),
         PathBuf::from(format!("/usr/local/bin/{}", brand::CLI)),
     ];
     for path in candidates {
@@ -163,20 +163,13 @@ fn list_user_files(config_dir: &Path) {
     }
 }
 
-fn home_dir() -> Result<PathBuf> {
-    std::env::var_os("HOME").map(PathBuf::from).ok_or_else(|| {
-        anyhow::Error::from(lynx_core::error::LynxError::Shell("$HOME not set".into()))
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn home_dir_returns_value_when_set() {
-        // HOME should be set in the test environment
-        let dir = home_dir().unwrap();
+        let dir = lynx_core::paths::home();
         assert!(!dir.as_os_str().is_empty());
     }
 

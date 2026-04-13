@@ -6,7 +6,6 @@ use clap::{Args, Subcommand};
 use lynx_core::error::LynxError;
 
 use lynx_config::snapshot::mutate_config_transaction;
-use lynx_core::brand;
 
 #[derive(Args)]
 #[command(arg_required_else_help = true)]
@@ -45,10 +44,7 @@ pub fn run(args: SyncArgs) -> Result<()> {
 }
 
 fn config_dir() -> PathBuf {
-    let home = std::env::var_os("HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("."));
-    home.join(brand::CONFIG_DIR)
+    lynx_core::paths::lynx_dir()
 }
 
 fn cmd_init(remote: &str) -> Result<()> {
@@ -221,9 +217,8 @@ mod tests {
     }
 
     #[test]
-    fn config_dir_contains_brand_config_dir() {
-        let dir = config_dir();
-        assert!(dir.to_string_lossy().contains(brand::CONFIG_DIR));
+    fn config_dir_matches_lynx_dir() {
+        assert_eq!(config_dir(), lynx_core::paths::lynx_dir());
     }
 
     #[tokio::test]

@@ -221,10 +221,7 @@ impl CachedVersion {
 }
 
 fn cache_path() -> PathBuf {
-    let home = std::env::var_os("HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("."));
-    home.join(brand::CONFIG_DIR).join(".update-check")
+    lynx_core::paths::update_check_file()
 }
 
 fn read_cached_version() -> Option<CachedVersion> {

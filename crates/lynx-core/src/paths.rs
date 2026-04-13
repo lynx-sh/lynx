@@ -27,7 +27,12 @@ use crate::env_vars;
 use std::path::PathBuf;
 
 /// Resolve `$HOME` — base for all config/data paths.
-fn home() -> PathBuf {
+///
+/// Use this instead of reading `$HOME` directly so all HOME derivation
+/// goes through a single place. For Lynx config paths, prefer the
+/// specific helpers (`lynx_dir()`, `config_file()`, etc.) over calling
+/// `home()` directly.
+pub fn home() -> PathBuf {
     PathBuf::from(std::env::var_os(env_vars::HOME).unwrap_or_default())
 }
 
@@ -101,6 +106,21 @@ pub fn taps_config_path() -> PathBuf {
 /// `~/.config/lynx/registry/` — cached registry indexes.
 pub fn registry_cache_dir() -> PathBuf {
     lynx_dir().join("registry")
+}
+
+/// `~/.config/lynx/lynx.lock` — installed plugin lock file.
+pub fn lynx_lock_path() -> PathBuf {
+    lynx_dir().join("lynx.lock")
+}
+
+/// `~/.config/lynx/benchmarks.jsonl` — benchmark results log.
+pub fn benchmarks_log_file() -> PathBuf {
+    lynx_dir().join("benchmarks.jsonl")
+}
+
+/// `~/.config/lynx/.update-check` — cached update version check.
+pub fn update_check_file() -> PathBuf {
+    lynx_dir().join(".update-check")
 }
 
 /// `~/.config/lynx/shell/init.zsh` — the shell init file sourced from `.zshrc`.
