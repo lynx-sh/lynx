@@ -57,6 +57,19 @@ pub enum WorkflowStepStatus {
     TimedOut,
 }
 
+impl WorkflowStepStatus {
+    /// Unicode icon representing this status.
+    pub fn icon(&self) -> &'static str {
+        match self {
+            WorkflowStepStatus::Passed => "\u{2713}",   // ✓
+            WorkflowStepStatus::Failed => "\u{2717}",   // ✗
+            WorkflowStepStatus::Skipped => "\u{2014}",  // —
+            WorkflowStepStatus::TimedOut => "\u{23f0}", // ⏰
+            WorkflowStepStatus::Pending | WorkflowStepStatus::Running => "",
+        }
+    }
+}
+
 // Keep a short alias for the enum used in events.
 pub type StepStepStatus = WorkflowStepStatus;
 
@@ -180,13 +193,7 @@ impl TuiState {
                 duration_ms,
             } => {
                 // Add a completion marker in the output.
-                let icon = match status {
-                    WorkflowStepStatus::Passed => "\u{2713}",
-                    WorkflowStepStatus::Failed => "\u{2717}",
-                    WorkflowStepStatus::Skipped => "\u{2014}",
-                    WorkflowStepStatus::TimedOut => "\u{23f0}",
-                    _ => "\u{25cb}",
-                };
+                let icon = if status.icon().is_empty() { "\u{25cb}" } else { status.icon() };
                 self.output_lines.push(OutputLine {
                     step_name: name.clone(),
                     text: format!("{icon} finished ({duration_ms}ms)"),
@@ -220,13 +227,7 @@ impl TuiState {
                     is_stderr: false,
                 });
                 for s in &self.steps {
-                    let icon = match s.status {
-                        WorkflowStepStatus::Passed => "\u{2713}",
-                        WorkflowStepStatus::Failed => "\u{2717}",
-                        WorkflowStepStatus::Skipped => "\u{2014}",
-                        WorkflowStepStatus::TimedOut => "\u{23f0}",
-                        _ => "\u{25cb}",
-                    };
+                    let icon = if s.status.icon().is_empty() { "\u{25cb}" } else { s.status.icon() };
                     let dur = s
                         .duration_ms
                         .map(|ms| format!(" ({ms}ms)"))
@@ -489,13 +490,17 @@ fn render_steps(
             let is_selected = state.list_state.selected() == Some(i);
             let is_filtered = state.filter_step.as_ref() == Some(&step.name);
 
-            let (icon, icon_color) = match step.status {
-                WorkflowStepStatus::Pending => ("\u{25cb}", colors.muted), // ○
-                WorkflowStepStatus::Running => ("\u{25cf}", colors.accent), // ●
-                WorkflowStepStatus::Passed => ("\u{2713}", colors.success), // ✓
-                WorkflowStepStatus::Failed => ("\u{2717}", colors.error),  // ✗
-                WorkflowStepStatus::Skipped => ("\u{2014}", colors.muted), // —
-                WorkflowStepStatus::TimedOut => ("\u{23f0}", colors.warning), // ⏰
+            let icon_color = match step.status {
+                WorkflowStepStatus::Pending | WorkflowStepStatus::Skipped => colors.muted,
+                WorkflowStepStatus::Running => colors.accent,
+                WorkflowStepStatus::Passed => colors.success,
+                WorkflowStepStatus::Failed => colors.error,
+                WorkflowStepStatus::TimedOut => colors.warning,
+            };
+            let icon = match step.status {
+                WorkflowStepStatus::Pending => "\u{25cb}", // ○
+                WorkflowStepStatus::Running => "\u{25cf}", // ●
+                _ => step.status.icon(),
             };
 
             let duration = step

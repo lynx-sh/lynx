@@ -187,12 +187,7 @@ pub async fn run(args: RunArgs) -> Result<()> {
                     status,
                     duration_ms,
                 }) => {
-                    let icon = match status {
-                        lynx_workflow::executor::StepStatus::Passed => "\u{2713}",
-                        lynx_workflow::executor::StepStatus::Failed => "\u{2717}",
-                        lynx_workflow::executor::StepStatus::Skipped => "\u{2014}",
-                        lynx_workflow::executor::StepStatus::TimedOut => "\u{23f0}",
-                    };
+                    let icon = status.icon();
                     println!("  {icon} {name} ({duration_ms}ms)");
                 }
                 Ok(lynx_workflow::executor::StreamEvent::Done {
@@ -283,13 +278,7 @@ fn map_stream_to_tui(
 
 fn print_summary(result: &lynx_workflow::executor::JobResult) {
     for step in &result.steps {
-        let status = match step.status {
-            lynx_workflow::executor::StepStatus::Passed => "\u{2713}",
-            lynx_workflow::executor::StepStatus::Failed => "\u{2717}",
-            lynx_workflow::executor::StepStatus::Skipped => "\u{2014}",
-            lynx_workflow::executor::StepStatus::TimedOut => "\u{23f0}",
-        };
-        println!("  {status} {}  ({}ms)", step.name, step.duration_ms);
+        println!("  {} {}  ({}ms)", step.status.icon(), step.name, step.duration_ms);
     }
     println!();
     if result.success {

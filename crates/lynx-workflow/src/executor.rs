@@ -50,6 +50,18 @@ pub enum StepStatus {
     TimedOut,
 }
 
+impl StepStatus {
+    /// Unicode icon representing this status.
+    pub fn icon(&self) -> &'static str {
+        match self {
+            StepStatus::Passed => "\u{2713}",   // ✓
+            StepStatus::Failed => "\u{2717}",   // ✗
+            StepStatus::Skipped => "\u{2014}",  // —
+            StepStatus::TimedOut => "\u{23f0}", // ⏰
+        }
+    }
+}
+
 /// Result of a full workflow execution.
 #[derive(Debug, Clone)]
 pub struct JobResult {
