@@ -129,6 +129,15 @@ impl TuiState {
                 if let Some(s) = self.steps.iter_mut().find(|s| s.name == name) {
                     s.status = WorkflowStepStatus::Running;
                 }
+                // Add a visible marker so every step appears in the output pane.
+                self.output_lines.push(OutputLine {
+                    step_name: name,
+                    text: "\u{2500}\u{2500} started".to_string(),
+                    is_stderr: false,
+                });
+                if self.auto_scroll {
+                    self.scroll_to_bottom();
+                }
             }
             WorkflowEvent::StepOutput { name, line, is_stderr } => {
                 self.output_lines.push(OutputLine {
@@ -142,9 +151,25 @@ impl TuiState {
                 }
             }
             WorkflowEvent::StepFinished { name, status, duration_ms } => {
+                // Add a completion marker in the output.
+                let icon = match status {
+                    WorkflowStepStatus::Passed => "\u{2713}",
+                    WorkflowStepStatus::Failed => "\u{2717}",
+                    WorkflowStepStatus::Skipped => "\u{2014}",
+                    WorkflowStepStatus::TimedOut => "\u{23f0}",
+                    _ => "\u{25cb}",
+                };
+                self.output_lines.push(OutputLine {
+                    step_name: name.clone(),
+                    text: format!("{icon} finished ({duration_ms}ms)"),
+                    is_stderr: false,
+                });
                 if let Some(s) = self.steps.iter_mut().find(|s| s.name == name) {
                     s.status = status;
                     s.duration_ms = Some(duration_ms);
+                }
+                if self.auto_scroll {
+                    self.scroll_to_bottom();
                 }
             }
             WorkflowEvent::Done { success, duration_ms } => {
@@ -410,12 +435,29 @@ fn render_steps(
                 .map(|ms| format!(" {ms}ms"))
                 .unwrap_or_default();
 
+            // Name color reflects status; selected gets bold.
+            let status_color = match step.status {
+                WorkflowStepStatus::Pending => None, // default terminal color
+                WorkflowStepStatus::Running => Some(colors.accent),
+                WorkflowStepStatus::Passed => Some(colors.success),
+                WorkflowStepStatus::Failed => Some(colors.error),
+                WorkflowStepStatus::Skipped => Some(colors.muted),
+                WorkflowStepStatus::TimedOut => Some(colors.warning),
+            };
+
             let name_style = if is_selected {
-                Style::default().fg(colors.accent).bold()
+                let base = Style::default().bold();
+                match status_color {
+                    Some(c) => base.fg(c),
+                    None => base.fg(colors.accent),
+                }
             } else if is_filtered {
                 Style::default().fg(colors.accent)
             } else {
-                Style::default()
+                match status_color {
+                    Some(c) => Style::default().fg(c),
+                    None => Style::default(),
+                }
             };
 
             let line = Line::from(vec![
