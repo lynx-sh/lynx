@@ -127,7 +127,7 @@ async fn cmd_render(transient: bool) -> Result<()> {
     let columns = ctx.env.get("COLUMNS").and_then(|v| v.parse::<u32>().ok());
     let (left, right, top, top_right, continuation) = evaluate_theme(&segments, theme_ref, &ctx).await;
     let output = render_prompt(&left, &right, &top, &top_right, &continuation, theme_ref, columns, Some(&ctx));
-    print!("{}", output);
+    print!("{output}");
     Ok(())
 }
 

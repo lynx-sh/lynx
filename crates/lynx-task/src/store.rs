@@ -65,7 +65,7 @@ pub fn read_last_run(log_dir: &Path, task_name: &str) -> (String, String) {
             .duration_since(std::time::UNIX_EPOCH)
             .map(|now| now.as_secs().saturating_sub(ts))
             .unwrap_or(0);
-        format!("{}s ago", elapsed)
+        format!("{elapsed}s ago")
     };
 
     (time_str, exit)

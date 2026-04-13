@@ -17,7 +17,7 @@ use std::sync::Arc;
 /// in-process and emits plugin:loaded so any registered handlers run.
 pub(super) async fn cmd_exec(name: &str) -> Result<()> {
     let script = generate_exec_script_for_plugin(name)?;
-    print!("{}", script);
+    print!("{script}");
 
     // Activate in-process: register this plugin's hook subscriptions on a
     // short-lived bus, emit plugin:loaded, then exit.
@@ -37,7 +37,7 @@ pub(super) async fn cmd_exec(name: &str) -> Result<()> {
 /// Emit zsh that removes the plugin's exported symbols and clears its load guard.
 pub(super) async fn cmd_unload(name: &str) -> Result<()> {
     let script = generate_unload_script_for_plugin(name)?;
-    print!("{}", script);
+    print!("{script}");
     Ok(())
 }
 
@@ -98,21 +98,20 @@ fn build_unload_script(name: &str, manifest: Option<&PluginManifest>) -> String 
 
     if let Some(manifest) = manifest {
         for func in &manifest.exports.functions {
-            out.push_str(&format!("unfunction {} 2>/dev/null\n", func));
+            out.push_str(&format!("unfunction {func} 2>/dev/null\n"));
         }
         for alias in &manifest.exports.aliases {
-            out.push_str(&format!("unalias {} 2>/dev/null\n", alias));
+            out.push_str(&format!("unalias {alias} 2>/dev/null\n"));
         }
         for hook in &manifest.load.hooks {
             let fn_name = format!("_{}_plugin_{}", name.replace('-', "_"), hook);
             out.push_str(&format!(
-                "add-zsh-hook -d {} {} 2>/dev/null\n",
-                hook, fn_name
+                "add-zsh-hook -d {hook} {fn_name} 2>/dev/null\n"
             ));
         }
     }
 
-    out.push_str(&format!("unset {}\n", guard_var));
+    out.push_str(&format!("unset {guard_var}\n"));
     out
 }
 

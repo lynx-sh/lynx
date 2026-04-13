@@ -31,8 +31,7 @@ fn check_no_wildcard_exports(manifest: &PluginManifest) -> Result<()> {
     for name in all {
         if name.contains('*') {
             return Err(LynxError::Manifest(format!(
-                "wildcard export '{}' is not allowed — list names explicitly",
-                name
+                "wildcard export '{name}' is not allowed — list names explicitly"
             )));
         }
     }
@@ -43,8 +42,7 @@ fn check_binary_deps(manifest: &PluginManifest) -> Result<()> {
     for bin in &manifest.deps.binaries {
         if which(bin).is_none() {
             return Err(LynxError::Manifest(format!(
-                "required binary '{}' not found on PATH",
-                bin
+                "required binary '{bin}' not found on PATH"
             )));
         }
     }

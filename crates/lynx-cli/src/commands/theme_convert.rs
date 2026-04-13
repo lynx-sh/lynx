@@ -40,7 +40,7 @@ pub async fn run(source: &str, name: Option<&str>, force: bool) -> Result<()> {
 
     if is_omp {
         let theme = lynx_convert::omp::parse(&content)
-            .map_err(|e| anyhow::Error::from(lynx_core::error::LynxError::Theme(e.to_string())))?;
+            .map_err(|e| anyhow::Error::from(lynx_core::error::LynxError::Theme(e)))?;
         let toml_str = lynx_convert::emit::omp_to_lynx_toml(&theme, &theme_name);
         std::fs::write(&out_path, &toml_str)?;
 

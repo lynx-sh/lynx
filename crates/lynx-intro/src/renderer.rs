@@ -38,10 +38,10 @@ fn render_block(block: &Block, tokens: &HashMap<String, String>) -> anyhow::Resu
             let mut lines = Vec::with_capacity(items.len());
             for [key, val] in items {
                 let val_rendered = substitute(val, tokens);
-                let key_col = format!("{:<width$}", key, width = max_key_len);
+                let key_col = format!("{key:<max_key_len$}");
                 let key_part = apply_style(&key_col, color_key.as_deref(), false);
                 let val_part = apply_style(&val_rendered, color_val.as_deref(), false);
-                lines.push(format!("  {}  {}", key_part, val_part));
+                lines.push(format!("  {key_part}  {val_part}"));
             }
             Ok(lines.join("\n"))
         }
@@ -92,8 +92,8 @@ fn apply_style(text: &str, color: Option<&str>, bold: bool) -> String {
     let reset = if color_esc.is_some() || bold { "\x1b[0m" } else { "" };
 
     match color_esc {
-        Some(fg) => format!("{}{}{}{}", bold_esc, fg, text, reset),
-        None if bold => format!("{}{}{}", bold_esc, text, reset),
+        Some(fg) => format!("{bold_esc}{fg}{text}{reset}"),
+        None if bold => format!("{bold_esc}{text}{reset}"),
         None => text.to_string(),
     }
 }

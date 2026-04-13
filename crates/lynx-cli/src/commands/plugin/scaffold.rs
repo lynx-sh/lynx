@@ -12,7 +12,7 @@ use std::path::PathBuf;
 pub(super) async fn cmd_new(name: &str) -> Result<()> {
     let dir = PathBuf::from(name);
     if dir.exists() {
-        return Err(LynxError::Plugin(format!("directory '{}' already exists", name)).into());
+        return Err(LynxError::Plugin(format!("directory '{name}' already exists")).into());
     }
 
     std::fs::create_dir_all(dir.join("shell"))?;
@@ -42,8 +42,7 @@ aliases   = []           # example: ["g", "gs"] — only loaded in interactive c
 # Aliases are never loaded in agent or minimal contexts (D-010).
 # Add "interactive" here to also skip functions in non-interactive shells.
 disabled_in = ["agent", "minimal"]
-"#,
-        name = name
+"#
     );
     std::fs::write(dir.join(lynx_core::brand::PLUGIN_MANIFEST), toml)?;
 
@@ -52,7 +51,6 @@ disabled_in = ["agent", "minimal"]
          # Sources functions and aliases; actual logic lives in functions.zsh.\n\
          source \"${{LYNX_PLUGIN_DIR}}/{name}/shell/functions.zsh\"\n\
          source \"${{LYNX_PLUGIN_DIR}}/{name}/shell/aliases.zsh\"\n",
-        name = name,
     );
     std::fs::write(dir.join("shell/init.zsh"), init_zsh)?;
 
@@ -90,7 +88,7 @@ disabled_in = ["agent", "minimal"]
     );
     std::fs::write(dir.join("shell/aliases.zsh"), aliases_zsh)?;
 
-    println!("Created plugin '{}' at ./{}/", name, name);
+    println!("Created plugin '{name}' at ./{name}/");
     println!();
     println!("  Structure:");
     println!("    {name}/plugin.toml          — manifest (edit exports + deps)");

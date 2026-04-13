@@ -117,10 +117,10 @@ fn cmd_validate() -> Result<()> {
 fn cmd_get(key: &str) -> Result<()> {
     let cfg = load()?;
     let value = match key {
-        "active_theme" => cfg.active_theme.clone(),
+        "active_theme" => cfg.active_theme,
         "active_context" => format!("{:?}", cfg.active_context).to_lowercase(),
         "schema_version" => cfg.schema_version.to_string(),
-        "sync.remote" => cfg.sync.remote.clone().unwrap_or_default(),
+        "sync.remote" => cfg.sync.remote.unwrap_or_default(),
         other => return Err(LynxError::NotFound {
             item_type: "Config key".into(),
             name: other.into(),
@@ -162,8 +162,7 @@ fn cmd_set(key: &str, value: &str) -> Result<()> {
             }
             other => {
                 return Err(lynx_core::error::LynxError::Config(format!(
-                    "unknown config key '{}' — cannot set via CLI",
-                    other
+                    "unknown config key '{other}' — cannot set via CLI"
                 )))
             }
         }

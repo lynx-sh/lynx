@@ -30,7 +30,7 @@ impl Segment for UsernameSegment {
             .map(|v| v == "0")
             .unwrap_or(false);
         let text = if uid_zero {
-            format!("\x1b[1;31m{}\x1b[0m", user)
+            format!("\x1b[1;31m{user}\x1b[0m")
         } else {
             user
         };

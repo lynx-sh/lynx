@@ -27,7 +27,7 @@ pub async fn run(args: InitArgs) -> Result<()> {
         Err(e) => {
             diag::error("init", &format!("config load failed: {e}"));
             let script = generate_safemode_script(&e.to_string());
-            print!("{}", script);
+            print!("{script}");
             return Ok(());
         }
     };
@@ -38,7 +38,7 @@ pub async fn run(args: InitArgs) -> Result<()> {
         Some("minimal") => Context::Minimal,
         Some("interactive") => Context::Interactive,
         Some(other) => {
-            let msg = format!("unknown context '{}', falling back to auto-detect", other);
+            let msg = format!("unknown context '{other}', falling back to auto-detect");
             diag::warn("init", &msg);
             detected
         }
@@ -55,7 +55,7 @@ pub async fn run(args: InitArgs) -> Result<()> {
     let enabled_plugins: Vec<String> = match lynx_depgraph::depgraph::resolve(&manifests) {
         Ok(order) => {
             for (name, bin) in &order.excluded {
-                let msg = format!("plugin '{}' excluded — missing binary '{}'", name, bin);
+                let msg = format!("plugin '{name}' excluded — missing binary '{bin}'");
                 diag::warn("init", &msg);
             }
             order.eager.into_iter().chain(order.lazy).collect()
@@ -79,7 +79,7 @@ pub async fn run(args: InitArgs) -> Result<()> {
             theme.autosuggestions.to_autosuggest_style(),
         ),
         Err(e) => {
-            diag::warn("init", &format!("theme '{}' failed to load: {e}", theme_name));
+            diag::warn("init", &format!("theme '{theme_name}' failed to load: {e}"));
             (None, None, None, None, None)
         }
     };
@@ -109,7 +109,7 @@ pub async fn run(args: InitArgs) -> Result<()> {
         zle_hook_plugins,
     });
 
-    print!("{}", script);
+    print!("{script}");
     Ok(())
 }
 
@@ -151,9 +151,9 @@ fn maybe_show_intro(config: &lynx_config::schema::LynxConfig, context: Context) 
         let rendered = lynx_intro::render_intro(&intro, &tokens);
         // MUST use eprint! — lx init output is eval'd by the shell.
         // Stdout gets executed as zsh; stderr goes directly to the terminal.
-        eprint!("{}", rendered);
+        eprint!("{rendered}");
     } else {
-        diag::warn("init", &format!("intro '{}' failed to load — skipping", slug));
+        diag::warn("init", &format!("intro '{slug}' failed to load — skipping"));
     }
 }
 
@@ -162,11 +162,11 @@ fn maybe_show_intro(config: &lynx_config::schema::LynxConfig, context: Context) 
 fn load_plugin_manifests(plugin_dir: &str, enabled: &[String]) -> Vec<PluginManifest> {
     let mut manifests = Vec::new();
     for name in enabled {
-        let toml_path = format!("{}/{}/plugin.toml", plugin_dir, name);
+        let toml_path = format!("{plugin_dir}/{name}/plugin.toml");
         if let Ok(content) = std::fs::read_to_string(&toml_path) {
             match lynx_manifest::parse_and_validate(&content) {
                 Ok(m) => manifests.push(m),
-                Err(e) => diag::warn("init", &format!("skipping plugin '{}': invalid manifest: {}", name, e)),
+                Err(e) => diag::warn("init", &format!("skipping plugin '{name}': invalid manifest: {e}")),
             }
         } // plugin dir missing or no manifest — silently skip (expected for optional plugins)
     }

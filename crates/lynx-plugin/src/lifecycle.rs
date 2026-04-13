@@ -35,7 +35,7 @@ pub fn declare(plugins_dir: &Path) -> PluginRegistry {
                 registry.insert(plugin_entry);
             }
             Err(e) => {
-                eprintln!("[lynx] warn: failed to parse {:?}: {}", manifest_path, e);
+                eprintln!("[lynx] warn: failed to parse {manifest_path:?}: {e}");
             }
         }
     }
@@ -69,7 +69,7 @@ pub fn apply_resolve(
         registry.set_state(
             name,
             PluginState::Excluded {
-                reason: format!("missing binary: {}", bin),
+                reason: format!("missing binary: {bin}"),
             },
         );
     }

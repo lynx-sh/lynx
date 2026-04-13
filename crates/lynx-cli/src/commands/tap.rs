@@ -98,7 +98,7 @@ fn cmd_add(source: &str) -> Result<()> {
     add_tap(&mut list, &name, &url)?;
     save_taps(&list, &path)?;
 
-    println!("○ added tap '{}' ({})", name, url);
+    println!("○ added tap '{name}' ({url})");
     println!("  run `lx tap update` to fetch the index");
     Ok(())
 }

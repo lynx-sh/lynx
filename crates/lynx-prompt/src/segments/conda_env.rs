@@ -32,7 +32,7 @@ impl Segment for CondaEnvSegment {
             return None;
         }
         let text = match cfg.symbol {
-            Some(ref sym) => format!("{} {}", sym, name),
+            Some(ref sym) => format!("{sym} {name}"),
             None => name.clone(),
         };
         Some(RenderedSegment::new(text))

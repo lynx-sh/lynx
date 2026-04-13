@@ -26,7 +26,7 @@ fn resolve_runtime_dir() -> PathBuf {
         return PathBuf::from(xdg).join("lynx");
     }
     let uid = get_uid();
-    PathBuf::from(format!("/tmp/lynx-{}", uid))
+    PathBuf::from(format!("/tmp/lynx-{uid}"))
 }
 
 /// Path to the Unix domain socket used for event IPC.
