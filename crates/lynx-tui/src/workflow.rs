@@ -2,14 +2,14 @@
 //!
 //! Renders a two-pane view: left shows step list with status indicators,
 //! right shows live stdout/stderr output. Supports stop, background, and
-//! quit actions via keybindings.
+//! quit actions via keybindings. Output pane is scrollable.
 
 use std::io;
 use std::sync::mpsc;
 use std::time::Duration;
 
 use crossterm::{
-    event::{self, Event, KeyCode, KeyEventKind, KeyModifiers},
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind, KeyModifiers, MouseEventKind},
     terminal::{self, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
@@ -71,8 +71,12 @@ struct StepState {
 struct TuiState {
     steps: Vec<StepState>,
     output_lines: Vec<OutputLine>,
-    /// Auto-scroll to bottom of output.
+    /// Auto-scroll to bottom of output (disabled when user scrolls up).
     auto_scroll: bool,
+    /// Manual scroll offset from the top of the output.
+    scroll_offset: usize,
+    /// Height of the output pane's inner area (updated each render).
+    output_inner_height: usize,
     /// Whether the workflow has finished.
     done: bool,
     /// Overall success (set when Done event arrives).
@@ -109,6 +113,8 @@ impl TuiState {
             steps,
             output_lines: Vec::new(),
             auto_scroll: true,
+            scroll_offset: 0,
+            output_inner_height: 0,
             done: false,
             success: None,
             total_duration_ms: None,
@@ -130,6 +136,10 @@ impl TuiState {
                     text: line,
                     is_stderr,
                 });
+                // If auto-scrolling, keep scroll at bottom.
+                if self.auto_scroll {
+                    self.scroll_to_bottom();
+                }
             }
             WorkflowEvent::StepFinished { name, status, duration_ms } => {
                 if let Some(s) = self.steps.iter_mut().find(|s| s.name == name) {
@@ -145,10 +155,38 @@ impl TuiState {
         }
     }
 
+    fn visible_output_count(&self) -> usize {
+        match &self.filter_step {
+            Some(name) => self.output_lines.iter().filter(|l| &l.step_name == name).count(),
+            None => self.output_lines.len(),
+        }
+    }
+
     fn visible_output(&self) -> Vec<&OutputLine> {
         match &self.filter_step {
             Some(name) => self.output_lines.iter().filter(|l| &l.step_name == name).collect(),
             None => self.output_lines.iter().collect(),
+        }
+    }
+
+    fn max_scroll(&self) -> usize {
+        self.visible_output_count().saturating_sub(self.output_inner_height)
+    }
+
+    fn scroll_to_bottom(&mut self) {
+        self.scroll_offset = self.max_scroll();
+    }
+
+    fn scroll_up(&mut self, lines: usize) {
+        self.auto_scroll = false;
+        self.scroll_offset = self.scroll_offset.saturating_sub(lines);
+    }
+
+    fn scroll_down(&mut self, lines: usize) {
+        self.scroll_offset = (self.scroll_offset + lines).min(self.max_scroll());
+        // Re-enable auto-scroll if we're at the bottom.
+        if self.scroll_offset >= self.max_scroll() {
+            self.auto_scroll = true;
         }
     }
 }
@@ -169,6 +207,7 @@ pub fn run_workflow_tui(
     terminal::enable_raw_mode()?;
     let mut stdout = io::stdout();
     stdout.execute(EnterAlternateScreen)?;
+    stdout.execute(EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
@@ -177,6 +216,7 @@ pub fn run_workflow_tui(
     }));
 
     terminal::disable_raw_mode()?;
+    terminal.backend_mut().execute(DisableMouseCapture)?;
     terminal.backend_mut().execute(LeaveAlternateScreen)?;
     terminal.show_cursor()?;
 
@@ -222,65 +262,93 @@ fn event_loop(
             render(frame, workflow_name, colors, &mut state);
         })?;
 
-        // Poll keyboard with short timeout so we keep refreshing output.
+        // Poll keyboard/mouse with short timeout so we keep refreshing output.
         if event::poll(Duration::from_millis(50))? {
-            if let Event::Key(key) = event::read()? {
-                if key.kind != KeyEventKind::Press {
-                    continue;
-                }
+            match event::read()? {
+                Event::Key(key) => {
+                    if key.kind != KeyEventKind::Press {
+                        continue;
+                    }
 
-                // Ctrl+C always stops.
-                if key.code == KeyCode::Char('c')
-                    && key.modifiers.contains(KeyModifiers::CONTROL)
-                {
-                    return Ok(WorkflowAction::Stopped);
-                }
-
-                match key.code {
-                    KeyCode::Char('q') | KeyCode::Esc => {
-                        if state.done {
-                            return Ok(WorkflowAction::Completed);
-                        }
-                        // While running, q also stops.
+                    // Ctrl+C always stops.
+                    if key.code == KeyCode::Char('c')
+                        && key.modifiers.contains(KeyModifiers::CONTROL)
+                    {
                         return Ok(WorkflowAction::Stopped);
                     }
-                    KeyCode::Char('b') => {
-                        if !state.done {
-                            return Ok(WorkflowAction::Background);
-                        }
-                    }
-                    KeyCode::Char('s') => {
-                        if !state.done {
+
+                    match key.code {
+                        KeyCode::Char('q') | KeyCode::Esc => {
+                            if state.done {
+                                return Ok(WorkflowAction::Completed);
+                            }
                             return Ok(WorkflowAction::Stopped);
                         }
-                    }
-                    KeyCode::Down | KeyCode::Char('j') => {
-                        let max = state.steps.len().saturating_sub(1);
-                        let cur = state.list_state.selected().unwrap_or(0);
-                        state.list_state.select(Some((cur + 1).min(max)));
-                    }
-                    KeyCode::Up | KeyCode::Char('k') => {
-                        let cur = state.list_state.selected().unwrap_or(0);
-                        state.list_state.select(Some(cur.saturating_sub(1)));
-                    }
-                    KeyCode::Enter => {
-                        // Toggle filter: show only selected step's output.
-                        if let Some(idx) = state.list_state.selected() {
-                            if let Some(step) = state.steps.get(idx) {
-                                if state.filter_step.as_ref() == Some(&step.name) {
-                                    state.filter_step = None;
-                                } else {
-                                    state.filter_step = Some(step.name.clone());
+                        KeyCode::Char('b') => {
+                            if !state.done {
+                                return Ok(WorkflowAction::Background);
+                            }
+                        }
+                        KeyCode::Char('s') => {
+                            if !state.done {
+                                return Ok(WorkflowAction::Stopped);
+                            }
+                        }
+                        // Step list navigation.
+                        KeyCode::Down | KeyCode::Char('j') => {
+                            let max = state.steps.len().saturating_sub(1);
+                            let cur = state.list_state.selected().unwrap_or(0);
+                            state.list_state.select(Some((cur + 1).min(max)));
+                        }
+                        KeyCode::Up | KeyCode::Char('k') => {
+                            let cur = state.list_state.selected().unwrap_or(0);
+                            state.list_state.select(Some(cur.saturating_sub(1)));
+                        }
+                        // Output scrolling.
+                        KeyCode::PageUp => state.scroll_up(state.output_inner_height),
+                        KeyCode::PageDown => state.scroll_down(state.output_inner_height),
+                        KeyCode::Home => {
+                            state.auto_scroll = false;
+                            state.scroll_offset = 0;
+                        }
+                        KeyCode::End => {
+                            state.auto_scroll = true;
+                            state.scroll_to_bottom();
+                        }
+                        // Shift+Up/Down for output scroll by single line.
+                        KeyCode::Char('K') => state.scroll_up(1),
+                        KeyCode::Char('J') => state.scroll_down(1),
+                        KeyCode::Enter => {
+                            // Toggle filter: show only selected step's output.
+                            if let Some(idx) = state.list_state.selected() {
+                                if let Some(step) = state.steps.get(idx) {
+                                    if state.filter_step.as_ref() == Some(&step.name) {
+                                        state.filter_step = None;
+                                    } else {
+                                        state.filter_step = Some(step.name.clone());
+                                    }
+                                    // Reset scroll when changing filter.
+                                    state.auto_scroll = true;
+                                    state.scroll_to_bottom();
                                 }
                             }
                         }
+                        KeyCode::Char('a') => {
+                            state.filter_step = None;
+                            state.auto_scroll = true;
+                            state.scroll_to_bottom();
+                        }
+                        _ => {}
                     }
-                    KeyCode::Char('a') => {
-                        // Show all output (clear filter).
-                        state.filter_step = None;
-                    }
-                    _ => {}
                 }
+                Event::Mouse(mouse) => {
+                    match mouse.kind {
+                        MouseEventKind::ScrollUp => state.scroll_up(3),
+                        MouseEventKind::ScrollDown => state.scroll_down(3),
+                        _ => {}
+                    }
+                }
+                _ => {}
             }
         }
     }
@@ -360,10 +428,12 @@ fn render_steps(
         })
         .collect();
 
-    let title = format!(" {workflow_name} ({}/{}) ",
-        state.steps.iter().filter(|s| matches!(s.status, WorkflowStepStatus::Passed | WorkflowStepStatus::Failed | WorkflowStepStatus::Skipped | WorkflowStepStatus::TimedOut)).count(),
-        state.steps.len(),
-    );
+    let completed = state.steps.iter().filter(|s| {
+        matches!(s.status, WorkflowStepStatus::Passed | WorkflowStepStatus::Failed
+            | WorkflowStepStatus::Skipped | WorkflowStepStatus::TimedOut)
+    }).count();
+
+    let title = format!(" {workflow_name} ({completed}/{}) ", state.steps.len());
 
     let block = Block::default()
         .borders(Borders::ALL)
@@ -383,10 +453,21 @@ fn render_output(
     frame: &mut Frame,
     area: Rect,
     colors: &TuiColors,
-    state: &TuiState,
+    state: &mut TuiState,
 ) {
-    let visible = state.visible_output();
+    // Update inner height for scroll calculations (before borrowing state).
+    let inner_height = area.height.saturating_sub(2) as usize;
+    state.output_inner_height = inner_height;
 
+    let total_lines = state.visible_output_count();
+
+    // Clamp scroll offset. Auto-scroll pins to bottom.
+    let max_scroll = total_lines.saturating_sub(inner_height);
+    if state.auto_scroll || state.scroll_offset > max_scroll {
+        state.scroll_offset = max_scroll;
+    }
+
+    let visible = state.visible_output();
     let lines: Vec<Line> = visible
         .iter()
         .map(|line| {
@@ -404,18 +485,21 @@ fn render_output(
         })
         .collect();
 
-    let title = match &state.filter_step {
-        Some(name) => format!(" Output: {name} (a=all) "),
-        None => " Output (enter=filter step) ".to_string(),
+    // Title shows filter state + scroll position.
+    let scroll_indicator = if !state.auto_scroll && total_lines > inner_height {
+        let pct = if max_scroll > 0 {
+            (state.scroll_offset * 100) / max_scroll
+        } else {
+            100
+        };
+        format!(" {pct}%")
+    } else {
+        String::new()
     };
 
-    // Auto-scroll: calculate scroll position to show the bottom.
-    let inner_height = area.height.saturating_sub(2) as usize; // minus borders
-    let total_lines = lines.len();
-    let scroll = if state.auto_scroll && total_lines > inner_height {
-        (total_lines - inner_height) as u16
-    } else {
-        0
+    let title = match &state.filter_step {
+        Some(name) => format!(" {name}{scroll_indicator} (a=all) "),
+        None => format!(" Output{scroll_indicator} "),
     };
 
     let block = Block::default()
@@ -427,7 +511,7 @@ fn render_output(
     let paragraph = Paragraph::new(lines)
         .block(block)
         .wrap(Wrap { trim: false })
-        .scroll((scroll, 0));
+        .scroll((state.scroll_offset as u16, 0));
 
     frame.render_widget(paragraph, area);
 }
@@ -455,6 +539,8 @@ fn render_status_bar(
             Span::styled(dur, Style::default().fg(colors.muted)),
             Span::styled("  q", Style::default().fg(colors.accent).bold()),
             Span::styled(" quit", Style::default().fg(colors.muted)),
+            Span::styled("  PgUp/Dn", Style::default().fg(colors.accent).bold()),
+            Span::styled(" scroll", Style::default().fg(colors.muted)),
         ])
     } else {
         let running = state
@@ -471,9 +557,11 @@ fn render_status_bar(
             Span::styled(" s", Style::default().fg(colors.accent).bold()),
             Span::styled(" stop", Style::default().fg(colors.muted)),
             Span::styled("  b", Style::default().fg(colors.accent).bold()),
-            Span::styled(" background", Style::default().fg(colors.muted)),
+            Span::styled(" bg", Style::default().fg(colors.muted)),
             Span::styled("  q", Style::default().fg(colors.accent).bold()),
             Span::styled(" quit", Style::default().fg(colors.muted)),
+            Span::styled("  J/K", Style::default().fg(colors.accent).bold()),
+            Span::styled(" scroll", Style::default().fg(colors.muted)),
         ])
     };
 
