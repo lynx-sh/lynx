@@ -113,6 +113,10 @@ Bugs found during refactor → `pt add`, fix separately.
 pt go                              # START — mandatory
 pt decisions <component>           # before any non-trivial design
 cargo nextest run -p lynx-<crate>  # targeted tests during work
-lx run lynx-ai-verify              # END — final gate
+lx run lynx-ai-verify              # END — final gate (MUST pass before any push)
+bash scripts/verify-guardrails.sh  # REQUIRED before git push — catches shell violations CI will reject
 git commit && pt done S-XXX success "what was done" "what next agent does first"
 ```
+
+> **Push gate (non-negotiable):** Never run `git push` until both `lx run lynx-ai-verify` and
+> `bash scripts/verify-guardrails.sh` exit 0. CI runs the same checks and will reject the branch.
