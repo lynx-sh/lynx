@@ -96,8 +96,8 @@ color        = { fg = "$success" }
 error_color  = { fg = "$error" }
 
 # ── File listing colors ───────────────────────────────────────────────────────
-# Emitted as LS_COLORS and EZA_COLORS on theme switch / shell init.
-# Uses semantic keys — palette vars supported. (H-054: in progress)
+# Emitted as LS_COLORS, EZA_COLORS, and BSD LSCOLORS on shell init.
+# Palette vars ($accent, $success, etc.) are supported everywhere.
 [ls_colors]
 dir        = { fg = "$accent", bold = true }
 symlink    = { fg = "#89ddff" }
@@ -106,6 +106,25 @@ archive    = { fg = "$warning" }
 image      = { fg = "#ff007c" }
 audio      = { fg = "#ff007c" }
 broken     = { fg = "$error" }
+
+# Per-extension colors — full control over individual file types
+[ls_colors.extensions]
+rs   = { fg = "#e7894f" }
+py   = { fg = "#bb9af7" }
+sh   = { fg = "#e0af68", bold = true }
+toml = { fg = "#9ece6a" }
+js   = { fg = "#e0af68" }
+ts   = { fg = "#7aa2f7" }
+
+# Eza column colors (metadata in `ls -la` output)
+[ls_colors.columns]
+date        = "#565f89"
+size_number = "#e0af68"
+size_unit   = "#565f89"
+user_you    = "#9ece6a"
+perm_read   = "#9ece6a"
+perm_write  = "#e0af68"
+perm_exec   = "#f7768e"
 ```
 
 Switch to your theme with:
@@ -813,11 +832,15 @@ color = "$muted"
 
 ## File Listing Colors
 
-> **Status:** Implemented. `lx theme set` emits `LS_COLORS` and `EZA_COLORS`
-> automatically from the active theme.
+> **Status:** Implemented. `lx init` emits `LS_COLORS`, `EZA_COLORS`, and BSD
+> `LSCOLORS` automatically from the active theme. On macOS, `ls` is aliased to
+> `eza` (or `gls`) so truecolor and per-extension colors render correctly.
 
 The `[ls_colors]` table lets a theme own `ls`, `eza`, and `lsd` output — the same
-palette variables available to segments apply here.
+palette variables available to segments apply here. All colors are emitted as
+**truecolor** (24-bit `38;2;R;G;B`) for maximum fidelity.
+
+### File-type categories
 
 ```toml
 [ls_colors]
@@ -831,8 +854,6 @@ broken     = { fg = "$error" }        # broken symlink
 other_writable = { fg = "$warning" }  # world-writable dir
 ```
 
-Semantic keys and their `LS_COLORS` mappings:
-
 | Key | LS_COLORS code | Notes |
 |---|---|---|
 | `dir` | `di` | Directories |
@@ -843,6 +864,46 @@ Semantic keys and their `LS_COLORS` mappings:
 | `audio` | — | `.mp3`, `.flac`, `.wav`, etc. |
 | `broken` | `or` | Broken symlinks |
 | `other_writable` | `ow` | Dirs writable by others |
+
+### Per-extension colors
+
+The `[ls_colors.extensions]` table gives full control over individual file types.
+Extension keys omit the dot. These override category colors when both match.
+
+```toml
+[ls_colors.extensions]
+rs   = { fg = "#e7894f" }              # Rust — orange
+py   = { fg = "#bb9af7" }              # Python — purple
+sh   = { fg = "#e0af68", bold = true } # Shell — bold yellow
+toml = { fg = "#9ece6a" }              # Config — green
+js   = { fg = "#e0af68" }              # JavaScript — yellow
+ts   = { fg = "#7aa2f7" }              # TypeScript — blue
+go   = { fg = "#7dcfff" }              # Go — cyan
+rb   = { fg = "#f7768e" }              # Ruby — red
+md   = { fg = "#c0caf5" }              # Markdown — light grey
+log  = { fg = "#565f89" }              # Logs — muted
+```
+
+### Eza column colors
+
+The `[ls_colors.columns]` table colors the metadata columns in `eza -la` output
+(dates, sizes, permissions, user/group). Only eza reads these — no effect on `/bin/ls`.
+
+```toml
+[ls_colors.columns]
+date         = "#565f89"   # File modification date
+size_number  = "#e0af68"   # Size digits
+size_unit    = "#565f89"   # Size suffix (B, K, M)
+user_you     = "#9ece6a"   # Owner = you
+user_other   = "#f7768e"   # Owner = someone else
+group_you    = "#7aa2f7"   # Group you belong to
+group_other  = "#565f89"   # Group you don't belong to
+perm_read    = "#9ece6a"   # r bits
+perm_write   = "#e0af68"   # w bits
+perm_exec    = "#f7768e"   # x bits
+header       = "#7aa2f7"   # Column headers (--header)
+symlink_path = "#7dcfff"   # Symlink target path
+```
 
 If `[ls_colors]` is absent, Lynx emits no `LS_COLORS` (OS default applies).
 
