@@ -16,12 +16,7 @@ struct GitAheadBehindConfig {
 
 pub struct GitAheadBehindSegment;
 
-fn git_state_obj(ctx: &RenderContext) -> Option<&serde_json::Map<String, serde_json::Value>> {
-    match ctx.cache.get(crate::cache_keys::GIT_STATE)? {
-        serde_json::Value::Object(m) => Some(m),
-        _ => None,
-    }
-}
+use super::git_common::git_state_obj;
 
 impl Segment for GitAheadBehindSegment {
     fn name(&self) -> &'static str {
