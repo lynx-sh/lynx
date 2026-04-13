@@ -12,6 +12,8 @@ impl Default for LynxConfig {
             intro: IntroConfig::default(),
             tui: TuiConfig::default(),
             onboarding_complete: false,
+            aliases: vec![],
+            paths: vec![],
         }
     }
 }
