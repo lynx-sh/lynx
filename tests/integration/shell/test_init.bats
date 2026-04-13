@@ -26,7 +26,11 @@ teardown() {
 @test "lx init does not auto-start daemon (daemon is opt-in)" {
   run lx init --context interactive
   [ "$status" -eq 0 ]
-  [[ "$output" != *"lx daemon"* ]]
+  # Must not invoke lx daemon directly — bare wrapper definitions are allowed,
+  # but calling lx daemon start/stop/status at init time is forbidden (D-012).
+  [[ "$output" != *"lx daemon start"* ]]
+  [[ "$output" != *"lx daemon stop"* ]]
+  [[ "$output" != *"lx daemon status"* ]]
 }
 
 @test "agent context detected from CLAUDE_CODE env var" {

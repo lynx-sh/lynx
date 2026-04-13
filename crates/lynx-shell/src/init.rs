@@ -258,7 +258,7 @@ fn generate_bare_wrappers() -> String {
     out.push_str("  # bare subcommand wrappers (shell.bare_subcommands = true)\n");
     for cmd in BARE_SUBCOMMANDS {
         out.push_str(&format!(
-            "  if (( ! $+functions[{cmd}] )) && (( ! $+commands[{cmd}] )) && (( ! $+aliases[{cmd}] )); then\n    function {cmd} {{ lx {cmd} \"$@\" }}\n  else\n    print -u2 'lynx: bare command \\'{cmd}\\' skipped — name already in use'\n  fi\n",
+            "  if (( ! $+functions[{cmd}] )) && (( ! $+commands[{cmd}] )) && (( ! $+aliases[{cmd}] )); then\n    function {cmd} {{ lx {cmd} \"$@\" }}\n  else\n    print -u2 \"lynx: bare command '{cmd}' skipped — name already in use\"\n  fi\n",
         ));
     }
     out
@@ -527,6 +527,11 @@ mod tests {
         assert!(
             script.contains("$+aliases[theme]"),
             "collision guard must check aliases: {script}"
+        );
+        // Warning uses double-quotes so single-quoted zsh strings are not broken
+        assert!(
+            script.contains("print -u2 \"lynx: bare command 'theme'"),
+            "collision warning must use double-quoted print to avoid zsh syntax error: {script}"
         );
     }
 
