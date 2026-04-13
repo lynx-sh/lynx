@@ -5,11 +5,12 @@ use tracing::debug;
 
 use lynx_core::brand;
 
-use crate::schema::{LockFile, RegistryIndex};
+use crate::lock::LockFile;
+use crate::schema::RegistryIndex;
 
 /// Default registry index URL — official Lynx plugin index.
 pub const DEFAULT_INDEX_URL: &str =
-    "https://raw.githubusercontent.com/proxikal/lynx-plugins/main/index.toml";
+    "https://raw.githubusercontent.com/lynx-sh/registry/main/index.toml";
 
 /// Path to the local cached index: `~/.config/lynx/registry/index.toml`.
 pub fn index_cache_path() -> PathBuf {
@@ -56,15 +57,17 @@ pub fn load_index_from(path: &Path) -> Result<RegistryIndex> {
 }
 
 /// Fetch the registry index from a URL, cache it locally, and return it.
-/// Uses a blocking HTTP request — not suitable for the async context; call
-/// from a `tokio::task::spawn_blocking` block.
+/// Uses a blocking HTTP request (ureq — no async runtime needed, per D-026).
 pub fn fetch_and_cache_index(url: &str) -> Result<RegistryIndex> {
     debug!("fetching registry index from {url}");
-    let body = reqwest::blocking::get(url)
-        .with_context(|| format!("HTTP GET failed for {url}"))?
-        .error_for_status()
-        .with_context(|| format!("registry index returned error status from {url}"))?
-        .text()
+    let resp = ureq::get(url)
+        .call()
+        .with_context(|| format!("HTTP GET failed for {url}"))?;
+    if resp.status() >= 400 {
+        anyhow::bail!("registry index returned status {} from {url}", resp.status());
+    }
+    let body = resp
+        .into_string()
         .context("failed to read registry index response body")?;
 
     let idx = parse_index(&body)?;
@@ -162,14 +165,15 @@ pub fn validate_index(idx: &RegistryIndex) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::schema::{LockEntry, PluginVersion, RegistryEntry};
+    use crate::lock::LockEntry;
+    use crate::schema::{PluginVersion, RegistryEntry};
 
     fn sample_index() -> RegistryIndex {
         RegistryIndex {
             plugins: vec![RegistryEntry {
                 name: "git".into(),
                 description: "Git integration".into(),
-                author: "proxikal".into(),
+                author: "lynx-sh".into(),
                 latest_version: "1.0.0".into(),
                 versions: vec![PluginVersion {
                     version: "1.0.0".into(),
@@ -177,6 +181,7 @@ mod tests {
                     checksum_sha256: "abc123".into(),
                     min_lynx_version: None,
                 }],
+                ..Default::default()
             }],
         }
     }
@@ -227,7 +232,7 @@ mod tests {
             checksum_sha256: "abc".into(),
             installed_checksum_sha256: Some("abc".into()),
             url: "https://x.com/git.tar.gz".into(),
-            source: "registry".into(),
+            source: crate::lock::PluginSource::Registry,
         });
         save_lock_to(&lock, &path).unwrap();
         let loaded = load_lock_from(&path).unwrap();

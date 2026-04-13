@@ -35,6 +35,9 @@ pub enum DaemonCommand {
     Restart,
     /// Remove the daemon service
     Uninstall,
+    /// Catch unknown subcommands for friendly error
+    #[command(external_subcommand)]
+    Other(Vec<String>),
 }
 
 pub async fn run(args: DaemonArgs) -> Result<()> {
@@ -102,6 +105,9 @@ pub async fn run(args: DaemonArgs) -> Result<()> {
             let _ = backend.uninstall();
             let _ = stop_detached()?;
             println!("✓ lynx-daemon removed");
+        }
+        DaemonCommand::Other(args) => {
+            return Err(anyhow!("unknown daemon command '{}' — run `lx daemon` for help", args.first().map(|s| s.as_str()).unwrap_or("")));
         }
     }
 

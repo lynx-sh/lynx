@@ -24,6 +24,9 @@ pub enum DiagCommand {
     Clear,
     /// Show the path to the diagnostic log file
     Path,
+    /// Catch unknown subcommands for friendly error
+    #[command(external_subcommand)]
+    Other(Vec<String>),
 }
 
 pub async fn run(args: DiagArgs) -> Result<()> {
@@ -34,6 +37,9 @@ pub async fn run(args: DiagArgs) -> Result<()> {
         }
         Some(DiagCommand::Path) => {
             println!("{}", diag::log_path().display());
+        }
+        Some(DiagCommand::Other(args)) => {
+            anyhow::bail!("unknown diag command '{}' — run `lx diag` for help", args.first().map(|s| s.as_str()).unwrap_or(""))
         }
         None => {
             let lines = diag::tail(args.lines);

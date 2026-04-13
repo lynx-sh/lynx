@@ -24,6 +24,9 @@ pub enum SyncCommand {
     Pull,
     /// Show ahead/behind counts
     Status,
+    /// Catch unknown subcommands for friendly error
+    #[command(external_subcommand)]
+    Other(Vec<String>),
 }
 
 pub async fn run(args: SyncArgs) -> Result<()> {
@@ -32,6 +35,9 @@ pub async fn run(args: SyncArgs) -> Result<()> {
         SyncCommand::Push => cmd_push(),
         SyncCommand::Pull => cmd_pull(),
         SyncCommand::Status => cmd_status(),
+        SyncCommand::Other(args) => {
+            bail!("unknown sync command '{}' — run `lx sync` for help", args.first().map(|s| s.as_str()).unwrap_or(""))
+        }
     }
 }
 
@@ -95,8 +101,7 @@ fn cmd_push() -> Result<()> {
 
     // Stage all tracked files (respecting .gitignore).
     git(&dir, &["add", "-u"])?;
-    // Explicitly include profiles/ so new profile files are synced.
-    git(&dir, &["add", "*.toml", "profiles/", ".gitignore"])?;
+    git(&dir, &["add", "*.toml", ".gitignore"])?;
 
     // Commit only if there are staged changes.
     let status = git_output(&dir, &["status", "--porcelain"])?;

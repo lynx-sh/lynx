@@ -1,7 +1,5 @@
 pub mod defaults;
 pub mod migrate;
-pub mod profile;
-pub mod profile_activator;
 pub mod schema;
 pub mod snapshot;
 pub mod validate;
@@ -32,6 +30,30 @@ pub fn load_from(path: &Path) -> Result<LynxConfig> {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(LynxConfig::default()),
         Err(e) => Err(LynxError::IoRaw(e)),
     }
+}
+
+/// Enable a plugin by adding it to enabled_plugins (D-007: snapshot → validate → apply).
+pub fn enable_plugin(name: &str) -> Result<()> {
+    let config = load()?;
+    if config.enabled_plugins.iter().any(|p| p == name) {
+        return Ok(());
+    }
+    snapshot::mutate_config_transaction(&format!("plugin-enable-{name}"), |cfg| {
+        cfg.enabled_plugins.push(name.to_string());
+        Ok(())
+    })
+}
+
+/// Disable a plugin by removing it from enabled_plugins (D-007: snapshot → validate → apply).
+pub fn disable_plugin(name: &str) -> Result<()> {
+    let config = load()?;
+    if !config.enabled_plugins.iter().any(|p| p == name) {
+        return Err(LynxError::Config(format!("plugin '{name}' is not enabled")));
+    }
+    snapshot::mutate_config_transaction(&format!("plugin-disable-{name}"), |cfg| {
+        cfg.enabled_plugins.retain(|p| p != name);
+        Ok(())
+    })
 }
 
 /// Validate then write config to disk (D-007: validate before writing).

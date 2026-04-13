@@ -13,8 +13,9 @@
 //!     tasks/          ← task_logs_dir()
 //!     events.jsonl    ← events_log_file()
 //!   themes/           ← themes_dir()
-//!   profiles/         ← profiles_dir()
 //!   plugins/          ← installed_plugins_dir()
+//!   taps.toml         ← taps_config_path()
+//!   registry/         ← registry_cache_dir()
 //!   shell/
 //!     init.zsh        ← shell_init_file()
 //! ~/.local/bin/
@@ -77,14 +78,29 @@ pub fn themes_dir() -> PathBuf {
     lynx_dir().join("themes")
 }
 
-/// `~/.config/lynx/profiles/`
-pub fn profiles_dir() -> PathBuf {
-    lynx_dir().join("profiles")
+/// `~/.config/lynx/workflows/`
+pub fn workflows_dir() -> PathBuf {
+    lynx_dir().join("workflows")
+}
+
+/// `~/.config/lynx/jobs/`
+pub fn jobs_dir() -> PathBuf {
+    lynx_dir().join("jobs")
 }
 
 /// `~/.config/lynx/plugins/` — installed plugins directory.
 pub fn installed_plugins_dir() -> PathBuf {
     lynx_dir().join("plugins")
+}
+
+/// `~/.config/lynx/taps.toml` — tap registry configuration.
+pub fn taps_config_path() -> PathBuf {
+    lynx_dir().join(brand::TAPS_FILE)
+}
+
+/// `~/.config/lynx/registry/` — cached registry indexes.
+pub fn registry_cache_dir() -> PathBuf {
+    lynx_dir().join("registry")
 }
 
 /// `~/.config/lynx/shell/init.zsh` — the shell init file sourced from `.zshrc`.
@@ -170,7 +186,6 @@ mod tests {
         assert_eq!(task_logs_dir(), base.join("logs").join("tasks"));
         assert_eq!(events_log_file(), base.join("logs").join("events.jsonl"));
         assert_eq!(themes_dir(), base.join("themes"));
-        assert_eq!(profiles_dir(), base.join("profiles"));
         assert_eq!(installed_plugins_dir(), base.join("plugins"));
     }
 

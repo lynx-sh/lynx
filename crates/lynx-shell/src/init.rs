@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use lynx_core::env_vars;
 use lynx_core::types::Context;
 
@@ -11,6 +13,15 @@ pub struct InitParams<'a> {
     pub ls_colors: Option<&'a str>,
     /// EZA_COLORS value from the active theme. Emitted inside the init guard.
     pub eza_colors: Option<&'a str>,
+    /// BSD LSCOLORS value for macOS /bin/ls.
+    pub bsd_lscolors: Option<&'a str>,
+    /// ZSH_HIGHLIGHT_STYLES assignments from the active theme.
+    pub syntax_highlight_styles: Option<&'a str>,
+    /// ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE value from the active theme.
+    pub autosuggest_style: Option<&'a str>,
+    /// Plugins that hook into ZLE (zle -N) and must be sourced directly.
+    /// These cannot go through eval "$()" — zle widget binding fails inside eval.
+    pub zle_hook_plugins: HashSet<String>,
 }
 
 /// Generate the zsh init script that the shell evals on startup.
@@ -50,6 +61,47 @@ pub fn generate_init_script(params: &InitParams<'_>) -> String {
     if let Some(eza) = params.eza_colors {
         out.push_str(&format!("  export EZA_COLORS={}\n", shell_quote(eza)));
     }
+    // BSD ls colors (macOS) — CLICOLOR enables color, LSCOLORS sets the palette.
+    if let Some(bsd) = params.bsd_lscolors {
+        out.push_str("  export CLICOLOR=1\n");
+        out.push_str(&format!("  export LSCOLORS={}\n", shell_quote(bsd)));
+    }
+
+    // Smart ls alias — macOS /bin/ls can't use LS_COLORS (truecolor, per-extension).
+    // Alias to eza or gls if available so theme colors actually render.
+    if params.ls_colors.is_some() {
+        out.push_str(concat!(
+            "  if (( ! ${+aliases[ls]} )); then\n",
+            "    if (( $+commands[eza] )); then\n",
+            "      alias ls='eza'\n",
+            "      alias ll='eza -la'\n",
+            "      alias la='eza -a'\n",
+            "      alias lt='eza --tree'\n",
+            "    elif (( $+commands[gls] )); then\n",
+            "      alias ls='gls --color=auto'\n",
+            "      alias ll='gls --color=auto -la'\n",
+            "      alias la='gls --color=auto -a'\n",
+            "    fi\n",
+            "  fi\n",
+        ));
+    }
+
+    // Syntax highlighting styles from the active theme.
+    // Emitted as individual ZSH_HIGHLIGHT_STYLES assignments that plugins source.
+    if let Some(styles) = params.syntax_highlight_styles {
+        // Declare the associative array first (idempotent — typeset -gA is safe to repeat).
+        out.push_str("  typeset -gA ZSH_HIGHLIGHT_STYLES 2>/dev/null\n");
+        for line in styles.lines() {
+            out.push_str(&format!("  {line}\n"));
+        }
+    }
+    // Auto-suggestion highlight style from the active theme.
+    if let Some(style) = params.autosuggest_style {
+        out.push_str(&format!(
+            "  export ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE={}\n",
+            shell_quote(style)
+        ));
+    }
 
     // HOSTNAME: macOS zsh special param — not exported by default.
     out.push_str("  export HOSTNAME=\"${HOSTNAME:-$(hostname -s)}\"\n");
@@ -83,9 +135,22 @@ pub fn generate_init_script(params: &InitParams<'_>) -> String {
         ));
     }
 
-    // Eval-bridge calls for each enabled plugin
+    // Load each enabled plugin.
+    // ZLE-hook plugins (syntax-highlight, autosuggestions, etc.) must be sourced
+    // directly — zle -N widget binding fails inside eval "$(...)".
+    // All other plugins go through lynx_eval_plugin (the standard eval-bridge).
     for plugin in params.enabled_plugins {
-        out.push_str(&format!("  lynx_eval_plugin {}\n", shell_quote(plugin)));
+        if params.zle_hook_plugins.contains(plugin.as_str()) {
+            let guard = env_vars::plugin_guard_var(plugin);
+            let full_plugin_dir = shell_quote(&format!("{}/{}", params.plugin_dir, plugin));
+            out.push_str(&format!(
+                "  if [[ -z \"${{{guard}}}\" ]]; then\n    LYNX_PLUGIN_DIR={full_plugin_dir}\n    source \"$LYNX_PLUGIN_DIR/shell/init.zsh\" 2>/dev/null\n    typeset -g {guard}=1\n  fi\n",
+                guard = guard,
+                full_plugin_dir = full_plugin_dir,
+            ));
+        } else {
+            out.push_str(&format!("  lynx_eval_plugin {}\n", shell_quote(plugin)));
+        }
     }
 
     // Not exported — must not leak into child shells or lx init would skip there too
@@ -115,6 +180,10 @@ mod tests {
             enabled_plugins: plugins,
             ls_colors: None,
             eza_colors: None,
+            bsd_lscolors: None,
+            syntax_highlight_styles: None,
+            autosuggest_style: None,
+            zle_hook_plugins: HashSet::new(),
         }
     }
 
@@ -171,6 +240,19 @@ mod tests {
     fn idempotency_guard_present() {
         let script = generate_init_script(&base_params(&Context::Interactive, &[]));
         assert!(script.contains("LYNX_INITIALIZED"));
+    }
+
+    #[test]
+    fn zle_hook_plugin_emits_direct_source_not_eval_bridge() {
+        let plugins = vec!["syntax-highlight".to_string(), "git".to_string()];
+        let mut params = base_params(&Context::Interactive, &plugins);
+        params.zle_hook_plugins = HashSet::from(["syntax-highlight".to_string()]);
+        let script = generate_init_script(&params);
+        // ZLE plugin must use direct source, not lynx_eval_plugin
+        assert!(!script.contains("lynx_eval_plugin 'syntax-highlight'"));
+        assert!(script.contains("source \"$LYNX_PLUGIN_DIR/shell/init.zsh\""));
+        // Non-ZLE plugin still uses eval bridge
+        assert!(script.contains("lynx_eval_plugin 'git'"));
     }
 
     #[test]

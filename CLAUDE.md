@@ -19,7 +19,6 @@ shell/          Thin zsh integration layer (logic-free — see patterns/shell-pr
 plugins/        First-party plugins (see patterns/plugin-protocol.md)
 themes/         TOML theme files
 contexts/       Context configs (interactive, agent, minimal)
-profiles/       Named load profiles
 docs/           Architecture, guides, ADRs
 tests/          Rust integration tests + bats shell tests
 .claude/skills/lynx/   Skill system (maps + patterns — read when task router points here)

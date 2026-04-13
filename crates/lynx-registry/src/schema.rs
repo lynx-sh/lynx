@@ -15,20 +15,100 @@ pub struct PluginVersion {
     pub min_lynx_version: Option<String>,
 }
 
-/// A plugin entry in the registry index.
+/// Package type in the registry.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum PackageType {
+    #[default]
+    Plugin,
+    Tool,
+    Theme,
+    Intro,
+    Bundle,
+    Workflow,
+}
+
+/// Install commands for tools — one field per package manager.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+pub struct InstallMethods {
+    /// Homebrew formula name (e.g. "eza", "ripgrep")
+    #[serde(default)]
+    pub brew: Option<String>,
+    /// APT package name
+    #[serde(default)]
+    pub apt: Option<String>,
+    /// DNF package name
+    #[serde(default)]
+    pub dnf: Option<String>,
+    /// Pacman package name
+    #[serde(default)]
+    pub pacman: Option<String>,
+    /// Cargo crate name
+    #[serde(default)]
+    pub cargo: Option<String>,
+    /// Direct download URL (for binaries or scripts)
+    #[serde(default)]
+    pub url: Option<String>,
+}
+
+/// A package entry in the registry index.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RegistryEntry {
-    /// Plugin name — must match the plugin.toml `[plugin].name` field.
+    /// Package name.
     pub name: String,
     /// Human-readable description (shown in search results).
     pub description: String,
     /// Author / maintainer name.
     #[serde(default)]
     pub author: String,
+    /// Package type: plugin, tool, theme, intro, or bundle.
+    #[serde(default)]
+    pub package_type: PackageType,
+    /// Category for browsing (e.g. "file-management", "search", "security").
+    #[serde(default)]
+    pub category: String,
+    /// Supported platforms. Empty = all platforms.
+    #[serde(default)]
+    pub platform: Vec<String>,
+    /// Install methods for tools (brew, apt, cargo, url, etc.).
+    #[serde(default)]
+    pub install: Option<InstallMethods>,
+    /// System command this tool replaces (e.g. "ls" for eza, "cat" for bat).
+    #[serde(default)]
+    pub replaces: Option<String>,
+    /// Whether this package integrates with Lynx theme colors.
+    #[serde(default)]
+    pub theme_integrated: bool,
+    /// Whether this package ships bundled with Lynx (not downloaded).
+    #[serde(default)]
+    pub bundled: bool,
+    /// List of package names included in a bundle.
+    #[serde(default)]
+    pub packages: Vec<String>,
     /// Latest available version (must match one entry in `versions`).
     pub latest_version: String,
     /// All available versions, newest-first.
     pub versions: Vec<PluginVersion>,
+}
+
+impl Default for RegistryEntry {
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+            description: String::new(),
+            author: String::new(),
+            package_type: PackageType::default(),
+            category: String::new(),
+            platform: Vec::new(),
+            install: None,
+            replaces: None,
+            theme_integrated: false,
+            bundled: false,
+            packages: Vec::new(),
+            latest_version: String::new(),
+            versions: Vec::new(),
+        }
+    }
 }
 
 impl RegistryEntry {
@@ -47,6 +127,22 @@ impl RegistryEntry {
     pub fn version_count(&self) -> usize {
         self.versions.len()
     }
+
+    pub fn is_plugin(&self) -> bool {
+        self.package_type == PackageType::Plugin
+    }
+    pub fn is_tool(&self) -> bool {
+        self.package_type == PackageType::Tool
+    }
+    pub fn is_theme(&self) -> bool {
+        self.package_type == PackageType::Theme
+    }
+    pub fn is_intro(&self) -> bool {
+        self.package_type == PackageType::Intro
+    }
+    pub fn is_bundle(&self) -> bool {
+        self.package_type == PackageType::Bundle
+    }
 }
 
 /// The full registry index, parsed from the index TOML file.
@@ -57,6 +153,11 @@ pub struct RegistryIndex {
 }
 
 impl RegistryIndex {
+    /// Build a name→index HashMap for O(1) lookups.
+    pub fn name_index(&self) -> std::collections::HashMap<&str, usize> {
+        self.plugins.iter().enumerate().map(|(i, e)| (e.name.as_str(), i)).collect()
+    }
+
     /// Look up a plugin by exact name.
     pub fn find(&self, name: &str) -> Option<&RegistryEntry> {
         self.plugins.iter().find(|e| e.name == name)
@@ -73,60 +174,22 @@ impl RegistryIndex {
             })
             .collect()
     }
-}
 
-/// A single entry in lynx.lock — pins an installed plugin to an exact version
-/// and checksum so future installs are reproducible.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct LockEntry {
-    /// Plugin name.
-    pub name: String,
-    /// Exact version installed.
-    pub version: String,
-    /// SHA-256 hex digest of the installed archive (verified at install time).
-    pub checksum_sha256: String,
-    /// SHA-256 hex digest of the installed plugin directory contents.
-    /// Used by `lx plugin checksum <name>` for post-install tamper checks.
-    #[serde(default)]
-    pub installed_checksum_sha256: Option<String>,
-    /// Source URL the archive was downloaded from.
-    pub url: String,
-    /// Install method: "registry" or "local".
-    #[serde(default = "default_source")]
-    pub source: String,
-}
-
-fn default_source() -> String {
-    "registry".to_string()
-}
-
-/// The full lynx.lock file.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
-pub struct LockFile {
-    #[serde(rename = "locked", default)]
-    pub entries: Vec<LockEntry>,
-}
-
-impl LockFile {
-    /// Find a locked entry by plugin name.
-    pub fn find(&self, name: &str) -> Option<&LockEntry> {
-        self.entries.iter().find(|e| e.name == name)
+    /// Filter entries by package type.
+    pub fn search_by_type(&self, pkg_type: &PackageType) -> Vec<&RegistryEntry> {
+        self.plugins
+            .iter()
+            .filter(|e| &e.package_type == pkg_type)
+            .collect()
     }
 
-    /// Upsert: replace an existing entry or append a new one.
-    pub fn upsert(&mut self, entry: LockEntry) {
-        if let Some(existing) = self.entries.iter_mut().find(|e| e.name == entry.name) {
-            *existing = entry;
-        } else {
-            self.entries.push(entry);
-        }
-    }
-
-    /// Remove an entry by name. Returns true if it was present.
-    pub fn remove(&mut self, name: &str) -> bool {
-        let before = self.entries.len();
-        self.entries.retain(|e| e.name != name);
-        self.entries.len() < before
+    /// Filter entries by category (case-insensitive exact match).
+    pub fn search_by_category(&self, category: &str) -> Vec<&RegistryEntry> {
+        let cat = category.to_lowercase();
+        self.plugins
+            .iter()
+            .filter(|e| e.category.to_lowercase() == cat)
+            .collect()
     }
 }
 
@@ -262,73 +325,168 @@ url = "https://example.com/broken.tar.gz"
         assert!(result.is_err(), "expected parse error for missing checksum");
     }
 
+    // ── B18-P02: expanded schema tests ──────────────────────────────────────
+
     #[test]
-    fn lockfile_upsert_and_find() {
-        let mut lock = LockFile::default();
-        lock.upsert(LockEntry {
-            name: "git".into(),
-            version: "1.0.0".into(),
-            checksum_sha256: "abc".into(),
-            installed_checksum_sha256: Some("abc".into()),
-            url: "https://example.com/git.tar.gz".into(),
-            source: "registry".into(),
-        });
-        assert!(lock.find("git").is_some());
-        assert_eq!(lock.entries.len(), 1);
+    fn backward_compat_plugin_only_index_parses() {
+        // Existing plugin-only index (no package_type field) must still parse.
+        let idx: RegistryIndex = toml::from_str(sample_index_toml()).unwrap();
+        assert_eq!(idx.plugins.len(), 3);
+        // All entries default to PackageType::Plugin.
+        assert!(idx.plugins.iter().all(|e| e.is_plugin()));
     }
 
     #[test]
-    fn lockfile_upsert_replaces_existing() {
-        let mut lock = LockFile::default();
-        lock.upsert(LockEntry {
-            name: "git".into(),
-            version: "1.0.0".into(),
-            checksum_sha256: "old".into(),
-            installed_checksum_sha256: Some("old".into()),
-            url: "u".into(),
-            source: "registry".into(),
-        });
-        lock.upsert(LockEntry {
-            name: "git".into(),
-            version: "1.1.0".into(),
-            checksum_sha256: "new".into(),
-            installed_checksum_sha256: Some("new".into()),
-            url: "u2".into(),
-            source: "registry".into(),
-        });
-        assert_eq!(lock.entries.len(), 1);
-        assert_eq!(lock.find("git").unwrap().version, "1.1.0");
+    fn parse_tool_entry() {
+        let toml = r#"
+[[plugin]]
+name = "eza"
+description = "Modern ls replacement"
+author = "lynx-sh"
+package_type = "tool"
+category = "file-management"
+replaces = "ls"
+theme_integrated = true
+latest_version = "0.0.0"
+
+[plugin.install]
+brew = "eza"
+apt = "eza"
+cargo = "eza"
+
+[[plugin.versions]]
+version = "0.0.0"
+url = "n/a"
+checksum_sha256 = "n/a"
+"#;
+        let idx: RegistryIndex = toml::from_str(toml).unwrap();
+        let eza = idx.find("eza").unwrap();
+        assert!(eza.is_tool());
+        assert_eq!(eza.category, "file-management");
+        assert_eq!(eza.replaces.as_deref(), Some("ls"));
+        assert!(eza.theme_integrated);
+        let install = eza.install.as_ref().unwrap();
+        assert_eq!(install.brew.as_deref(), Some("eza"));
+        assert_eq!(install.apt.as_deref(), Some("eza"));
     }
 
     #[test]
-    fn lockfile_remove() {
-        let mut lock = LockFile::default();
-        lock.upsert(LockEntry {
-            name: "git".into(),
-            version: "1.0.0".into(),
-            checksum_sha256: "x".into(),
-            installed_checksum_sha256: Some("x".into()),
-            url: "u".into(),
-            source: "registry".into(),
-        });
-        assert!(lock.remove("git"));
-        assert!(lock.find("git").is_none());
-        assert!(!lock.remove("git")); // already gone
+    fn parse_theme_entry() {
+        let toml = r#"
+[[plugin]]
+name = "catppuccin"
+description = "Catppuccin theme for Lynx"
+package_type = "theme"
+category = "themes"
+latest_version = "1.0.0"
+
+[[plugin.versions]]
+version = "1.0.0"
+url = "https://example.com/catppuccin.toml"
+checksum_sha256 = "abc"
+"#;
+        let idx: RegistryIndex = toml::from_str(toml).unwrap();
+        let theme = idx.find("catppuccin").unwrap();
+        assert!(theme.is_theme());
     }
 
     #[test]
-    fn lockfile_roundtrips_toml() {
-        let mut lock = LockFile::default();
-        lock.upsert(LockEntry {
-            name: "git".into(),
-            version: "1.0.0".into(),
-            checksum_sha256: "abc".into(),
-            installed_checksum_sha256: Some("abc".into()),
-            url: "https://x.com/git.tar.gz".into(),
-            source: "registry".into(),
-        });
-        let serialized = toml::to_string_pretty(&lock).unwrap();
-        let parsed: LockFile = toml::from_str(&serialized).unwrap();
-        assert_eq!(lock, parsed);
+    fn parse_bundle_entry() {
+        let toml = r#"
+[[plugin]]
+name = "modern-cli"
+description = "Modern CLI tools bundle"
+package_type = "bundle"
+category = "bundles"
+packages = ["eza", "bat", "fd", "ripgrep"]
+latest_version = "1.0.0"
+
+[[plugin.versions]]
+version = "1.0.0"
+url = "n/a"
+checksum_sha256 = "n/a"
+"#;
+        let idx: RegistryIndex = toml::from_str(toml).unwrap();
+        let bundle = idx.find("modern-cli").unwrap();
+        assert!(bundle.is_bundle());
+        assert_eq!(bundle.packages, vec!["eza", "bat", "fd", "ripgrep"]);
+    }
+
+    #[test]
+    fn search_by_type_filters_correctly() {
+        let toml = r#"
+[[plugin]]
+name = "git"
+description = "Git plugin"
+package_type = "plugin"
+latest_version = "1.0.0"
+[[plugin.versions]]
+version = "1.0.0"
+url = "x"
+checksum_sha256 = "x"
+
+[[plugin]]
+name = "eza"
+description = "Modern ls"
+package_type = "tool"
+latest_version = "1.0.0"
+[[plugin.versions]]
+version = "1.0.0"
+url = "x"
+checksum_sha256 = "x"
+
+[[plugin]]
+name = "tokyo-night"
+description = "Tokyo Night theme"
+package_type = "theme"
+latest_version = "1.0.0"
+[[plugin.versions]]
+version = "1.0.0"
+url = "x"
+checksum_sha256 = "x"
+"#;
+        let idx: RegistryIndex = toml::from_str(toml).unwrap();
+        assert_eq!(idx.search_by_type(&PackageType::Plugin).len(), 1);
+        assert_eq!(idx.search_by_type(&PackageType::Tool).len(), 1);
+        assert_eq!(idx.search_by_type(&PackageType::Theme).len(), 1);
+        assert_eq!(idx.search_by_type(&PackageType::Bundle).len(), 0);
+    }
+
+    #[test]
+    fn search_by_category_case_insensitive() {
+        let toml = r#"
+[[plugin]]
+name = "eza"
+description = "Modern ls"
+category = "File-Management"
+latest_version = "1.0.0"
+[[plugin.versions]]
+version = "1.0.0"
+url = "x"
+checksum_sha256 = "x"
+"#;
+        let idx: RegistryIndex = toml::from_str(toml).unwrap();
+        assert_eq!(idx.search_by_category("file-management").len(), 1);
+        assert_eq!(idx.search_by_category("FILE-MANAGEMENT").len(), 1);
+        assert_eq!(idx.search_by_category("search").len(), 0);
+    }
+
+    #[test]
+    fn platform_field_parses() {
+        let toml = r#"
+[[plugin]]
+name = "linpeas"
+description = "Privilege escalation audit"
+package_type = "tool"
+platform = ["linux", "macos"]
+latest_version = "1.0.0"
+[[plugin.versions]]
+version = "1.0.0"
+url = "x"
+checksum_sha256 = "x"
+"#;
+        let idx: RegistryIndex = toml::from_str(toml).unwrap();
+        let entry = idx.find("linpeas").unwrap();
+        assert_eq!(entry.platform, vec!["linux", "macos"]);
     }
 }

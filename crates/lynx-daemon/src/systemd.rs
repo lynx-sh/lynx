@@ -1,6 +1,6 @@
 use crate::{ServiceBackend, ServiceStatus};
 use anyhow::{Context, Result};
-use lynx_core::{brand, env_vars};
+use lynx_core::{brand, env_vars, paths};
 use std::path::PathBuf;
 
 pub struct SystemdBackend {
@@ -38,7 +38,7 @@ impl SystemdBackend {
                 }
             }
         }
-        PathBuf::from("/usr/local/bin/").join(brand::DAEMON_NAME)
+        paths::bin_dir().join(brand::DAEMON_NAME)
     }
 
     fn unit_content(&self) -> String {

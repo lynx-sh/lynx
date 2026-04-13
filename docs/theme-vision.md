@@ -251,10 +251,6 @@ prod_pattern = "prod-.*"
 color        = { fg = "$warning" }
 hide_in      = ["minimal"]
 
-[segment.profile_badge]
-icon    = "⬡ "
-hide_in = ["agent", "minimal"]
-
 # planned segments (H-056):
 # username, hostname, exit_code, venv, newline,
 # git_ahead_behind, git_stash

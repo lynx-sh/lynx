@@ -1,6 +1,6 @@
-use std::process::Command;
-
 use anyhow::{bail, Result};
+
+use super::open_in_vscode;
 use clap::{Args, Subcommand};
 
 use lynx_config::snapshot::{create as snapshot, mutate_config_transaction};
@@ -28,6 +28,9 @@ pub enum ConfigCommand {
     Set { key: String, value: String },
     /// Show real-world usage examples
     Examples,
+    /// Catch unknown subcommands for friendly error
+    #[command(external_subcommand)]
+    Other(Vec<String>),
 }
 
 pub async fn run(args: ConfigArgs) -> Result<()> {
@@ -42,6 +45,9 @@ pub async fn run(args: ConfigArgs) -> Result<()> {
                 command: Some("config".into()),
             })
             .await
+        }
+        ConfigCommand::Other(args) => {
+            bail!("unknown config command '{}' — run `lx config` for help", args.first().map(|s| s.as_str()).unwrap_or(""))
         }
     }
 }
@@ -58,17 +64,14 @@ fn cmd_edit() -> Result<()> {
     let snapshot_dir = snapshot(path.parent().unwrap_or(&path), "config-edit")?;
     let _ = snapshot_dir;
 
+    let file_existed = path.exists();
     let snapshot_content = std::fs::read_to_string(&path).unwrap_or_default();
-    let editor = std::env::var("EDITOR").unwrap_or_else(|_| "vi".to_string());
-
-    let status = Command::new(&editor)
-        .arg(&path)
-        .status()
-        .map_err(|e| anyhow::anyhow!("failed to launch editor '{editor}': {e}"))?;
-
-    if !status.success() {
-        std::fs::write(&path, &snapshot_content).ok();
-        bail!("editor exited with error — config unchanged");
+    open_in_vscode(&path)?;
+    // VS Code edits in place; re-read to check for changes.
+    let after = std::fs::read_to_string(&path).unwrap_or_default();
+    if after == snapshot_content && (file_existed || after.is_empty()) {
+        println!("no changes made");
+        return Ok(());
     }
 
     // Validate.

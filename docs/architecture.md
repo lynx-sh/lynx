@@ -26,6 +26,11 @@ lynx-plugin        (exec script gen, lazy wrappers, namespace lint, context filt
 lynx-task          (task parser + scheduler runtime primitives)
 lynx-daemon        (background process hosting event dispatch + task scheduler loops)
 lynx-registry      (plugin index fetch, checksum verify, version lock)
+lynx-convert       (OMZ + Oh-My-Posh theme converter)
+lynx-intro         (startup intro renderer — ASCII art, system info)
+lynx-doctor        (health check library — environment diagnostics)
+lynx-workflow      (TOML workflow schema, runners, step executor, job manager)
+lynx-dashboard     (local web UI — Axum server, embedded HTML/CSS/JS frontend)
 lynx-test-utils    (dev-dependency only — fixtures, temp HOME, zsh validators)
 
 lynx-cli           (lx binary — assembles all crates, dispatches subcommands)
@@ -136,7 +141,6 @@ is called.
 lx prompt render
   ├── reads LYNX_CACHE_GIT_STATE env var     → cache["git_state"]
   ├── reads LYNX_CACHE_KUBECTL_STATE env var → cache["kubectl_state"]
-  ├── reads LynxConfig.active_profile        → cache["profile_state"]
   ├── loads active theme (LYNX_THEME env var → config.active_theme → brand::DEFAULT_THEME fallback)
   ├── evaluates all segments concurrently (tokio)
   └── prints: PROMPT="..." \n RPROMPT="..."   ← eval'd by precmd
@@ -208,4 +212,3 @@ They appear in the eval'd output — never in static `shell/init.zsh` files.
 | Prompt render | `lx prompt render` | lynx-prompt, lynx-theme | `PROMPT=` / `RPROMPT=` assignments |
 | Config change | `lx config set <k> <v>` | lynx-config, lynx-core | TOML on disk + event emitted |
 | Plugin install | `lx plugin add <name>` | lynx-registry, lynx-manifest | plugin dir + config update |
-| Profile switch | `lx profile switch <name>` | lynx-config, lynx-cli | config update + plugin diff eval'd |

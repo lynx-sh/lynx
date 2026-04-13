@@ -13,11 +13,13 @@ path = "src/main.rs"
 lynx-core     = { path = "../lynx-core" }
 lynx-config   = { path = "../lynx-config" }
 lynx-convert  = { path = "../lynx-convert" }
+lynx-doctor   = { path = "../lynx-doctor" }
+lynx-dashboard = { path = "../lynx-dashboard" }
+lynx-workflow  = { path = "../lynx-workflow" }
 lynx-events   = { path = "../lynx-events" }
 lynx-manifest = { path = "../lynx-manifest" }
 lynx-plugin   = { path = "../lynx-plugin" }
 lynx-theme   = { path = "../lynx-theme" }
-lynx-studio  = { path = "../lynx-studio" }
 lynx-prompt  = { path = "../lynx-prompt" }
 lynx-task    = { path = "../lynx-task" }
 lynx-daemon  = { path = "../lynx-daemon" }
@@ -25,6 +27,7 @@ lynx-depgraph = { path = "../lynx-depgraph" }
 lynx-shell    = { path = "../lynx-shell" }
 lynx-registry = { path = "../lynx-registry" }
 clap.workspace = true
+owo-colors.workspace = true
 serde_json.workspace = true
 toml.workspace = true
 anyhow.workspace = true

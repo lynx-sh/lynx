@@ -7,12 +7,14 @@ use lynx_prompt::{
     evaluator::evaluate_theme,
     renderer::{render_prompt, render_transient_prompt},
     segment::RenderContext,
-    AwsProfileSegment, BackgroundJobsSegment, CmdDurationSegment, CondaEnvSegment, ContextBadgeSegment, DirSegment,
-    ExitCodeSegment, GitActionSegment, GitAheadBehindSegment, GitBranchSegment, GitShaSegment,
-    GitStashSegment, GitStatusSegment, GitTimeSinceCommitSegment, GolangVersionSegment,
-    HistNumberSegment, HostnameSegment, KubectlContextSegment, NewlineSegment,
-    NodeVersionSegment, ProfileBadgeSegment, PromptCharSegment, RubyVersionSegment,
-    RustVersionSegment, SshIndicatorSegment, TaskStatusSegment, TimeSegment, UsernameSegment,
+    AwsProfileSegment, BackgroundJobsSegment, BatterySegment, CmdDurationSegment,
+    CondaEnvSegment, ContextBadgeSegment, DirSegment, DockerSegment,
+    ExitCodeSegment, GcpSegment, GitActionSegment, GitAheadBehindSegment, GitBranchSegment,
+    GitShaSegment, GitStashSegment, GitStatusSegment, GitTimeSinceCommitSegment,
+    GolangVersionSegment, HistNumberSegment, HostnameSegment, KubectlContextSegment,
+    LangVersionSegment, NewlineSegment, NodeVersionSegment, OsSegment, PromptCharSegment,
+    RubyVersionSegment, RustVersionSegment, ShellSegment, SshIndicatorSegment,
+    TaskStatusSegment, TerraformSegment, TextSegment, TimeSegment, UsernameSegment,
     VenvSegment, ViModeSegment, CustomSegment,
 };
 use lynx_theme::loader::load as load_theme;
@@ -87,15 +89,18 @@ async fn cmd_render(transient: bool) -> Result<()> {
         Box::new(GitStashSegment),
         Box::new(GitTimeSinceCommitSegment),
         Box::new(AwsProfileSegment),
+        Box::new(BatterySegment),
+        Box::new(DockerSegment),
+        Box::new(GcpSegment),
         Box::new(HistNumberSegment),
         Box::new(KubectlContextSegment),
         Box::new(NodeVersionSegment),
         Box::new(RubyVersionSegment),
         Box::new(GolangVersionSegment),
         Box::new(RustVersionSegment),
+        Box::new(LangVersionSegment),
         Box::new(VenvSegment),
         Box::new(CondaEnvSegment),
-        Box::new(ProfileBadgeSegment),
         Box::new(TaskStatusSegment),
         Box::new(CmdDurationSegment),
         Box::new(ExitCodeSegment),
@@ -105,7 +110,11 @@ async fn cmd_render(transient: bool) -> Result<()> {
         Box::new(TimeSegment),
         Box::new(ContextBadgeSegment),
         Box::new(NewlineSegment),
+        Box::new(OsSegment),
         Box::new(PromptCharSegment),
+        Box::new(ShellSegment),
+        Box::new(TerraformSegment),
+        Box::new(TextSegment),
     ];
 
     // --- Evaluate and render ---
@@ -117,7 +126,7 @@ async fn cmd_render(transient: bool) -> Result<()> {
 
     let columns = ctx.env.get("COLUMNS").and_then(|v| v.parse::<u32>().ok());
     let (left, right, top, top_right, continuation) = evaluate_theme(&segments, theme_ref, &ctx).await;
-    let output = render_prompt(&left, &right, &top, &top_right, &continuation, theme_ref, columns);
+    let output = render_prompt(&left, &right, &top, &top_right, &continuation, theme_ref, columns, Some(&ctx));
     print!("{}", output);
     Ok(())
 }
@@ -170,17 +179,6 @@ fn build_render_context_from_env() -> RenderContext {
         }
     }
 
-    if let Ok(config) = load_config() {
-        if let Some(profile) = &config.active_profile {
-            if !profile.is_empty() {
-                cache.insert(
-                    cache_keys::PROFILE_STATE.into(),
-                    serde_json::json!({ "name": profile }),
-                );
-            }
-        }
-    }
-
     // Capture env snapshot — segments must read from ctx.env, not std::env::var().
     let env_keys = [
         "USER",
@@ -213,7 +211,6 @@ fn build_render_context_from_env() -> RenderContext {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lynx_test_utils::temp_home;
     use std::sync::{Mutex, OnceLock};
 
     fn env_lock() -> &'static Mutex<()> {
@@ -325,31 +322,6 @@ mod tests {
         std::env::set_var("PWD", "/");
         let ctx = build_render_context_from_env();
         assert_eq!(ctx.cache[lynx_prompt::cache_keys::KUBECTL_STATE]["context"], "dev");
-    }
-
-    #[test]
-    fn profile_state_is_loaded_from_config() {
-        let _lock = env_lock().lock().expect("lock");
-        let _guard = EnvGuard::new(&["HOME", "PWD", "LYNX_DIR"]);
-        let home = temp_home();
-        std::env::set_var("HOME", home.path());
-        std::env::remove_var("LYNX_DIR");
-        std::env::set_var("PWD", "/");
-        let config_dir = home.path().join(lynx_core::brand::CONFIG_DIR);
-        std::fs::create_dir_all(&config_dir).expect("create config dir");
-        std::fs::write(
-            config_dir.join(lynx_core::brand::CONFIG_FILE),
-            r#"schema_version = 1
-enabled_plugins = []
-active_theme = "default"
-active_context = "interactive"
-active_profile = "work"
-"#,
-        )
-        .expect("write config");
-
-        let ctx = build_render_context_from_env();
-        assert_eq!(ctx.cache[lynx_prompt::cache_keys::PROFILE_STATE]["name"], "work");
     }
 
     #[test]

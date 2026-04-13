@@ -17,7 +17,7 @@ pub fn load(name: &str) -> Result<Theme> {
     if path.exists() {
         return load_from_path(&path);
     }
-    Err(LynxError::Theme(format!("theme '{name}' not found — run `lx install` to set up default themes")))
+    Err(LynxError::Theme(format!("theme '{name}' not found — run `lx setup` to set up default themes")))
 }
 
 /// Load a theme from an explicit file path.
@@ -81,6 +81,12 @@ fn resolve_ls_colors_palette(
     .into_iter()
     .flatten()
     {
+        resolve_color_ref(&mut entry.fg, palette);
+        resolve_color_ref(&mut entry.bg, palette);
+    }
+
+    // Per-extension entries.
+    for entry in lsc.extensions.values_mut() {
         resolve_color_ref(&mut entry.fg, palette);
         resolve_color_ref(&mut entry.bg, palette);
     }

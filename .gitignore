@@ -1,4 +1,26 @@
 /target
 **/*.rs.bk
-.DS_Store
 *.swp
+
+# OS and editor
+.DS_Store
+Thumbs.db
+*.iml
+.idea/
+.vscode/
+
+# Secrets and credentials
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+credentials
+credentials.*
+*.secret
+
+# Dev tooling — internal, not shipped
+.claude/
+.project-tracker/
+.config/

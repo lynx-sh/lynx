@@ -30,6 +30,9 @@ pub enum EventCommand {
     },
     /// Show real-world usage examples
     Examples,
+    /// Catch unknown subcommands for friendly error
+    #[command(external_subcommand)]
+    Other(Vec<String>),
 }
 
 pub async fn run(args: EventArgs) -> Result<()> {
@@ -58,6 +61,9 @@ pub async fn run(args: EventArgs) -> Result<()> {
                 command: Some("event".into()),
             })
             .await?;
+        }
+        EventCommand::Other(args) => {
+            anyhow::bail!("unknown event command '{}' — run `lx event` for help", args.first().map(|s| s.as_str()).unwrap_or(""))
         }
     }
     Ok(())

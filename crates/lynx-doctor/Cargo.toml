@@ -1,0 +1,17 @@
+[package]
+name = "lynx-doctor"
+description = "Health check library for Lynx shell framework"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[dependencies]
+lynx-core = { path = "../lynx-core" }
+lynx-config = { path = "../lynx-config" }
+lynx-theme = { path = "../lynx-theme" }
+toml.workspace = true
+which = "6"
+
+[dev-dependencies]
+lynx-test-utils = { path = "../lynx-test-utils" }
+tempfile = { workspace = true }

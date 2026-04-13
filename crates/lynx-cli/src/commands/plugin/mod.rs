@@ -22,9 +22,9 @@ pub struct PluginArgs {
 
 #[derive(Subcommand)]
 pub enum PluginCommand {
-    /// Install a plugin from a local path
+    /// Install a plugin — from the registry by name, or from a local path
     Add {
-        /// Local path to the plugin directory
+        /// Plugin name (registry) or path to a local plugin directory
         path: String,
     },
     /// Remove an installed plugin
@@ -53,7 +53,7 @@ pub enum PluginCommand {
         /// Plugin name to exec
         name: String,
     },
-    /// Unload a plugin from the shell (called by eval-bridge on profile switch)
+    /// Unload a plugin from the shell
     Unload {
         /// Plugin name to unload
         name: String,
@@ -91,6 +91,19 @@ pub enum PluginCommand {
         /// Path to index.toml
         path: String,
     },
+    /// Enable an installed plugin (add to enabled_plugins without reinstalling)
+    Enable {
+        /// Plugin name to enable
+        name: String,
+    },
+    /// Disable a plugin without removing its files
+    Disable {
+        /// Plugin name to disable
+        name: String,
+    },
+    /// Catch unknown subcommands for friendly error
+    #[command(external_subcommand)]
+    Other(Vec<String>),
 }
 
 pub async fn run(args: PluginArgs) -> Result<()> {
@@ -107,19 +120,33 @@ pub async fn run(args: PluginArgs) -> Result<()> {
         PluginCommand::Update { name, all } => registry_ops::cmd_update(name.as_deref(), all).await,
         PluginCommand::Checksum { target } => registry_ops::cmd_checksum(&target).await,
         PluginCommand::IndexValidate { path } => registry_ops::cmd_index_validate(&path).await,
+        PluginCommand::Enable { name } => cmd_enable(&name).await,
+        PluginCommand::Disable { name } => cmd_disable(&name).await,
         PluginCommand::Examples => {
             crate::commands::examples::run(crate::commands::examples::ExamplesArgs {
                 command: Some("plugin".into()),
             })
             .await
         }
+        PluginCommand::Other(args) => {
+            bail!("unknown plugin command '{}' — run `lx plugin` for help", args.first().map(|s| s.as_str()).unwrap_or(""))
+        }
     }
 }
 
 async fn cmd_add(path: &str) -> Result<()> {
-    // Registry install: no path separators means it's a registry name, not a local path.
+    // Registry install: no path separators means it's a name, not a local path.
+    // Check installed dir and in-repo plugins/ first (bundled plugins) before hitting registry.
     if !path.contains('/') && !path.contains('\\') {
-        return registry_ops::cmd_add_from_registry(path, false).await;
+        let name = path;
+        let installed = lynx_core::paths::installed_plugins_dir().join(name);
+        let in_repo = std::path::PathBuf::from("plugins").join(name);
+        if installed.join(lynx_core::brand::PLUGIN_MANIFEST).exists()
+            || in_repo.join(lynx_core::brand::PLUGIN_MANIFEST).exists()
+        {
+            return cmd_enable(name).await;
+        }
+        return registry_ops::cmd_add_from_registry(name, false).await;
     }
 
     let plugin_path = std::path::PathBuf::from(path);
@@ -162,6 +189,23 @@ async fn cmd_remove(name: &str) -> Result<()> {
         Ok(())
     })?;
     println!("Removed plugin '{}'.", name);
+    Ok(())
+}
+
+async fn cmd_enable(name: &str) -> Result<()> {
+    let config = load_config()?;
+    if config.enabled_plugins.iter().any(|p| p == name) {
+        println!("Plugin '{name}' is already enabled.");
+        return Ok(());
+    }
+    lynx_config::enable_plugin(name)?;
+    println!("Enabled plugin '{name}'. Restart your shell to activate.");
+    Ok(())
+}
+
+async fn cmd_disable(name: &str) -> Result<()> {
+    lynx_config::disable_plugin(name)?;
+    println!("Disabled plugin '{name}'. Restart your shell to take effect.");
     Ok(())
 }
 

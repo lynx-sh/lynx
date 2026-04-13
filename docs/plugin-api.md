@@ -180,7 +180,7 @@ Examples:
 
 Lynx manages this variable automatically via `lx plugin exec` and
 `lx plugin unload`. Plugin authors **must not** set or unset this variable
-manually — doing so will break idempotency guards and profile switching.
+manually — doing so will break idempotency guards.
 
 To check whether your plugin is already loaded from within plugin code:
 

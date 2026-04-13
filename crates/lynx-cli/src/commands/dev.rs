@@ -17,35 +17,50 @@ pub struct DevArgs {
 pub enum DevCommand {
     /// Sync source-tree assets (themes, shell, plugins) to the installed LYNX_DIR.
     /// Run after editing any asset file in the repo to see changes in your live shell.
+    /// Searches upward from the current directory for the source tree automatically.
     Sync {
-        /// Path to the Lynx source tree root (default: current directory)
-        #[arg(long, default_value = ".")]
-        source: String,
+        /// Explicit path to the Lynx source tree root (auto-detected if omitted)
+        #[arg(long)]
+        source: Option<String>,
     },
+    /// Catch unknown subcommands for friendly error
+    #[command(external_subcommand)]
+    Other(Vec<String>),
 }
 
 pub async fn run(args: DevArgs) -> Result<()> {
     match args.command {
-        DevCommand::Sync { source } => cmd_sync(&source),
+        DevCommand::Sync { source } => cmd_sync(source.as_deref()),
+        DevCommand::Other(args) => {
+            bail!("unknown dev command '{}' — run `lx dev` for help", args.first().map(|s| s.as_str()).unwrap_or(""))
+        }
     }
 }
 
-fn cmd_sync(source: &str) -> Result<()> {
-    let src = Path::new(source).canonicalize()
-        .with_context(|| format!("source path not found: {source}"))?;
+fn cmd_sync(source: Option<&str>) -> Result<()> {
+    let src = match source {
+        Some(s) => Path::new(s).canonicalize()
+            .with_context(|| format!("source path not found: {s}"))?,
+        None => find_source_root()
+            .ok_or_else(|| anyhow::anyhow!(
+                "could not find a Lynx source tree in the current directory or any parent\n  \
+                 hint: run from inside the repo, or pass --source <path>"
+            ))?,
+    };
 
-    // Verify we're in a Lynx source tree.
+    // Verify it's actually a Lynx source tree.
     if !src.join("Cargo.toml").exists() || !src.join("themes").exists() {
         bail!(
-            "'{source}' does not look like a Lynx source tree \
-             (expected Cargo.toml and themes/ directory)"
+            "'{}' does not look like a Lynx source tree \
+             (expected Cargo.toml and themes/ directory)",
+            src.display()
         );
     }
 
     let lynx_dir = lynx_dir();
     if !lynx_dir.exists() {
         bail!(
-            "LYNX_DIR not installed at {} — run `lx install` first",
+            "LYNX_DIR not installed at {} — run `lx setup` first",
             lynx_dir.display()
         );
     }
@@ -82,7 +97,6 @@ fn cmd_sync(source: &str) -> Result<()> {
         ("shell",    lynx_dir.join("shell")),
         ("plugins",  lynx_dir.join("plugins")),
         ("contexts", lynx_dir.join("contexts")),
-        ("profiles", lynx_dir.join("profiles")),
     ];
 
     for (dir_name, dst) in sync_pairs {
@@ -132,6 +146,20 @@ fn sync_dir(src: &Path, dst: &Path, label: &str) -> Result<usize> {
     }
 
     Ok(count)
+}
+
+/// Walk upward from cwd looking for a Lynx source tree root.
+/// Identified by the presence of both Cargo.toml and themes/ in the same dir.
+fn find_source_root() -> Option<std::path::PathBuf> {
+    let mut dir = std::env::current_dir().ok()?;
+    loop {
+        if dir.join("Cargo.toml").exists() && dir.join("themes").exists() {
+            return Some(dir);
+        }
+        if !dir.pop() {
+            return None;
+        }
+    }
 }
 
 /// Flat recursive file list (dirs included so we can mkdir them).

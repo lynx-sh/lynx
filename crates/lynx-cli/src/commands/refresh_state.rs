@@ -34,10 +34,13 @@ pub async fn run(_args: RefreshStateArgs) -> Result<()> {
 
 /// Read the enabled plugin list from config, falling back to empty on any error.
 fn read_enabled_plugins() -> Vec<String> {
-    lynx_config::load_from(&lynx_core::paths::config_file())
-        .ok()
-        .map(|cfg| cfg.enabled_plugins)
-        .unwrap_or_default()
+    match lynx_config::load_from(&lynx_core::paths::config_file()) {
+        Ok(cfg) => cfg.enabled_plugins,
+        Err(e) => {
+            lynx_core::diag::warn("refresh-state", &format!("failed to load config — plugins will not load: {e}"));
+            Vec::new()
+        }
+    }
 }
 
 /// Gather state for all enabled plugins. Failures are silently skipped.

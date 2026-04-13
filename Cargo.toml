@@ -15,10 +15,12 @@ members = [
     "crates/lynx-registry",
     "crates/lynx-daemon",
     "crates/lynx-convert",
+    "crates/lynx-doctor",
+    "crates/lynx-dashboard",
     "crates/lynx-cli",
-    "crates/lynx-studio",
     "crates/lynx-test-utils",
     "crates/lynx-intro",
+    "crates/lynx-workflow",
 ]
 
 [workspace.package]
@@ -26,7 +28,7 @@ version = "0.1.0"
 edition = "2021"
 authors = ["proxikal"]
 license = "MIT"
-repository = "https://github.com/proxikal/lynx"
+repository = "https://github.com/lynx-sh/lynx"
 
 [workspace.dependencies]
 # Serialization
@@ -36,6 +38,7 @@ toml = "0.8"
 
 # CLI
 clap = { version = "4", features = ["derive", "color"] }
+owo-colors = { version = "4", features = ["supports-colors"] }
 
 # Async
 tokio = { version = "1", features = ["full"] }
@@ -63,9 +66,6 @@ hex = "0.4"
 # HTTP server (theme studio)
 axum = "0.7"
 tower-http = { version = "0.5", features = ["cors"] }
-
-# HTTP client (registry fetch)
-reqwest = { version = "0.12", features = ["blocking", "rustls-tls"], default-features = false }
 
 # HTTP client (sync, lightweight — D-026)
 ureq = "2"

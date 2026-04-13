@@ -1,7 +1,8 @@
 use std::path::PathBuf;
-use std::process::Command;
 
 use anyhow::{bail, Context as _, Result};
+
+use super::open_in_vscode;
 use clap::{Args, Subcommand};
 
 use lynx_config::{load, snapshot::mutate_config_transaction};
@@ -50,7 +51,7 @@ pub enum ThemeCommand {
     /// Add, remove, or move segments in the prompt order
     #[command(subcommand)]
     Segment(SegmentCommand),
-    /// Convert an OMZ .zsh-theme file to Lynx TOML format
+    /// Convert an OMZ .zsh-theme or Oh-My-Posh .omp.json theme to Lynx TOML format
     Convert {
         /// Source: local file path, GitHub URL, or raw URL
         source: String,
@@ -62,6 +63,9 @@ pub enum ThemeCommand {
     },
     /// Open the WYSIWYG theme studio in your browser (local web UI, no npm)
     Studio,
+    /// Smart dispatch: treat unknown subcommand as theme name for `set`
+    #[command(external_subcommand)]
+    Other(Vec<String>),
 }
 
 #[derive(Subcommand)]
@@ -117,7 +121,17 @@ pub async fn run(args: ThemeArgs) -> Result<()> {
         }
         ThemeCommand::Segment(seg) => cmd_segment(seg).await,
         ThemeCommand::Convert { source, name, force } => cmd_convert(&source, name.as_deref(), force).await,
-        ThemeCommand::Studio => lynx_studio::run().await,
+        ThemeCommand::Studio => {
+            eprintln!("Note: `lx theme studio` is deprecated. Use `lx dashboard` instead.");
+            lynx_dashboard::run().await
+        }
+        ThemeCommand::Other(args) => {
+            if args.len() == 1 {
+                cmd_set(&args[0]).await
+            } else {
+                bail!("unknown theme command '{}' — run `lx theme` for help", args.first().map(|s| s.as_str()).unwrap_or(""))
+            }
+        }
     }
 }
 
@@ -283,24 +297,14 @@ async fn cmd_edit() -> Result<()> {
     // Determine the path: prefer user theme dir, else error (built-ins are read-only).
     let user_path = user_theme_dir().join(format!("{theme_name}.toml"));
     if !user_path.exists() {
-        bail!("theme '{theme_name}' not found — run `lx install` to set up default themes");
+        bail!("theme '{theme_name}' not found — run `lx setup` to set up default themes");
     }
     let path = user_path;
 
-    let editor = std::env::var("EDITOR").unwrap_or_else(|_| "vi".to_string());
     let snapshot = std::fs::read_to_string(&path)
         .with_context(|| format!("failed to read theme file {path:?}"))?;
 
-    let status = Command::new(&editor)
-        .arg(&path)
-        .status()
-        .with_context(|| format!("failed to launch editor '{editor}'"))?;
-
-    if !status.success() {
-        // Editor exited non-zero — restore snapshot.
-        std::fs::write(&path, &snapshot).ok();
-        bail!("editor exited with error — theme unchanged");
-    }
+    open_in_vscode(&path)?;
 
     // Validate the saved file.
     match lynx_theme::loader::load_from_path(&path) {
@@ -406,7 +410,7 @@ fn resolve_user_theme_path(theme_name: &str) -> Result<PathBuf> {
     if user_path.exists() {
         Ok(user_path)
     } else {
-        bail!("theme '{theme_name}' not found — run `lx install` to set up default themes")
+        bail!("theme '{theme_name}' not found — run `lx setup` to set up default themes")
     }
 }
 
@@ -431,10 +435,16 @@ async fn cmd_convert(source: &str, name: Option<&str>, force: bool) -> Result<()
     let theme_name = name
         .map(|n| n.to_string())
         .unwrap_or_else(|| {
-            std::path::Path::new(source)
+            let stem = std::path::Path::new(source)
                 .file_stem()
                 .and_then(|s| s.to_str())
                 .unwrap_or("converted")
+                .to_string();
+            // Strip .omp / .zsh-theme suffixes from multi-extension filenames
+            // e.g. "atomic.omp" → "atomic", "candy.zsh-theme" → "candy"
+            stem.strip_suffix(".omp")
+                .or_else(|| stem.strip_suffix(".zsh-theme"))
+                .unwrap_or(&stem)
                 .to_string()
         });
 
@@ -452,28 +462,51 @@ async fn cmd_convert(source: &str, name: Option<&str>, force: bool) -> Result<()
     let content = lynx_convert::fetch::fetch_content(&resolved)
         .context("failed to fetch theme content")?;
 
-    // Parse.
-    let ir = lynx_convert::omz::parse(&content);
-
-    // Emit TOML.
-    let toml_str = lynx_convert::emit::to_lynx_toml(&ir, &theme_name);
+    // Auto-detect format: JSON = OMP, anything else = OMZ.
+    let is_omp = content.trim_start().starts_with('{');
 
     // Write.
     std::fs::create_dir_all(user_theme_dir())?;
-    std::fs::write(&out_path, &toml_str)?;
 
-    // Print summary.
-    println!("Converted OMZ theme → {}", out_path.display());
-    println!("  Segments (left):  {}", ir.left.join(", "));
-    if !ir.right.is_empty() {
-        println!("  Segments (right): {}", ir.right.join(", "));
-    }
-    if ir.two_line {
-        println!("  Two-line layout detected");
-    }
-    if !ir.notes.is_empty() {
-        for note in &ir.notes {
-            println!("  ⚠ {note}");
+    if is_omp {
+        // Oh-My-Posh JSON theme.
+        let theme = lynx_convert::omp::parse(&content)
+            .map_err(|e| anyhow::anyhow!(e))?;
+        let toml_str = lynx_convert::emit::omp_to_lynx_toml(&theme, &theme_name);
+        std::fs::write(&out_path, &toml_str)?;
+
+        println!("Converted OMP theme → {}", out_path.display());
+        if theme.two_line {
+            println!("  Layout: two-line");
+        }
+        let seg_count = theme.top.len() + theme.top_right.len() + theme.left.len();
+        println!("  Segments: {seg_count} mapped");
+        if !theme.palette.is_empty() {
+            println!("  Palette: {} colors extracted", theme.palette.len());
+        }
+        if !theme.notes.is_empty() {
+            for note in &theme.notes {
+                println!("  ⚠ {note}");
+            }
+        }
+    } else {
+        // OMZ .zsh-theme file.
+        let ir = lynx_convert::omz::parse(&content);
+        let toml_str = lynx_convert::emit::to_lynx_toml(&ir, &theme_name);
+        std::fs::write(&out_path, &toml_str)?;
+
+        println!("Converted OMZ theme → {}", out_path.display());
+        println!("  Segments (left):  {}", ir.left.join(", "));
+        if !ir.right.is_empty() {
+            println!("  Segments (right): {}", ir.right.join(", "));
+        }
+        if ir.two_line {
+            println!("  Two-line layout detected");
+        }
+        if !ir.notes.is_empty() {
+            for note in &ir.notes {
+                println!("  ⚠ {note}");
+            }
         }
     }
     println!("\nActivate with: lx theme set {theme_name}");

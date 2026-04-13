@@ -3,7 +3,7 @@
 The Lynx plugin registry is a **static TOML file** hosted in a git repository.
 There is no registry server — the client fetches the raw file directly from GitHub.
 
-Official index: `https://raw.githubusercontent.com/proxikal/lynx-plugins/main/index.toml`
+Official index: `https://raw.githubusercontent.com/lynx-sh/registry/main/index.toml`
 
 ---
 
@@ -15,12 +15,12 @@ The index file contains one or more `[[plugin]]` tables, each describing a singl
 [[plugin]]
 name            = "git"                          # required — must match plugin.toml [plugin].name
 description     = "Git integration for Lynx"    # required — shown in lx plugin search
-author          = "proxikal"                     # required
+author          = "lynx-sh"                     # required
 latest_version  = "1.2.0"                       # required — must match one entry in versions[]
 
 [[plugin.versions]]
 version          = "1.2.0"                      # semver — required
-url              = "https://github.com/proxikal/lynx-plugins/releases/download/git-1.2.0/git-1.2.0.tar.gz"
+url              = "https://github.com/lynx-sh/registry/releases/download/git-1.2.0/git-1.2.0.tar.gz"
 checksum_sha256  = "e3b0c44298fc1c149afb..."    # SHA-256 hex digest — required, no exceptions
 min_lynx_version = "0.1.0"                      # optional — minimum Lynx version required
 
@@ -90,7 +90,7 @@ archives where the digest does not match exactly.
 
 ## Submission Process
 
-1. **Fork** `https://github.com/proxikal/lynx-plugins`
+1. **Fork** `https://github.com/lynx-sh/registry`
 2. **Create a release** on your plugin's repository and upload the `.tar.gz` archive
 3. **Generate the checksum** with `shasum -a 256 <archive>.tar.gz`
 4. **Add an entry** to `index.toml` following the schema above

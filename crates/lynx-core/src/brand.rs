@@ -6,7 +6,7 @@
 pub const NAME: &str = "Lynx";
 pub const CLI: &str = "lx";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
-pub const REPO: &str = "https://github.com/proxikal/lynx";
+pub const REPO: &str = "https://github.com/lynx-sh/lynx";
 
 // ── Directory layout (relative to $HOME) ─────────────────────────────────────
 
@@ -36,7 +36,13 @@ pub const DEFAULT_THEME: &str = "default";
 
 // ── Shell integration ─────────────────────────────────────────────────────────
 
-/// The line written to `.zshrc` by `lx install` and matched by `lx uninstall`.
+/// Taps configuration file name.
+pub const TAPS_FILE: &str = "taps.toml";
+/// Official registry index URL.
+pub const DEFAULT_REGISTRY_URL: &str =
+    "https://raw.githubusercontent.com/lynx-sh/registry/main/index.toml";
+
+/// The line written to `.zshrc` by `lx setup` and matched by `lx uninstall`.
 /// Must be a single exact string — both install and uninstall use this for matching.
 pub const ZSHRC_INIT_LINE: &str =
     r#"source "${HOME}/.config/lynx/shell/init.zsh""#;

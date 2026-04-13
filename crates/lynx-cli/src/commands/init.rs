@@ -70,20 +70,31 @@ pub async fn run(args: InitArgs) -> Result<()> {
     let theme_name = std::env::var(env_vars::LYNX_THEME)
         .unwrap_or_else(|_| config.active_theme.clone());
     let theme_result = load_theme(&theme_name).or_else(|_| load_theme(brand::DEFAULT_THEME));
-    let (ls_colors_str, eza_colors_str) = match &theme_result {
+    let (ls_colors_str, eza_colors_str, bsd_lscolors_str, syntax_styles_str, autosuggest_str) = match &theme_result {
         Ok(theme) => (
             theme.ls_colors.to_ls_colors_string(),
             theme.ls_colors.to_eza_colors_string(),
+            Some(theme.ls_colors.to_bsd_lscolors()),
+            theme.syntax_highlight.to_zsh_highlight_styles(),
+            theme.autosuggestions.to_autosuggest_style(),
         ),
         Err(e) => {
             diag::warn("init", &format!("theme '{}' failed to load: {e}", theme_name));
-            (None, None)
+            (None, None, None, None, None)
         }
     };
 
     // Display intro if enabled and in interactive context.
     // Must print BEFORE the eval script so it appears above the first prompt.
     maybe_show_intro(&config, context.clone());
+
+    // Collect plugins that require direct source (zle_hook = true in plugin.toml).
+    // These cannot go through eval "$()" — zle -N widget binding fails inside eval.
+    let zle_hook_plugins: std::collections::HashSet<String> = manifests
+        .iter()
+        .filter(|m| m.shell.zle_hook)
+        .map(|m| m.plugin.name.clone())
+        .collect();
 
     let script = generate_init_script(&InitParams {
         context: &context,
@@ -92,6 +103,10 @@ pub async fn run(args: InitArgs) -> Result<()> {
         enabled_plugins: &enabled_plugins,
         ls_colors: ls_colors_str.as_deref(),
         eza_colors: eza_colors_str.as_deref(),
+        bsd_lscolors: bsd_lscolors_str.as_deref(),
+        syntax_highlight_styles: syntax_styles_str.as_deref(),
+        autosuggest_style: autosuggest_str.as_deref(),
+        zle_hook_plugins,
     });
 
     print!("{}", script);

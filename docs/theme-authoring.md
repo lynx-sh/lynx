@@ -96,8 +96,8 @@ color        = { fg = "$success" }
 error_color  = { fg = "$error" }
 
 # ── File listing colors ───────────────────────────────────────────────────────
-# Emitted as LS_COLORS and EZA_COLORS on theme switch / shell init.
-# Uses semantic keys — palette vars supported. (H-054: in progress)
+# Emitted as LS_COLORS, EZA_COLORS, and BSD LSCOLORS on shell init.
+# Palette vars ($accent, $success, etc.) are supported everywhere.
 [ls_colors]
 dir        = { fg = "$accent", bold = true }
 symlink    = { fg = "#89ddff" }
@@ -106,11 +106,30 @@ archive    = { fg = "$warning" }
 image      = { fg = "#ff007c" }
 audio      = { fg = "#ff007c" }
 broken     = { fg = "$error" }
+
+# Per-extension colors — full control over individual file types
+[ls_colors.extensions]
+rs   = { fg = "#e7894f" }
+py   = { fg = "#bb9af7" }
+sh   = { fg = "#e0af68", bold = true }
+toml = { fg = "#9ece6a" }
+js   = { fg = "#e0af68" }
+ts   = { fg = "#7aa2f7" }
+
+# Eza column colors (metadata in `ls -la` output)
+[ls_colors.columns]
+date        = "#565f89"
+size_number = "#e0af68"
+size_unit   = "#565f89"
+user_you    = "#9ece6a"
+perm_read   = "#9ece6a"
+perm_write  = "#e0af68"
+perm_exec   = "#f7768e"
 ```
 
 Switch to your theme with:
 ```bash
-lx theme switch my-theme
+lx theme my-theme
 lx theme list        # shows all available themes
 ```
 
@@ -183,9 +202,6 @@ segment costs zero evaluation time (D-017).
 ```toml
 [segment.username]
 show_in = ["interactive"]       # only show in interactive context
-
-[segment.profile_badge]
-hide_in = ["agent", "minimal"]  # hide in agent and minimal
 
 [segment.context_badge]
 show_in = ["agent", "minimal"]  # always shown (overrides hide_in)
@@ -495,26 +511,6 @@ color = { fg = "cyan" }
 
 ---
 
-### `profile_badge` — Active Profile Name
-
-Shows the active Lynx profile name. Hidden in agent and minimal contexts,
-and when no profile is active.
-
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `icon` | string | `"⬡ "` | Prefix icon |
-| `color` | color | none | Text color |
-
-```toml
-[segment.profile_badge]
-icon  = "⬡ "
-color = { fg = "magenta" }
-```
-
-**Example output:** `⬡ work`
-
----
-
 ### `task_status` — Running Background Tasks
 
 Shows a count of running Lynx background tasks. Hidden when no tasks are running.
@@ -654,14 +650,197 @@ in_git_repo_symbol = "±"
 
 ---
 
+### `time` — Current Time
+
+Shows the current time. Always visible.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `format` | string | `"24h"` | `"24h"` (%H:%M), `"12h"` (%I:%M %p), or custom strftime pattern |
+| `icon` | string | none | Prefix icon |
+| `color` | color | none | Text color |
+
+---
+
+### `newline` — Line Break
+
+Inserts a newline for two-line prompt layouts. No config fields.
+
+```toml
+[segments.left]
+order = ["dir", "git_branch", "newline", "prompt_char"]
+```
+
+---
+
+### `exit_code` — Last Exit Code
+
+Shows the exit code when non-zero. Hidden on success.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `symbol` | string | `"✘"` | Prefix symbol |
+| `color` | color | none | Text color |
+
+---
+
+### `username` — Current User
+
+Shows the current username. Bold red when root.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `color` | color | none | Text color |
+
+---
+
+### `hostname` — Hostname
+
+Shows the system hostname, typically only over SSH.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `show_when_ssh` | bool | `true` | Only show when connected via SSH |
+| `color` | color | none | Text color |
+
+---
+
+### `ssh_indicator` — SSH Connection Badge
+
+Shows a badge when connected via SSH. Hidden otherwise.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `symbol` | string | `"ssh"` | Text to display |
+| `color` | color | none | Text color |
+
+---
+
+### `venv` — Python Virtual Environment
+
+Shows active Python venv name. Hidden when no venv active.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `symbol` | string | none | Prefix symbol |
+| `color` | color | none | Text color |
+
+---
+
+### `conda_env` — Conda Environment
+
+Shows active Conda environment. Hidden when inactive.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `hide_base` | bool | `true` | Hide when env is "base" |
+| `symbol` | string | none | Prefix symbol |
+| `color` | color | none | Text color |
+
+---
+
+### `background_jobs` — Background Job Count
+
+Shows background job count. Hidden when zero.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `symbol` | string | `"⚙"` | Prefix symbol |
+| `color` | color | none | Text color |
+
+---
+
+### `vi_mode` — Vi Mode Indicator
+
+Shows vi editing mode. Hidden when vi mode inactive.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `insert_label` | string | `"INSERT"` | Label for insert mode |
+| `normal_label` | string | `"NORMAL"` | Label for normal mode |
+| `color` | color | none | Text color |
+
+---
+
+### `git_action` — Git Action in Progress
+
+Shows active git action (merge, rebase, cherry-pick, bisect). Hidden otherwise.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `label` | map | none | Custom labels per action (e.g., `{merge = "MERGING"}`) |
+| `color` | color | none | Text color |
+
+---
+
+### `lang_version` — Auto-Detected Language Version
+
+Auto-detects project language from marker files and shows version with icon.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `icon` | string | auto | Override auto-detected language icon |
+| `color` | color | none | Text color |
+
+Detected markers: `Cargo.toml` (Rust), `go.mod` (Go), `package.json` (Node), `pyproject.toml` (Python), `Gemfile` (Ruby), `composer.json` (PHP), `pom.xml` (Java).
+
+---
+
+### `node_version` / `rust_version` / `golang_version` — Language Versions
+
+Show language version from the corresponding plugin cache.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `icon` | string | none | Prefix icon |
+| `color` | color | none | Text color |
+
+---
+
+## Syntax Highlighting
+
+The `[syntax_highlight]` table controls zsh-syntax-highlighting colors.
+
+```toml
+[syntax_highlight]
+command  = "$success"     # valid external commands
+unknown  = "$error"       # unknown/invalid commands
+builtin  = "cyan"         # shell builtins (cd, echo)
+alias    = "green"        # aliases
+function = "green"        # functions
+path     = "underline"    # file paths
+string   = "yellow"       # quoted strings
+argument = "$fg"          # command arguments
+option   = "cyan"         # flags (--flag, -x)
+comment  = "$muted"       # comments
+globbing = "magenta"      # glob patterns
+variable = "blue"         # variable references ($VAR)
+```
+
+---
+
+## Auto-Suggestions
+
+The `[auto_suggestions]` table controls fish-style auto-suggestion text color.
+
+```toml
+[auto_suggestions]
+color = "$muted"
+```
+
+---
+
 ## File Listing Colors
 
-> **Status:** Planned — tracked in H-054. The schema below is the target design.
-> Once implemented, `lx theme switch` will emit `LS_COLORS` and `EZA_COLORS`
-> automatically.
+> **Status:** Implemented. `lx init` emits `LS_COLORS`, `EZA_COLORS`, and BSD
+> `LSCOLORS` automatically from the active theme. On macOS, `ls` is aliased to
+> `eza` (or `gls`) so truecolor and per-extension colors render correctly.
 
 The `[ls_colors]` table lets a theme own `ls`, `eza`, and `lsd` output — the same
-palette variables available to segments apply here.
+palette variables available to segments apply here. All colors are emitted as
+**truecolor** (24-bit `38;2;R;G;B`) for maximum fidelity.
+
+### File-type categories
 
 ```toml
 [ls_colors]
@@ -675,8 +854,6 @@ broken     = { fg = "$error" }        # broken symlink
 other_writable = { fg = "$warning" }  # world-writable dir
 ```
 
-Semantic keys and their `LS_COLORS` mappings:
-
 | Key | LS_COLORS code | Notes |
 |---|---|---|
 | `dir` | `di` | Directories |
@@ -687,6 +864,46 @@ Semantic keys and their `LS_COLORS` mappings:
 | `audio` | — | `.mp3`, `.flac`, `.wav`, etc. |
 | `broken` | `or` | Broken symlinks |
 | `other_writable` | `ow` | Dirs writable by others |
+
+### Per-extension colors
+
+The `[ls_colors.extensions]` table gives full control over individual file types.
+Extension keys omit the dot. These override category colors when both match.
+
+```toml
+[ls_colors.extensions]
+rs   = { fg = "#e7894f" }              # Rust — orange
+py   = { fg = "#bb9af7" }              # Python — purple
+sh   = { fg = "#e0af68", bold = true } # Shell — bold yellow
+toml = { fg = "#9ece6a" }              # Config — green
+js   = { fg = "#e0af68" }              # JavaScript — yellow
+ts   = { fg = "#7aa2f7" }              # TypeScript — blue
+go   = { fg = "#7dcfff" }              # Go — cyan
+rb   = { fg = "#f7768e" }              # Ruby — red
+md   = { fg = "#c0caf5" }              # Markdown — light grey
+log  = { fg = "#565f89" }              # Logs — muted
+```
+
+### Eza column colors
+
+The `[ls_colors.columns]` table colors the metadata columns in `eza -la` output
+(dates, sizes, permissions, user/group). Only eza reads these — no effect on `/bin/ls`.
+
+```toml
+[ls_colors.columns]
+date         = "#565f89"   # File modification date
+size_number  = "#e0af68"   # Size digits
+size_unit    = "#565f89"   # Size suffix (B, K, M)
+user_you     = "#9ece6a"   # Owner = you
+user_other   = "#f7768e"   # Owner = someone else
+group_you    = "#7aa2f7"   # Group you belong to
+group_other  = "#565f89"   # Group you don't belong to
+perm_read    = "#9ece6a"   # r bits
+perm_write   = "#e0af68"   # w bits
+perm_exec    = "#f7768e"   # x bits
+header       = "#7aa2f7"   # Column headers (--header)
+symlink_path = "#7dcfff"   # Symlink target path
+```
 
 If `[ls_colors]` is absent, Lynx emits no `LS_COLORS` (OS default applies).
 
@@ -767,23 +984,36 @@ This requires segments to have `bg` colors set in their `color` config.
 
 ---
 
-## Theme Convert (OMZ Import)
+## Theme Convert (OMZ + OMP Import)
 
-Convert Oh My Zsh themes to Lynx TOML format:
+Convert Oh My Zsh or Oh-My-Posh themes to Lynx TOML format. Format is auto-detected:
+`.omp.json` or valid JSON → OMP parser, otherwise → OMZ parser.
 
 ```bash
-# From a GitHub URL
+# OMZ: from a GitHub URL
 lx theme convert https://github.com/ohmyzsh/ohmyzsh/blob/master/themes/candy.zsh-theme candy
 
-# From a local file
+# OMZ: from a local file
 lx theme convert ./mytheme.zsh-theme mytheme
+
+# OMP: from a local .omp.json file
+lx theme convert ./tokyo.omp.json tokyo
+
+# OMP: from a GitHub URL (auto-converts blob → raw URL)
+lx theme convert https://github.com/JanDeDobbeleer/oh-my-posh/blob/main/themes/atomic.omp.json atomic
 
 # Overwrite existing
 lx theme convert ./mytheme.zsh-theme mytheme --force
 ```
 
-The converter maps OMZ `%` tokens and `$(function)` calls to Lynx segments.
+The OMZ converter maps `%` tokens and `$(function)` calls to Lynx segments.
 Agnoster-style themes produce partial output with notes for manual tuning.
+
+The OMP converter parses JSON v2+ themes, maps segment types to Lynx equivalents,
+extracts colors into a `[colors]` palette (per D-038), and handles two-line layouts,
+diamond/powerline separators, transient prompts, and filler segments. Language segments
+(node, python, go, etc.) map to `lang_version_<lang>` with per-language colors.
+OMP-only features (Go templates, tooltips) are noted as comments.
 
 ---
 
@@ -802,7 +1032,7 @@ author      = "you"
 order = ["dir", "git_branch", "git_status"]
 
 [segments.right]
-order = ["kubectl_context", "profile_badge", "cmd_duration", "task_status", "context_badge"]
+order = ["kubectl_context", "cmd_duration", "task_status", "context_badge"]
 
 [segment.dir]
 max_depth        = 3
@@ -821,10 +1051,6 @@ untracked = { icon = "?", color = "#565f89" }
 [segment.kubectl_context]
 prod_pattern = "prod.*"
 color        = { fg = "#7dcfff" }
-
-[segment.profile_badge]
-icon  = " "
-color = { fg = "#bb9af7" }
 
 [segment.cmd_duration]
 min_ms = 1000
@@ -848,7 +1074,7 @@ muted   = "#565f89"
 
 Activate it:
 ```bash
-lx theme switch powerline
+lx theme powerline
 ```
 
 ---
@@ -893,7 +1119,7 @@ lx theme patch segment.context_badge.hide_in '["minimal"]'
 
 All patch operations: snapshot → apply → validate → rollback on failure →
 emit `theme:changed`. Theme files live in `~/.config/lynx/themes/` (set up
-by `lx install`).
+by `lx setup`).
 
 ### Layer 3 — Full editor
 
@@ -922,7 +1148,7 @@ lx theme list    # will error if your theme TOML is malformed
 
 Preview without switching:
 ```bash
-lx theme switch powerline
+lx theme powerline
 # Open a new terminal to see it
 ```
 

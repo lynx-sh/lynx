@@ -1,6 +1,7 @@
 mod bus;
 mod cli;
 mod commands;
+mod error_display;
 
 use anyhow::Result;
 use clap::{CommandFactory, Parser, error::ErrorKind};
@@ -24,6 +25,13 @@ async fn main() {
             let root = Cli::command();
             print_subcommand_help(root, &args)
         }
+        Err(e) if matches!(e.kind(), ErrorKind::InvalidSubcommand) => {
+            // Unknown top-level subcommand — render through our error system
+            // so users see the styled red error + hint, not clap's generic stderr.
+            let args: Vec<String> = std::env::args().skip(1).collect();
+            let cmd = args.first().map(|s| s.as_str()).unwrap_or("?");
+            Err(anyhow::anyhow!("unknown command '{cmd}' — run `lx` to see available commands"))
+        }
         Err(e) => {
             // All other clap errors (unknown flag, bad arg value, etc.) go to
             // stderr as normal — these ARE errors the user should fix.
@@ -34,7 +42,7 @@ async fn main() {
     // Print errors to STDOUT so they're visible even when the shell precmd hook
     // re-renders the prompt (which can overwrite stderr output).
     if let Err(e) = result {
-        println!("error: {e:#}");
+        error_display::render_error(&e);
         std::process::exit(1);
     }
 }

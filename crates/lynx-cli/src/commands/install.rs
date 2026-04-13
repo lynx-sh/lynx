@@ -1,318 +1,228 @@
-use std::path::{Path, PathBuf};
+//! Unified package installer — `lx install` and `lx uninstall` (D-028).
+//!
+//! Resolves packages from all configured taps, detects the type,
+//! and routes to the correct installer.
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Result};
 use clap::Args;
-use lynx_core::brand;
-use lynx_core::brand::ZSHRC_INIT_LINE;
+use lynx_config::snapshot::mutate_config_transaction;
+use lynx_core::paths;
+use lynx_registry::autoplug::generate_tool_plugin;
+use lynx_registry::installer::{install_tool_via_pm, uninstall_tool};
+use lynx_registry::schema::PackageType;
+use lynx_registry::tap::{load_taps, merge_tap_indexes, TrustTier};
 
 #[derive(Args)]
-pub struct InstallArgs {
-    /// Also add `source ~/.config/lynx/shell/init.zsh` to ~/.zshrc
+pub struct InstallPkgArgs {
+    /// Package names to install
+    pub names: Vec<String>,
+    /// Force reinstall if already present
     #[arg(long)]
-    pub zshrc: bool,
-
-    /// Target install directory (default: ~/.config/lynx)
-    #[arg(long)]
-    pub dir: Option<String>,
-
-    /// Source directory containing shell/ and plugins/ (default: detected from binary location)
-    #[arg(long)]
-    pub source: Option<String>,
+    pub force: bool,
 }
 
-pub async fn run(args: InstallArgs) -> Result<()> {
-    let home = home_dir()?;
+#[derive(Args)]
+pub struct UninstallPkgArgs {
+    /// Package name to remove
+    pub name: String,
+}
 
-    let lynx_dir: PathBuf = args
-        .dir
-        .as_deref()
-        .map(PathBuf::from)
-        .unwrap_or_else(|| home.join(brand::CONFIG_DIR));
-
-    let source_dir = resolve_source_dir(args.source.as_deref())?;
-
-    println!("Installing {} to {}...", brand::NAME, lynx_dir.display());
-    println!();
-
-    // Snapshot existing config dir before any writes (D-007)
-    snapshot_if_exists(&lynx_dir);
-
-    // Create target directory
-    std::fs::create_dir_all(&lynx_dir)
-        .with_context(|| format!("cannot create install dir: {}", lynx_dir.display()))?;
-
-    // Copy shell/ and plugins/
-    let shell_src = source_dir.join("shell");
-    let plugins_src = source_dir.join("plugins");
-    let themes_src = source_dir.join("themes");
-
-    if shell_src.exists() {
-        copy_dir_all(&shell_src, &lynx_dir.join("shell"))
-            .with_context(|| format!("failed to copy shell/ from {}", shell_src.display()))?;
-        println!("  ✓ shell/   → {}/shell/", lynx_dir.display());
-    } else {
-        anyhow::bail!(
-            "shell/ not found at {} — run lx install from the Lynx source directory or pass --source",
-            shell_src.display()
-        );
+pub async fn run_install(args: InstallPkgArgs) -> Result<()> {
+    if args.names.is_empty() {
+        bail!("provide at least one package name — e.g. `lx install eza`");
     }
 
-    if plugins_src.exists() {
-        copy_dir_all(&plugins_src, &lynx_dir.join("plugins"))
-            .with_context(|| format!("failed to copy plugins/ from {}", plugins_src.display()))?;
-        println!("  ✓ plugins/ → {}/plugins/", lynx_dir.display());
-    } else {
-        println!("  ⚠ plugins/ not found at {} — skipping", plugins_src.display());
+    let taps_path = paths::taps_config_path();
+    let list = load_taps(&taps_path)?;
+    let merged = merge_tap_indexes(&list)?;
+
+    for name in &args.names {
+        let tapped = match merged.iter().find(|t| t.entry.name == *name) {
+            Some(t) => t,
+            None => {
+                eprintln!("package '{name}' not found in any tap");
+                continue;
+            }
+        };
+
+        // Trust warning for community packages.
+        if tapped.trust == TrustTier::Community {
+            println!(
+                "  {} '{name}' is from community tap '{}' — unverified",
+                tapped.trust.badge(),
+                tapped.tap_name
+            );
+            print!("  continue? [y/N] ");
+            std::io::Write::flush(&mut std::io::stdout())?;
+            let mut input = String::new();
+            std::io::stdin().read_line(&mut input)?;
+            if !input.trim().eq_ignore_ascii_case("y") {
+                println!("  skipped '{name}'");
+                continue;
+            }
+        }
+
+        let entry = &tapped.entry;
+        match entry.package_type {
+            PackageType::Tool => install_tool(name, entry, args.force)?,
+            PackageType::Plugin => install_plugin(name, entry, args.force).await?,
+            PackageType::Theme => {
+                if entry.bundled {
+                    println!("  ✓ theme '{name}' is bundled — use `lx theme set {name}`");
+                } else {
+                    let version = entry.resolve_version(None);
+                    if let Some(v) = version {
+                        lynx_registry::installer::install_theme(name, &v.url, args.force)?;
+                        println!("  ✓ installed theme '{name}' — activate with `lx theme set {name}`");
+                    } else {
+                        println!("  no version found for theme '{name}'");
+                    }
+                }
+            }
+            PackageType::Intro => {
+                if entry.bundled {
+                    println!("  ✓ intro '{name}' is bundled — use `lx intro set {name}`");
+                } else {
+                    let version = entry.resolve_version(None);
+                    if let Some(v) = version {
+                        lynx_registry::installer::install_intro(name, &v.url, args.force)?;
+                        println!("  ✓ installed intro '{name}'");
+                    } else {
+                        println!("  no version found for intro '{name}'");
+                    }
+                }
+            }
+            PackageType::Workflow => {
+                let version = entry.resolve_version(None);
+                if let Some(v) = version {
+                    let dest = lynx_core::paths::workflows_dir().join(format!("{name}.toml"));
+                    std::fs::create_dir_all(lynx_core::paths::workflows_dir())?;
+                    let content = ureq::get(&v.url).call()?.into_string()?;
+                    // Validate before writing
+                    lynx_workflow::parse(&content)?;
+                    std::fs::write(&dest, &content)?;
+                    println!("  \u{2713} installed workflow '{name}' — run with `lx run {name}`");
+                } else {
+                    println!("  no version found for workflow '{name}'");
+                }
+            }
+            PackageType::Bundle => {
+                // Resolve bundle to its package list and install each.
+                let all_entries: Vec<_> = merged.iter().map(|t| t.entry.clone()).collect();
+                let idx = lynx_registry::schema::RegistryIndex { plugins: all_entries };
+                let resolved = lynx_registry::bundle::resolve_bundle(entry, &idx)?;
+                println!("  bundle '{name}' contains {} packages:", resolved.len());
+                for pkg in &resolved {
+                    println!("    - {}", pkg.name);
+                }
+                print!("  install all? [y/N] ");
+                std::io::Write::flush(&mut std::io::stdout())?;
+                let mut input = String::new();
+                std::io::stdin().read_line(&mut input)?;
+                if !input.trim().eq_ignore_ascii_case("y") {
+                    println!("  skipped bundle '{name}'");
+                    continue;
+                }
+                for pkg in &resolved {
+                    println!();
+                    match pkg.package_type {
+                        PackageType::Tool => install_tool(&pkg.name, pkg, args.force)?,
+                        PackageType::Plugin => install_plugin(&pkg.name, pkg, args.force).await?,
+                        _ => println!("  skipping {} (type {:?})", pkg.name, pkg.package_type),
+                    }
+                }
+                println!("  ✓ bundle '{name}' complete");
+            }
+        }
     }
 
-    if themes_src.exists() {
-        let themes_dst = lynx_dir.join("themes");
-        copy_dir_all(&themes_src, &themes_dst)
-            .with_context(|| format!("failed to copy themes/ from {}", themes_src.display()))?;
-        println!("  ✓ themes/  → {}/themes/", lynx_dir.display());
-    } else {
-        println!("  ⚠ themes/ not found — skipping");
+    Ok(())
+}
+
+fn install_tool(
+    name: &str,
+    entry: &lynx_registry::schema::RegistryEntry,
+    force: bool,
+) -> Result<()> {
+    let config = lynx_config::load()?;
+    if config.enabled_plugins.contains(&name.to_string()) && !force {
+        println!("  '{name}' is already installed — use --force to reinstall");
+        return Ok(());
     }
 
-    // Write default config if none exists
-    let config_path = lynx_dir.join(brand::CONFIG_FILE);
-    if !config_path.exists() {
-        std::fs::write(
-            &config_path,
-            default_config(),
+    println!("  installing tool '{name}'...");
+    install_tool_via_pm(entry)?;
+
+    // Auto-generate plugin.
+    let plugins_dir = paths::installed_plugins_dir();
+    generate_tool_plugin(entry, &plugins_dir)?;
+
+    // Enable the plugin.
+    mutate_config_transaction(&format!("install-tool-{name}"), |cfg| {
+        if !cfg.enabled_plugins.contains(&name.to_string()) {
+            cfg.enabled_plugins.push(name.to_string());
+        }
+        Ok(())
+    })?;
+
+    println!("  ✓ installed '{name}' — restart your shell to activate");
+    Ok(())
+}
+
+async fn install_plugin(
+    name: &str,
+    entry: &lynx_registry::schema::RegistryEntry,
+    force: bool,
+) -> Result<()> {
+    if entry.bundled {
+        mutate_config_transaction(&format!("install-plugin-{name}"), |cfg| {
+            if !cfg.enabled_plugins.contains(&name.to_string()) {
+                cfg.enabled_plugins.push(name.to_string());
+            }
+            Ok(())
+        })?;
+        println!("  ✓ enabled bundled plugin '{name}'");
+        return Ok(());
+    }
+
+    use lynx_registry::fetch::{fetch_plugin, FetchOptions};
+    let n = name.to_string();
+    tokio::task::spawn_blocking(move || {
+        fetch_plugin(
+            &n,
+            &FetchOptions {
+                force,
+                refresh_index: true,
+                ..Default::default()
+            },
         )
-        .with_context(|| format!("failed to write config.toml to {}", config_path.display()))?;
-        println!("  ✓ config.toml written (default)");
-    } else {
-        println!("  ✓ config.toml preserved (already exists)");
-    }
+    })
+    .await??;
 
-    // Optionally patch .zshrc
-    if args.zshrc {
-        patch_zshrc(&home)?;
-    }
+    mutate_config_transaction(&format!("install-plugin-{name}"), |cfg| {
+        if !cfg.enabled_plugins.contains(&name.to_string()) {
+            cfg.enabled_plugins.push(name.to_string());
+        }
+        Ok(())
+    })?;
 
-    println!();
-    println!("Lynx installed to {}.", lynx_dir.display());
-
-    if !args.zshrc {
-        println!();
-        println!("Add this to your ~/.zshrc to activate Lynx:");
-        println!();
-        println!("    {ZSHRC_INIT_LINE}");
-        println!();
-        println!("Or run `lx install --zshrc` to do it automatically.");
-    } else {
-        println!();
-        println!("Restart your shell or run:");
-        println!();
-        println!("    source ~/.zshrc");
-    }
-
+    println!("  ✓ installed plugin '{name}'");
     Ok(())
 }
 
-/// Resolve the source directory: explicit --source, or CARGO_MANIFEST_DIR (dev), or binary location.
-fn resolve_source_dir(explicit: Option<&str>) -> Result<PathBuf> {
-    if let Some(s) = explicit {
-        return Ok(PathBuf::from(s));
+pub async fn run_uninstall(args: UninstallPkgArgs) -> Result<()> {
+    let name = &args.name;
+    let plugins_dir = paths::installed_plugins_dir();
+    uninstall_tool(name, &plugins_dir)?;
+
+    let config = lynx_config::load()?;
+    if config.enabled_plugins.iter().any(|p| p == name) {
+        mutate_config_transaction(&format!("uninstall-{name}"), |cfg| {
+            cfg.enabled_plugins.retain(|p| p != name);
+            Ok(())
+        })?;
+        println!("disabled '{name}' in config");
     }
 
-    // In dev: CARGO_MANIFEST_DIR is set when running via cargo run.
-    // Navigate up to workspace root (crates/lynx-cli → ../../)
-    if let Ok(manifest) = std::env::var("CARGO_MANIFEST_DIR") {
-        let workspace_root = PathBuf::from(&manifest)
-            .parent() // lynx-cli
-            .and_then(|p| p.parent()) // crates
-            .and_then(|p| p.parent()) // workspace root
-            .map(|p| p.to_path_buf());
-        if let Some(root) = workspace_root {
-            if root.join("shell").exists() {
-                return Ok(root);
-            }
-        }
-    }
-
-    // Production: binary sits at ~/.local/bin/lx or /usr/local/bin/lx.
-    // Source tree is expected alongside it at a sibling share/ dir, or in the same dir.
-    if let Ok(exe) = std::env::current_exe() {
-        // Try: <exe-parent>/../share/lynx
-        if let Some(bin_dir) = exe.parent() {
-            let share = bin_dir.join("../share/lynx");
-            if share.join("shell").exists() {
-                return Ok(share.canonicalize().unwrap_or(share));
-            }
-            // Try: <exe-parent> directly (portable bundle)
-            if bin_dir.join("shell").exists() {
-                return Ok(bin_dir.to_path_buf());
-            }
-        }
-    }
-
-    // Last resort: current working directory
-    let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-    if cwd.join("shell").exists() {
-        return Ok(cwd);
-    }
-
-    anyhow::bail!(
-        "Cannot locate Lynx source files (shell/ and plugins/).\n\
-         Run from the Lynx source directory or pass --source <path>."
-    )
-}
-
-/// Snapshot the target directory to ~/.config/lynx/.snapshots/<timestamp> if it already exists.
-fn snapshot_if_exists(lynx_dir: &Path) {
-    if !lynx_dir.exists() {
-        return;
-    }
-    let ts = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
-    let snap_dir = lynx_dir.join(format!(".snapshots/install-{ts}"));
-    if std::fs::create_dir_all(&snap_dir).is_ok() {
-        // Best-effort: copy config.toml if it exists
-        let cfg = lynx_dir.join("config.toml");
-        if cfg.exists() {
-            let _ = std::fs::copy(&cfg, snap_dir.join("config.toml"));
-        }
-        println!("  ✓ snapshot → {}", snap_dir.display());
-    }
-}
-
-/// Recursively copy src into dst, creating dst if needed.
-fn copy_dir_all(src: &Path, dst: &Path) -> Result<()> {
-    std::fs::create_dir_all(dst)?;
-    for entry in std::fs::read_dir(src)? {
-        let entry = entry?;
-        let ty = entry.file_type()?;
-        let dest_path = dst.join(entry.file_name());
-        if ty.is_dir() {
-            copy_dir_all(&entry.path(), &dest_path)?;
-        } else {
-            std::fs::copy(entry.path(), &dest_path)
-                .with_context(|| format!("failed to copy {}", entry.path().display()))?;
-        }
-    }
     Ok(())
-}
-
-/// Append the Lynx init line to ~/.zshrc if not already present.
-fn patch_zshrc(home: &Path) -> Result<()> {
-    let zshrc = home.join(".zshrc");
-
-    if zshrc.exists() {
-        let content = std::fs::read_to_string(&zshrc)
-            .with_context(|| format!("failed to read {}", zshrc.display()))?;
-
-        if content.lines().any(|l| l.contains(ZSHRC_INIT_LINE)) {
-            println!("  ✓ ~/.zshrc already has Lynx init line — skipping");
-            return Ok(());
-        }
-
-        // Append
-        let mut appended = content;
-        if !appended.ends_with('\n') {
-            appended.push('\n');
-        }
-        appended.push_str(&format!("\n# Lynx shell framework\n{ZSHRC_INIT_LINE}\n"));
-        std::fs::write(&zshrc, &appended)
-            .with_context(|| format!("failed to write {}", zshrc.display()))?;
-    } else {
-        // Create minimal .zshrc
-        std::fs::write(
-            &zshrc,
-            format!("# Lynx shell framework\n{ZSHRC_INIT_LINE}\n"),
-        )
-        .with_context(|| format!("failed to create {}", zshrc.display()))?;
-    }
-
-    println!("  ✓ ~/.zshrc patched with Lynx init line");
-    Ok(())
-}
-
-/// Minimal default config.toml for a fresh install.
-fn default_config() -> &'static str {
-    r#"# Lynx configuration — https://github.com/proxikal/lynx
-
-enabled_plugins = ["git", "kubectl"]
-
-[theme]
-name = "default"
-
-[contexts.interactive]
-enabled = true
-
-[contexts.agent]
-enabled = true
-
-[contexts.minimal]
-enabled = true
-"#
-}
-
-fn home_dir() -> Result<PathBuf> {
-    std::env::var_os("HOME")
-        .map(PathBuf::from)
-        .ok_or_else(|| anyhow::anyhow!("$HOME not set"))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::fs;
-    use tempfile::TempDir;
-
-    #[test]
-    fn copy_dir_all_copies_nested_files() {
-        let src = TempDir::new().unwrap();
-        let dst = TempDir::new().unwrap();
-
-        fs::create_dir(src.path().join("sub")).unwrap();
-        fs::write(src.path().join("file.txt"), b"hello").unwrap();
-        fs::write(src.path().join("sub/nested.txt"), b"world").unwrap();
-
-        copy_dir_all(src.path(), dst.path()).unwrap();
-
-        assert!(dst.path().join("file.txt").exists());
-        assert!(dst.path().join("sub/nested.txt").exists());
-    }
-
-    #[test]
-    fn patch_zshrc_idempotent() {
-        let home = TempDir::new().unwrap();
-        let zshrc = home.path().join(".zshrc");
-        fs::write(&zshrc, format!("{ZSHRC_INIT_LINE}\n")).unwrap();
-
-        patch_zshrc(home.path()).unwrap();
-
-        let content = fs::read_to_string(&zshrc).unwrap();
-        assert_eq!(
-            content.lines().filter(|l| l.contains(ZSHRC_INIT_LINE)).count(),
-            1,
-            "should not duplicate init line"
-        );
-    }
-
-    #[test]
-    fn patch_zshrc_creates_if_missing() {
-        let home = TempDir::new().unwrap();
-        patch_zshrc(home.path()).unwrap();
-        let content = fs::read_to_string(home.path().join(".zshrc")).unwrap();
-        assert!(content.contains(ZSHRC_INIT_LINE));
-    }
-
-    #[test]
-    fn patch_zshrc_appends_to_existing() {
-        let home = TempDir::new().unwrap();
-        let zshrc = home.path().join(".zshrc");
-        fs::write(&zshrc, "export FOO=bar\n").unwrap();
-
-        patch_zshrc(home.path()).unwrap();
-
-        let content = fs::read_to_string(&zshrc).unwrap();
-        assert!(content.contains("export FOO=bar"));
-        assert!(content.contains(ZSHRC_INIT_LINE));
-    }
 }

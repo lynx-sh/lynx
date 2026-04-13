@@ -18,12 +18,22 @@ pub enum ContextCommand {
     Set { name: String },
     /// Show current context and detection method (default when no subcommand given)
     Status,
+    /// Smart dispatch: treat unknown subcommand as context name for `set`
+    #[command(external_subcommand)]
+    Other(Vec<String>),
 }
 
 pub async fn run(args: ContextArgs) -> Result<()> {
     match args.command.unwrap_or(ContextCommand::Status) {
         ContextCommand::Set { name } => cmd_set(&name).await,
         ContextCommand::Status => cmd_status(),
+        ContextCommand::Other(args) => {
+            if args.len() == 1 {
+                cmd_set(&args[0]).await
+            } else {
+                anyhow::bail!("unknown context command '{}' — run `lx context` for help", args.first().map(|s| s.as_str()).unwrap_or(""))
+            }
+        }
     }
 }
 

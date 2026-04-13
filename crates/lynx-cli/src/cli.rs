@@ -16,16 +16,16 @@ pub struct Cli {
 pub enum Command {
     /// Initialize Lynx in a new shell session
     Init(crate::commands::init::InitArgs),
-    /// Install Lynx files to LYNX_DIR and optionally patch .zshrc
-    Install(crate::commands::install::InstallArgs),
+    /// Set up Lynx files in LYNX_DIR and optionally patch .zshrc
+    Setup(crate::commands::setup::SetupArgs),
     /// Emit or subscribe to events
     Event(crate::commands::event::EventArgs),
     /// Manage plugins
     Plugin(crate::commands::plugin::PluginArgs),
     /// Manage themes
     Theme(crate::commands::theme::ThemeArgs),
-    /// Manage task scheduler
-    Task(crate::commands::task::TaskArgs),
+    /// Manage scheduled cron tasks
+    Cron(crate::commands::cron::CronArgs),
     /// Manage the Lynx background daemon
     Daemon(crate::commands::daemon::DaemonArgs),
     /// Switch or show context (interactive, agent, minimal)
@@ -48,8 +48,6 @@ pub enum Command {
     Uninstall(crate::commands::uninstall::UninstallArgs),
     /// Show real-world usage examples and quickstart guide
     Examples(crate::commands::examples::ExamplesArgs),
-    /// Manage shell profiles
-    Profile(crate::commands::profile::ProfileArgs),
     /// Render PROMPT/RPROMPT for eval by shell precmd hook
     Prompt(crate::commands::prompt::PromptArgs),
     /// Emit zsh that populates _lynx_git_state (standalone / debugging)
@@ -67,4 +65,20 @@ pub enum Command {
     Diag(crate::commands::diag::DiagArgs),
     /// Manage shell startup intros — ASCII art, system info, welcome messages
     Intro(crate::commands::intro::IntroArgs),
+    /// Manage package registry taps (sources)
+    Tap(crate::commands::tap::TapArgs),
+    /// Install packages from the registry (tools, plugins, themes)
+    Install(crate::commands::install::InstallPkgArgs),
+    /// Remove a package's Lynx integration (preserves system binaries)
+    Remove(crate::commands::install::UninstallPkgArgs),
+    /// Browse available packages by category
+    Browse(crate::commands::browse::BrowseArgs),
+    /// Audit enabled plugins — show exports, hooks, binary deps, checksums
+    Audit(crate::commands::audit::AuditArgs),
+    /// Open the Lynx Dashboard — full management web UI
+    Dashboard(crate::commands::dashboard::DashboardArgs),
+    /// View and manage workflow jobs
+    Jobs(crate::commands::jobs::JobsArgs),
+    /// Execute a workflow
+    Run(crate::commands::run::RunArgs),
 }
