@@ -94,7 +94,8 @@ pub async fn execute_workflow(
                     let ld = log_dir.clone();
                     let sem = semaphore.clone();
                     tokio::spawn(async move {
-                        let _permit = sem.acquire().await.expect("semaphore closed");
+                        // Semaphore is Arc-owned by the enclosing scope — never closed.
+                        let _permit = sem.acquire().await.expect("semaphore is never closed");
                         execute_step(&step, &params, &mode, ld.as_deref()).await
                     })
                 })

@@ -94,7 +94,9 @@ impl Segment for GitStatusSegment {
                 let staged_icon = cfg.staged.as_ref().and_then(|s| s.icon.as_deref()).unwrap_or("+");
                 let modified_icon = cfg.modified.as_ref().and_then(|s| s.icon.as_deref()).unwrap_or("!");
                 let untracked_icon = cfg.untracked.as_ref().and_then(|s| s.icon.as_deref()).unwrap_or("?");
-                let state = git_state_obj(ctx).unwrap();
+                let Some(state) = git_state_obj(ctx) else {
+                    return None;
+                };
                 let staged_val = if state.get("staged").and_then(|v| v.as_bool()).unwrap_or(false) { staged_icon } else { "" };
                 let modified_val = if state.get("modified").and_then(|v| v.as_bool()).unwrap_or(false) { modified_icon } else { "" };
                 let untracked_val = if state.get("untracked").and_then(|v| v.as_bool()).unwrap_or(false) { untracked_icon } else { "" };
