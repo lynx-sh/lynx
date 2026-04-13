@@ -446,7 +446,7 @@ fn assemble(segs: &[RenderedSegment], theme: &Theme, sep: &Separators, is_left: 
                 }
             } else if sep.mode == SeparatorMode::Adaptive {
                 // Default tail arrow for adaptive mode.
-                if let Some(last_bg) = resolve_seg_bg(segs.last().unwrap(), theme) {
+                if let Some(last_bg) = segs.last().and_then(|s| resolve_seg_bg(s, theme)) {
                     if cap != TermCapability::None {
                         let color = SegmentColor { fg: Some(last_bg), bg: None, bold: false };
                         joined.push_str(&apply_color_zsh(sep_str, &color, cap));

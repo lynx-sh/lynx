@@ -28,7 +28,7 @@ fn serve(content: &'static str, content_type: &'static str) -> Response {
         .status(StatusCode::OK)
         .header(header::CONTENT_TYPE, content_type)
         .body(content.to_string())
-        .unwrap()
+        .expect("static response builder with valid constants")
         .into_response()
 }
 

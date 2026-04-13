@@ -119,7 +119,8 @@ fn sync_dir(src: &Path, dst: &Path, label: &str) -> Result<usize> {
 
     let mut count = 0usize;
     for entry in walkdir(src)? {
-        let rel = entry.strip_prefix(src).unwrap();
+        let rel = entry.strip_prefix(src)
+            .with_context(|| format!("path {} is not under {}", entry.display(), src.display()))?;
         let dest = dst.join(rel);
 
         if entry.is_dir() {

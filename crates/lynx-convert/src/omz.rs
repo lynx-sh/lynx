@@ -1,5 +1,6 @@
 use regex::Regex;
 use std::collections::HashMap;
+use std::sync::LazyLock;
 
 /// Intermediate representation of a parsed OMZ theme.
 #[derive(Debug, Clone, Default)]
@@ -159,15 +160,18 @@ fn extract_segments(prompt: &str) -> Vec<String> {
 /// Extract color annotations from OMZ prompt strings.
 fn extract_colors(prompt: &str, colors: &mut HashMap<String, SegColor>) {
     // Pattern: $fg[color] or $fg_bold[color] followed by segment content.
-    let re = Regex::new(r"\$fg(?:_bold)?\[(\w+)\]").unwrap();
-    let bold_re = Regex::new(r"\$fg_bold\[(\w+)\]").unwrap();
+    static RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"\$fg(?:_bold)?\[(\w+)\]").expect("static regex"));
+    static BOLD_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"\$fg_bold\[(\w+)\]").expect("static regex"));
 
-    for caps in re.captures_iter(prompt) {
+    for caps in RE.captures_iter(prompt) {
         let color_name = &caps[1];
-        let is_bold = bold_re.is_match(caps.get(0).unwrap().as_str());
+        let full_match = caps.get(0).expect("capture group 0 always exists");
+        let is_bold = BOLD_RE.is_match(full_match.as_str());
 
         // Try to associate with the next segment token.
-        let pos = caps.get(0).unwrap().end();
+        let pos = full_match.end();
         let rest = &prompt[pos..];
 
         let seg_name = identify_next_segment(rest);
