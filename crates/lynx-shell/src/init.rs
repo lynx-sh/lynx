@@ -28,6 +28,9 @@ pub struct InitParams<'a> {
     pub user_aliases: &'a [UserAlias],
     /// User-defined PATH entries to prepend. Always emitted regardless of context.
     pub user_paths: &'a [String],
+    /// Preferred editor binary from config (e.g. `code`, `zed`, `vim`).
+    /// When set, exported as `$VISUAL` only if `$VISUAL` is not already set in the environment.
+    pub editor: Option<&'a str>,
 }
 
 /// Generate the zsh init script that the shell evals on startup.
@@ -170,6 +173,16 @@ pub fn generate_init_script(params: &InitParams<'_>) -> String {
         }
     }
 
+    // Editor preference from config — exported as $VISUAL only if not already set.
+    // Uses ${VISUAL:-} so the user's existing env always wins over the config value.
+    // Works with any editor binary: code, zed, vim, nano, etc.
+    if let Some(editor) = params.editor {
+        out.push_str(&format!(
+            "  export VISUAL=${{VISUAL:-{}}}\n",
+            shell_quote(editor)
+        ));
+    }
+
     // User-defined PATH entries — prepend regardless of context.
     for path in params.user_paths {
         out.push_str(&format!(
@@ -208,6 +221,7 @@ mod tests {
             zle_hook_plugins: HashSet::new(),
             user_aliases: &[],
             user_paths: &[],
+            editor: None,
         }
     }
 
@@ -378,6 +392,26 @@ mod tests {
         assert!(
             script.contains("/usr/local/sbin"),
             "user paths must be emitted even in agent context"
+        );
+    }
+
+    #[test]
+    fn editor_exported_as_visual_when_set() {
+        let mut params = base_params(&Context::Interactive, &[]);
+        params.editor = Some("zed");
+        let script = generate_init_script(&params);
+        assert!(
+            script.contains("export VISUAL=${VISUAL:-'zed'}"),
+            "editor must be exported as VISUAL with env fallback: {script}"
+        );
+    }
+
+    #[test]
+    fn editor_not_exported_when_unset() {
+        let script = generate_init_script(&base_params(&Context::Interactive, &[]));
+        assert!(
+            !script.contains("VISUAL="),
+            "VISUAL must not appear when editor is not configured"
         );
     }
 
