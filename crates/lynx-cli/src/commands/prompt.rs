@@ -45,16 +45,6 @@ pub async fn run(args: PromptArgs) -> Result<()> {
 async fn cmd_render(transient: bool) -> Result<()> {
     let ctx = build_render_context_from_env();
 
-    // Run in-process plugin lifecycle and emit shell:precmd so plugin handlers
-    // fire before the prompt is built. Bus is discarded when this fn returns.
-    let plugins_dir = lynx_core::paths::installed_plugins_dir();
-    let bus = crate::bus::build_active_bus(&ctx.shell_context, &plugins_dir);
-    bus.emit(lynx_events::types::Event::new(
-        lynx_events::types::SHELL_PRECMD,
-        &ctx.cwd,
-    ))
-    .await;
-
     // --- Load theme ---
     // Priority: LYNX_THEME env var (runtime override) → config.active_theme
     // (user's configured choice) → brand::DEFAULT_THEME (last-resort fallback).

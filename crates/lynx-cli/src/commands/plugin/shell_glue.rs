@@ -5,34 +5,16 @@
 // Never write to stderr here; the shell's 2>/dev/null suppresses it on load.
 
 use anyhow::Result;
-use lynx_events::types::{Event, PLUGIN_LOADED};
 use lynx_manifest::schema::PluginManifest;
-use lynx_plugin::{exec::generate_exec_script, lifecycle};
+use lynx_plugin::exec::generate_exec_script;
 use std::path::Path;
-use std::sync::Arc;
 
 use super::path::resolve_plugin_dir;
 
 /// Emit zsh that activates the plugin's exported symbols and sets its load guard.
-///
-/// After emitting the shell glue, activates the plugin's EventBus subscriptions
-/// in-process and emits plugin:loaded so any registered handlers run.
-pub(super) async fn cmd_exec(name: &str) -> Result<()> {
+pub(super) fn cmd_exec(name: &str) -> Result<()> {
     let script = generate_exec_script_for_plugin(name)?;
     print!("{script}");
-
-    // Activate in-process: register this plugin's hook subscriptions on a
-    // short-lived bus, emit plugin:loaded, then exit.
-    if let Some(plugin_dir) = resolve_plugin_dir(name) {
-        if let Ok(Some(manifest)) = read_plugin_manifest(&plugin_dir) {
-            let bus = Arc::new(lynx_events::EventBus::new());
-            if let Err(e) = lifecycle::activate(name, &manifest, Arc::clone(&bus)) {
-                tracing::warn!("plugin '{name}' activation failed: {e}");
-            }
-            bus.emit(Event::new(PLUGIN_LOADED, name)).await;
-        }
-    }
-
     Ok(())
 }
 

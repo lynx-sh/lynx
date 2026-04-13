@@ -1,11 +1,8 @@
 use crate::context_filter::filter_for_context;
 use crate::registry::{PluginEntry, PluginRegistry, PluginState};
-use lynx_core::error::Result;
 use lynx_core::types::Context;
-use lynx_events::EventBus;
 use lynx_manifest::schema::PluginManifest;
 use std::path::Path;
-use std::sync::Arc;
 
 /// DECLARE stage: parse all plugin.toml files from a directory.
 ///
@@ -78,66 +75,10 @@ pub fn apply_resolve(
     }
 }
 
-/// Map a plugin.toml short hook name to the canonical EventBus event name.
-///
-/// Two subscription pathways exist:
-/// - **Shell-side (working now):** `lx init` output wires `_pluginname_hook()` functions
-///   into zsh hook arrays (chpwd_functions, precmd_functions, etc.). This is what
-///   actually runs today.
-/// - **Daemon-side (this function):** registers Rust handlers on the EventBus so the
-///   daemon can act when events arrive over IPC. NOTE: `activate()` is not yet called
-///   by the daemon — see wiring issue filed against lynx-daemon.
-///
-/// Both pathways are valid; they serve different purposes:
-/// - Shell hooks: run zsh-side plugin code during prompt render cycle
-/// - EventBus handlers: run Rust-side daemon logic (caching, side effects)
-fn hook_event_name(hook: &str) -> String {
-    match hook {
-        "chpwd" => "shell:chpwd".to_string(),
-        "precmd" => "shell:precmd".to_string(),
-        "preexec" => "shell:preexec".to_string(),
-        other => format!("shell:{other}"),
-    }
-}
-
-/// ACTIVATE stage: register EventBus subscriptions from the manifest's hooks list.
-///
-/// Handlers trace the dispatch so daemon-side hook delivery is observable.
-/// Shell-side hook execution (the working path today) is a separate mechanism
-/// wired by `lx init` output — see `hook_event_name` doc above.
-pub fn activate(name: &str, manifest: &PluginManifest, bus: Arc<EventBus>) -> Result<()> {
-    for hook in &manifest.load.hooks {
-        let event_name = hook_event_name(hook);
-        let plugin_name = name.to_string();
-        let hook_short = hook.clone();
-        bus.subscribe(&event_name, move |ev| {
-            let plugin = plugin_name.clone();
-            let hook = hook_short.clone();
-            async move {
-                tracing::debug!(plugin = %plugin, hook = %hook, data = %ev.data,
-                    "plugin hook dispatched via EventBus");
-            }
-        });
-    }
-    Ok(())
-}
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn hook_event_name_known_hooks() {
-        assert_eq!(hook_event_name("chpwd"), "shell:chpwd");
-        assert_eq!(hook_event_name("precmd"), "shell:precmd");
-        assert_eq!(hook_event_name("preexec"), "shell:preexec");
-    }
-
-    #[test]
-    fn hook_event_name_unknown_prefixes_shell() {
-        assert_eq!(hook_event_name("custom_hook"), "shell:custom_hook");
-        assert_eq!(hook_event_name("zshaddhistory"), "shell:zshaddhistory");
-    }
 
     #[test]
     fn declare_empty_dir() {
