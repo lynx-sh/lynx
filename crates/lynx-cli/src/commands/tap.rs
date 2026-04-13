@@ -1,3 +1,4 @@
+use lynx_core::error::LynxError;
 use anyhow::Result;
 use clap::{Args, Subcommand};
 use lynx_core::paths::taps_config_path;
@@ -40,7 +41,7 @@ pub async fn run(args: TapArgs) -> Result<()> {
         TapCommand::Remove { name } => cmd_remove(&name),
         TapCommand::Update => cmd_update(),
         TapCommand::Other(args) => {
-            anyhow::bail!("unknown tap command '{}' — run `lx tap` for help", args.first().map(|s| s.as_str()).unwrap_or(""))
+            Err(LynxError::unknown_command(args.first().map(|s| s.as_str()).unwrap_or(""), "tap").into())
         }
     }
 }
@@ -156,7 +157,7 @@ fn cmd_update() -> Result<()> {
     }
 
     if failures > 0 && failures == total as u32 {
-        anyhow::bail!("all {total} tap(s) failed to update");
+        return Err(LynxError::Registry(format!("all {total} tap(s) failed to update")).into());
     } else if failures > 0 {
         eprintln!("warning: {failures}/{total} tap(s) failed to update");
     }

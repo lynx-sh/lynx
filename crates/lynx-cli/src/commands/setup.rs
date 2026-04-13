@@ -1,3 +1,4 @@
+use lynx_core::error::LynxError;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
@@ -51,10 +52,10 @@ pub async fn run(args: SetupArgs) -> Result<()> {
             .with_context(|| format!("failed to copy shell/ from {}", shell_src.display()))?;
         println!("  ✓ shell/   → {}/shell/", lynx_dir.display());
     } else {
-        anyhow::bail!(
+        return Err(LynxError::Config(format!(
             "shell/ not found at {} — run lx setup from the Lynx source directory or pass --source",
             shell_src.display()
-        );
+        )).into());
     }
 
     if plugins_src.exists() {
@@ -155,10 +156,9 @@ fn resolve_source_dir(explicit: Option<&str>) -> Result<PathBuf> {
         return Ok(cwd);
     }
 
-    anyhow::bail!(
-        "Cannot locate Lynx source files (shell/ and plugins/).\n\
-         Run from the Lynx source directory or pass --source <path>."
-    )
+    Err(LynxError::Config(
+        "Cannot locate Lynx source files (shell/ and plugins/). Run from the Lynx source directory or pass --source <path>.".into()
+    ).into())
 }
 
 /// Snapshot the target directory to ~/.config/lynx/.snapshots/<timestamp> if it already exists.

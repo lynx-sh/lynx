@@ -4,6 +4,7 @@
 /// printing to stderr (which would corrupt the terminal during shell startup).
 /// Use `lx diag` to see what Lynx has logged. Use `lx doctor` for a full
 /// health check with actionable fixes.
+use lynx_core::error::LynxError;
 use anyhow::Result;
 use clap::{Args, Subcommand};
 use lynx_core::diag;
@@ -39,7 +40,7 @@ pub async fn run(args: DiagArgs) -> Result<()> {
             println!("{}", diag::log_path().display());
         }
         Some(DiagCommand::Other(args)) => {
-            anyhow::bail!("unknown diag command '{}' — run `lx diag` for help", args.first().map(|s| s.as_str()).unwrap_or(""))
+            return Err(LynxError::unknown_command(args.first().map(|s| s.as_str()).unwrap_or(""), "diag").into())
         }
         None => {
             let lines = diag::tail(args.lines);

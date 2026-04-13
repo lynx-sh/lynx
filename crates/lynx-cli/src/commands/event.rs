@@ -1,3 +1,4 @@
+use lynx_core::error::LynxError;
 use anyhow::Result;
 use clap::{Args, Subcommand};
 use lynx_events::{logger, types::Event};
@@ -63,7 +64,7 @@ pub async fn run(args: EventArgs) -> Result<()> {
             .await?;
         }
         EventCommand::Other(args) => {
-            anyhow::bail!("unknown event command '{}' — run `lx event` for help", args.first().map(|s| s.as_str()).unwrap_or(""))
+            return Err(LynxError::unknown_command(args.first().map(|s| s.as_str()).unwrap_or(""), "event").into())
         }
     }
     Ok(())

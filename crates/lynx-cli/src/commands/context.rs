@@ -1,3 +1,4 @@
+use lynx_core::error::LynxError;
 use anyhow::Result;
 use clap::{Args, Subcommand};
 
@@ -31,7 +32,7 @@ pub async fn run(args: ContextArgs) -> Result<()> {
             if args.len() == 1 {
                 cmd_set(&args[0]).await
             } else {
-                anyhow::bail!("unknown context command '{}' — run `lx context` for help", args.first().map(|s| s.as_str()).unwrap_or(""))
+                Err(LynxError::unknown_command(args.first().map(|s| s.as_str()).unwrap_or(""), "context").into())
             }
         }
     }
@@ -87,9 +88,10 @@ fn parse_context(s: &str) -> anyhow::Result<Context> {
         "interactive" => Ok(Context::Interactive),
         "agent" => Ok(Context::Agent),
         "minimal" => Ok(Context::Minimal),
-        other => anyhow::bail!(
-            "unknown context '{}' — valid: interactive, agent, minimal",
-            other
-        ),
+        other => Err(LynxError::NotFound {
+            item_type: "Context".into(),
+            name: other.to_string(),
+            hint: "valid contexts: interactive, agent, minimal".into(),
+        }.into()),
     }
 }

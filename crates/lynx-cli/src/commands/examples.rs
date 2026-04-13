@@ -1,4 +1,5 @@
-use anyhow::{bail, Result};
+use anyhow::{Result};
+use lynx_core::error::LynxError;
 use clap::Args;
 
 #[derive(Args)]
@@ -21,7 +22,7 @@ pub async fn run(args: ExamplesArgs) -> Result<()> {
         Some("jobs") => print_jobs_examples(),
         Some("dashboard") => print_dashboard_examples(),
         Some(other) => {
-            bail!("unknown command '{other}' — try: lx examples plugin, theme, cron, run, jobs, dashboard, event, config, doctor");
+            return Err(LynxError::unknown_command(other, "examples").into());
         }
         None => print_quickstart(),
     }

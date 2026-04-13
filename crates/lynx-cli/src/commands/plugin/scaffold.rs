@@ -4,14 +4,15 @@
 // with inline comments that explain each field so new contributors don't need
 // to read the full protocol docs to get started.
 
-use anyhow::{bail, Result};
+use anyhow::{Result};
+use lynx_core::error::LynxError;
 use lynx_plugin::namespace::scaffold_convention_comment;
 use std::path::PathBuf;
 
 pub(super) async fn cmd_new(name: &str) -> Result<()> {
     let dir = PathBuf::from(name);
     if dir.exists() {
-        bail!("directory '{}' already exists.", name);
+        return Err(LynxError::Plugin(format!("directory '{}' already exists", name)).into());
     }
 
     std::fs::create_dir_all(dir.join("shell"))?;

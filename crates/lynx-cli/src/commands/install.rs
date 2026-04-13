@@ -3,7 +3,8 @@
 //! Resolves packages from all configured taps, detects the type,
 //! and routes to the correct installer.
 
-use anyhow::{bail, Result};
+use anyhow::{Result};
+use lynx_core::error::LynxError;
 use clap::Args;
 use lynx_config::snapshot::mutate_config_transaction;
 use lynx_core::paths;
@@ -29,7 +30,7 @@ pub struct UninstallPkgArgs {
 
 pub async fn run_install(args: InstallPkgArgs) -> Result<()> {
     if args.names.is_empty() {
-        bail!("provide at least one package name — e.g. `lx install eza`");
+        return Err(LynxError::Registry("provide at least one package name — e.g. `lx install eza`".into()).into());
     }
 
     let taps_path = paths::taps_config_path();

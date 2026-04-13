@@ -1,4 +1,5 @@
-use anyhow::{bail, Context as _, Result};
+use anyhow::{Context as _, Result};
+use lynx_core::error::LynxError;
 
 use super::open_in_vscode;
 use clap::{Args, Subcommand};
@@ -70,7 +71,7 @@ pub async fn run(args: IntroArgs) -> Result<()> {
             if args.len() == 1 {
                 cmd_set(&args[0])
             } else {
-                bail!("unknown intro command '{}' — run `lx intro` for help", args.first().map(|s| s.as_str()).unwrap_or(""))
+                Err(LynxError::unknown_command(args.first().map(|s| s.as_str()).unwrap_or(""), "intro").into())
             }
         }
         IntroCommand::Logo { text, font, list_fonts, append } => {
@@ -217,7 +218,7 @@ fn cmd_edit(slug: &str) -> Result<()> {
         Err(e) => {
             std::fs::write(&path, &snapshot)
                 .context("CRITICAL: failed to restore intro snapshot")?;
-            bail!("intro validation failed — changes reverted: {e}");
+            return Err(LynxError::Config(format!("intro validation failed — changes reverted: {e}")).into());
         }
     }
     Ok(())
@@ -226,12 +227,12 @@ fn cmd_edit(slug: &str) -> Result<()> {
 fn cmd_delete(slug: &str) -> Result<()> {
     // Only user intros can be deleted.
     if loader::list_builtin().contains(&slug) {
-        bail!("cannot delete built-in intro '{slug}' — built-ins are read-only");
+        return Err(LynxError::Config(format!("cannot delete built-in intro '{slug}' — built-ins are read-only")).into());
     }
 
     let path = user_intro_dir().join(format!("{slug}.toml"));
     if !path.exists() {
-        bail!("intro '{slug}' not found in user intro directory");
+        return Err(LynxError::NotFound { item_type: "Intro".into(), name: slug.to_string(), hint: "run `lx intro list` to see available intros".into() }.into());
     }
 
     std::fs::remove_file(&path)
@@ -256,7 +257,7 @@ fn cmd_delete(slug: &str) -> Result<()> {
 fn cmd_new(slug: &str) -> Result<()> {
     // Validate slug is a safe identifier.
     if slug.contains('/') || slug.contains('\\') || slug.contains("..") || slug.is_empty() {
-        bail!("invalid slug '{slug}': use only letters, numbers, hyphens, and underscores");
+        return Err(LynxError::Config(format!("invalid slug '{slug}': use only letters, numbers, hyphens, and underscores")).into());
     }
 
     let user_dir = user_intro_dir();
@@ -264,7 +265,7 @@ fn cmd_new(slug: &str) -> Result<()> {
 
     let path = user_dir.join(format!("{slug}.toml"));
     if path.exists() {
-        bail!("intro '{slug}' already exists — use `lx intro edit {slug}` to modify it");
+        return Err(LynxError::Config(format!("intro '{slug}' already exists — use `lx intro edit {slug}` to modify it")).into());
     }
 
     let template = format!(
@@ -306,7 +307,7 @@ color = "muted"
                 lynx_core::diag::warn("intro", &format!("failed to clean up invalid intro file {path:?}: {rm_err}"));
                 eprintln!("warning: could not remove invalid intro file: {rm_err}");
             }
-            bail!("intro validation failed — file removed: {e}");
+            return Err(LynxError::Config(format!("intro validation failed — file removed: {e}")).into());
         }
     }
     Ok(())

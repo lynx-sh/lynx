@@ -1,4 +1,5 @@
-use anyhow::{bail, Result};
+use anyhow::{Result};
+use lynx_core::error::LynxError;
 use clap::Args;
 use std::collections::HashMap;
 
@@ -39,7 +40,7 @@ pub async fn run(args: RunArgs) -> Result<()> {
         if let Some((k, v)) = param.split_once('=') {
             provided.insert(k.to_string(), v.to_string());
         } else {
-            bail!("invalid param format '{}' — expected key=value", param);
+            return Err(LynxError::Workflow(format!("invalid param format '{param}' — expected key=value")).into());
         }
     }
 

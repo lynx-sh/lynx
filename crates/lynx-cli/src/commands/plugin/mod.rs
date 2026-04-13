@@ -5,7 +5,8 @@
 //   registry_ops.rs — search, info, update, checksum, index-validate
 //   shell_glue.rs   — exec and unload (eval-bridge script generation)
 
-use anyhow::{bail, Result};
+use anyhow::{Result};
+use lynx_core::error::LynxError;
 use clap::{Args, Subcommand};
 use lynx_config::{load as load_config, snapshot::mutate_config_transaction};
 
@@ -129,7 +130,7 @@ pub async fn run(args: PluginArgs) -> Result<()> {
             .await
         }
         PluginCommand::Other(args) => {
-            bail!("unknown plugin command '{}' — run `lx plugin` for help", args.first().map(|s| s.as_str()).unwrap_or(""))
+            Err(LynxError::unknown_command(args.first().map(|s| s.as_str()).unwrap_or(""), "plugin").into())
         }
     }
 }
@@ -153,7 +154,7 @@ async fn cmd_add(path: &str) -> Result<()> {
     let manifest_path = plugin_path.join(lynx_core::brand::PLUGIN_MANIFEST);
 
     if !manifest_path.exists() {
-        bail!("no plugin.toml found at {}", manifest_path.display());
+        return Err(LynxError::Manifest(format!("no plugin.toml found at {}", manifest_path.display())).into());
     }
 
     let content = std::fs::read_to_string(&manifest_path)?;
@@ -181,7 +182,7 @@ async fn cmd_add(path: &str) -> Result<()> {
 async fn cmd_remove(name: &str) -> Result<()> {
     let config = load_config()?;
     if !config.enabled_plugins.iter().any(|p| p == name) {
-        bail!("plugin '{}' is not installed.", name);
+        return Err(LynxError::NotInstalled(name.to_string()).into());
     }
 
     mutate_config_transaction(&format!("plugin-remove-{name}"), |cfg| {

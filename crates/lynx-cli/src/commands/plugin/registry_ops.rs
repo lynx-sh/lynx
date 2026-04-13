@@ -2,7 +2,8 @@
 //
 // All network/IO work is offloaded via spawn_blocking so the async runtime stays unblocked.
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
+use lynx_core::error::LynxError;
 use lynx_config::snapshot::mutate_config_transaction;
 use lynx_registry::fetch::{
     check_for_update, checksum_file, checksum_plugin_dir, fetch_plugin, update_plugin, FetchOptions,
@@ -171,13 +172,10 @@ pub(super) async fn cmd_checksum(target: &str) -> Result<()> {
         );
         Ok(())
     } else {
-        bail!(
-            "checksum mismatch for '{}'\nexpected: {}\nactual:   {}\npath:     {}",
-            name,
-            expected,
-            actual,
-            plugin_dir.display()
-        );
+        Err(LynxError::Registry(format!(
+                "checksum mismatch for '{}'\nexpected: {}\nactual:   {}\npath:     {}",
+                name, expected, actual, plugin_dir.display()
+            )).into())
     }
 }
 
@@ -206,11 +204,11 @@ fn verify_installed_plugin_checksum(
 
     let plugin_dir = plugins_install_dir().join(name);
     if !plugin_dir.exists() {
-        bail!(
-            "installed plugin directory not found for '{}': {}",
-            name,
-            plugin_dir.display()
-        );
+        return Err(LynxError::NotFound {
+            item_type: "Plugin directory".into(),
+            name: name.to_string(),
+            hint: format!("expected at {}", plugin_dir.display()),
+        }.into());
     }
     let actual = checksum_plugin_dir(&plugin_dir)?;
     Ok((expected, actual, plugin_dir))

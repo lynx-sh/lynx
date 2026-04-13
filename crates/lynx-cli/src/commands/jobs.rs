@@ -1,3 +1,4 @@
+use lynx_core::error::LynxError;
 use anyhow::Result;
 use clap::{Args, Subcommand};
 
@@ -46,7 +47,7 @@ pub async fn run(args: JobsArgs) -> Result<()> {
         JobsCommand::Log { id } => cmd_log(&id),
         JobsCommand::Clean { hours } => cmd_clean(hours),
         JobsCommand::Other(args) => {
-            anyhow::bail!("unknown jobs command '{}' — run `lx jobs` for help", args.first().map(|s| s.as_str()).unwrap_or(""))
+            Err(LynxError::unknown_command(args.first().map(|s| s.as_str()).unwrap_or(""), "jobs").into())
         }
     }
 }

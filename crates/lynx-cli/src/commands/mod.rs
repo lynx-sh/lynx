@@ -33,7 +33,8 @@ pub mod uninstall;
 pub mod update;
 
 use crate::cli::{Cli, Command};
-use anyhow::{bail, Result};
+use anyhow::{Result};
+use lynx_core::error::LynxError;
 
 /// Load TUI colors from the active theme. Falls back to defaults.
 pub(crate) fn tui_colors() -> lynx_tui::TuiColors {
@@ -60,7 +61,7 @@ pub(crate) fn open_in_vscode(path: &std::path::Path) -> Result<()> {
         ))?;
 
     if !status.success() {
-        bail!("VS Code exited with an error — file may not have been saved");
+        return Err(LynxError::Shell("VS Code exited with an error — file may not have been saved".into()).into());
     }
     Ok(())
 }

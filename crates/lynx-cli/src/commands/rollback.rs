@@ -1,4 +1,5 @@
-use anyhow::{bail, Result};
+use anyhow::Result;
+use lynx_core::error::LynxError;
 use clap::Args;
 
 use lynx_config::snapshot::{list, restore};
@@ -14,7 +15,7 @@ pub async fn run(args: RollbackArgs) -> Result<()> {
     let snaps = list()?;
 
     if snaps.is_empty() {
-        bail!("no snapshots found — nothing to rollback");
+        return Err(LynxError::Config("no snapshots found — nothing to rollback".into()).into());
     }
 
     if args.last {
