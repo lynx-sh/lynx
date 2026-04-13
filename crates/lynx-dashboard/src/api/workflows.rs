@@ -131,7 +131,7 @@ pub async fn stream_job(
                         for line in new_data.lines() {
                             if !line.is_empty() {
                                 yield Ok::<Event, std::convert::Infallible>(
-                                    Event::default().event("log").data(line.to_string())
+                                    Event::default().event("log").data(line)
                                 );
                             }
                         }

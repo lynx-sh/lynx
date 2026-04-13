@@ -37,6 +37,7 @@ pub struct SyncConfig {
 /// Intro display configuration, stored under `[intro]` in `config.toml`.
 /// Disabled by default — user must opt in via `lx intro on`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct IntroConfig {
     /// Whether the intro is enabled. Default: false.
     #[serde(default)]
@@ -46,11 +47,3 @@ pub struct IntroConfig {
     pub active: Option<String>,
 }
 
-impl Default for IntroConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            active: None,
-        }
-    }
-}

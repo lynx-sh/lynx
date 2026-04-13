@@ -140,12 +140,12 @@ fn resolve_dotted(path: &str, ctx: &RenderContext) -> String {
             .cache
             .get(*plugin)
             .and_then(|v| v.get(*field))
-            .and_then(|v| {
+            .map(|v| {
                 // Support both string values and numeric/bool values coerced to string.
                 if let Some(s) = v.as_str() {
-                    Some(s.to_string())
+                    s.to_string()
                 } else {
-                    Some(v.to_string())
+                    v.to_string()
                 }
             })
             .unwrap_or_default(),

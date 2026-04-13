@@ -79,7 +79,7 @@ pub fn detect_context_outcome() -> DetectionOutcome {
 
 fn override_context() -> Option<Context> {
     let val = std::env::var(CONTEXT_OVERRIDE_ENV).ok()?;
-    Context::from_str(val.to_lowercase().as_str())
+    Context::parse(val.to_lowercase().as_str())
 }
 
 #[cfg(test)]

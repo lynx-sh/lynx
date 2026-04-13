@@ -72,11 +72,10 @@ pub fn parse(content: &str) -> OmzTheme {
     }
 
     // Check for ZSH_THEME_* customization.
-    if content.contains("ZSH_THEME_") {
-        if theme.tier == Tier::Simple {
+    if content.contains("ZSH_THEME_")
+        && theme.tier == Tier::Simple {
             theme.tier = Tier::Customized;
         }
-    }
 
     theme
 }
@@ -189,7 +188,7 @@ fn extract_colors(prompt: &str, colors: &mut HashMap<String, SegColor>) {
 
 /// Identify which segment follows a color annotation.
 fn identify_next_segment(text: &str) -> Option<String> {
-    let trimmed = text.trim_start_matches(|c: char| c == '}' || c == '%' || c == '{' || c == ' ');
+    let trimmed = text.trim_start_matches(['}', '%', '{', ' ']);
     let mappings: &[(&str, &str)] = &[
         ("%n", "username"),
         ("%m", "hostname"),

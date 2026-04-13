@@ -1129,6 +1129,7 @@ dependencies = [
  "lynx-task",
  "lynx-test-utils",
  "lynx-theme",
+ "lynx-tui",
  "lynx-workflow",
  "owo-colors",
  "serde_json",
