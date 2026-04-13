@@ -764,6 +764,29 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn streaming_captures_stderr_output() {
+        // Simulates a fast cached build that only outputs to stderr.
+        let wf = make_workflow(vec![
+            make_step("build", "echo 'Finished release' >&2"),
+        ]);
+        let (tx, rx) = std::sync::mpsc::channel();
+        let result = execute_workflow_streaming(&wf, &HashMap::new(), None, tx)
+            .await
+            .unwrap();
+        assert!(result.success);
+
+        let events: Vec<StreamEvent> = rx.try_iter().collect();
+        let stderr_output: Vec<&StreamEvent> = events
+            .iter()
+            .filter(|e| matches!(e, StreamEvent::StepOutput { is_stderr: true, .. }))
+            .collect();
+        assert!(
+            !stderr_output.is_empty(),
+            "stderr output should be captured; events: {events:?}"
+        );
+    }
+
+    #[tokio::test]
     async fn condition_passes() {
         let mut step = make_step("cond", "true");
         step.condition = Some("$deploy == yes".into());

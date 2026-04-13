@@ -185,6 +185,45 @@ impl TuiState {
                 self.done = true;
                 self.success = Some(success);
                 self.total_duration_ms = Some(duration_ms);
+
+                // Append a final summary so the user always sees all step results.
+                self.output_lines.push(OutputLine {
+                    step_name: "workflow".to_string(),
+                    text: String::new(),
+                    is_stderr: false,
+                });
+                self.output_lines.push(OutputLine {
+                    step_name: "workflow".to_string(),
+                    text: "\u{2500}\u{2500}\u{2500} summary \u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}".to_string(),
+                    is_stderr: false,
+                });
+                for s in &self.steps {
+                    let icon = match s.status {
+                        WorkflowStepStatus::Passed => "\u{2713}",
+                        WorkflowStepStatus::Failed => "\u{2717}",
+                        WorkflowStepStatus::Skipped => "\u{2014}",
+                        WorkflowStepStatus::TimedOut => "\u{23f0}",
+                        _ => "\u{25cb}",
+                    };
+                    let dur = s.duration_ms
+                        .map(|ms| format!(" ({ms}ms)"))
+                        .unwrap_or_default();
+                    self.output_lines.push(OutputLine {
+                        step_name: "workflow".to_string(),
+                        text: format!("  {icon} {}{dur}", s.name),
+                        is_stderr: s.status == WorkflowStepStatus::Failed,
+                    });
+                }
+                let total_icon = if success { "\u{2713}" } else { "\u{2717}" };
+                self.output_lines.push(OutputLine {
+                    step_name: "workflow".to_string(),
+                    text: format!("  {total_icon} total: {duration_ms}ms"),
+                    is_stderr: !success,
+                });
+
+                if self.auto_scroll {
+                    self.scroll_to_bottom();
+                }
             }
         }
     }
