@@ -92,8 +92,7 @@ pub fn resolve(manifests: &[PluginManifest]) -> Result<LoadOrder> {
             .collect();
         let cycle_path = find_cycle(&active, &unsorted);
         return Err(LynxError::Plugin(format!(
-            "circular plugin dependency detected: {}",
-            cycle_path
+            "circular plugin dependency detected: {cycle_path}"
         )));
     }
 

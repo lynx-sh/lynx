@@ -31,7 +31,7 @@ pub fn redact(data: &str) -> String {
     for part in data.split_whitespace() {
         if let Some((k, _v)) = part.split_once('=') {
             if is_secret_key(k) {
-                out = out.replace(part, &format!("{}=[REDACTED]", k));
+                out = out.replace(part, &format!("{k}=[REDACTED]"));
             }
         }
     }

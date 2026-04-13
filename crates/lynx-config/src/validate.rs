@@ -29,8 +29,7 @@ pub fn validate_before_apply(config: &LynxConfig) -> Result<()> {
         }
         if plugin.contains('/') || plugin.contains("..") {
             return Err(LynxError::Config(format!(
-                "plugin name '{}' contains invalid characters — use `lx plugin list` to inspect",
-                plugin
+                "plugin name '{plugin}' contains invalid characters — use `lx plugin list` to inspect"
             )));
         }
     }

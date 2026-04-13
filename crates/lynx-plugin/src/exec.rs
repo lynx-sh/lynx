@@ -43,7 +43,7 @@ pub fn generate_exec_script(manifest: &PluginManifest, plugin_dir: &Path) -> Res
         out.push_str("fi\n");
     }
 
-    out.push_str(&format!("if [[ -z \"${{{}}}\" ]]; then\n", guard_var));
+    out.push_str(&format!("if [[ -z \"${{{guard_var}}}\" ]]; then\n"));
     // Not exported — LYNX_PLUGIN_DIR is shell-local state used only during plugin sourcing
     out.push_str(&format!(
         "  LYNX_PLUGIN_DIR='{}'\n",
@@ -53,8 +53,7 @@ pub fn generate_exec_script(manifest: &PluginManifest, plugin_dir: &Path) -> Res
     for fpath_dir in &manifest.shell.fpath {
         let escaped = fpath_dir.replace('\'', "'\\''");
         out.push_str(&format!(
-            "  fpath=(\"$LYNX_PLUGIN_DIR/{}\" $fpath)\n",
-            escaped
+            "  fpath=(\"$LYNX_PLUGIN_DIR/{escaped}\" $fpath)\n"
         ));
     }
     out.push_str("  source \"$LYNX_PLUGIN_DIR/shell/init.zsh\" 2>/dev/null\n");
@@ -64,11 +63,11 @@ pub fn generate_exec_script(manifest: &PluginManifest, plugin_dir: &Path) -> Res
             manifest.plugin.name.replace('-', "_"),
             hook
         );
-        out.push_str(&format!("  add-zsh-hook {} {}\n", hook, fn_name));
+        out.push_str(&format!("  add-zsh-hook {hook} {fn_name}\n"));
     }
     // ZLE widget registrations
     for widget in &manifest.shell.widgets {
-        out.push_str(&format!("  zle -N {}\n", widget));
+        out.push_str(&format!("  zle -N {widget}\n"));
     }
     // Key bindings
     for kb in &manifest.shell.keybindings {
@@ -79,7 +78,7 @@ pub fn generate_exec_script(manifest: &PluginManifest, plugin_dir: &Path) -> Res
         ));
     }
     // Not exported — guard must not leak into child shells where aliases won't be inherited
-    out.push_str(&format!("  typeset -g {}=1\n", guard_var));
+    out.push_str(&format!("  typeset -g {guard_var}=1\n"));
     out.push_str("fi\n");
 
     Ok(out)

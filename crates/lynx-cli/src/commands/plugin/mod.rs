@@ -161,11 +161,11 @@ async fn cmd_add(path: &str) -> Result<()> {
     let manifest =
         lynx_manifest::parse_and_validate(&content).map_err(|e| anyhow::Error::from(lynx_core::error::LynxError::Manifest(e.to_string())))?;
 
-    let name = manifest.plugin.name.clone();
+    let name = manifest.plugin.name;
     let config = load_config()?;
 
     if config.enabled_plugins.contains(&name) {
-        println!("Plugin '{}' is already installed.", name);
+        println!("Plugin '{name}' is already installed.");
         return Ok(());
     }
 
@@ -175,7 +175,7 @@ async fn cmd_add(path: &str) -> Result<()> {
         }
         Ok(())
     })?;
-    println!("Added plugin '{}'.", name);
+    println!("Added plugin '{name}'.");
     Ok(())
 }
 
@@ -189,7 +189,7 @@ async fn cmd_remove(name: &str) -> Result<()> {
         cfg.enabled_plugins.retain(|p| p != name);
         Ok(())
     })?;
-    println!("Removed plugin '{}'.", name);
+    println!("Removed plugin '{name}'.");
     Ok(())
 }
 

@@ -57,7 +57,7 @@ pub(crate) fn gather_kubectl_state() -> KubectlState {
     // Bail if no kubeconfig exists
     let home = std::env::var("HOME").unwrap_or_default();
     let kubeconfig_env = std::env::var("KUBECONFIG").ok();
-    let default_kube = format!("{}/.kube/config", home);
+    let default_kube = format!("{home}/.kube/config");
     let has_config = kubeconfig_env
         .as_deref()
         .map(|p| std::path::Path::new(p).exists())

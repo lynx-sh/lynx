@@ -43,8 +43,6 @@ fn lazy_fn_wrapper(plugin_name: &str, fn_name: &str) -> String {
   {fn_name} "$@"
 }}
 "#,
-        plugin_name = plugin_name,
-        fn_name = fn_name,
     )
 }
 
@@ -65,8 +63,6 @@ fn lazy_alias_wrapper(plugin_name: &str, alias_name: &str) -> String {
   {alias_name} "$@"
 }}
 "#,
-        plugin_name = plugin_name,
-        alias_name = alias_name,
     )
 }
 

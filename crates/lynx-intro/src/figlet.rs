@@ -84,7 +84,7 @@ pub fn render_ascii(font: &str, text: &str) -> anyhow::Result<String> {
 
 fn convert_figlet(font: &FIGlet, text: &str, font_name: &str) -> anyhow::Result<String> {
     font.convert(text)
-        .map(|fig| fig.as_str().to_string())
+        .map(|fig| fig.as_str())
         .ok_or_else(|| {
             anyhow::Error::from(lynx_core::error::LynxError::Theme(format!(
                 "figlet: font '{font_name}' could not render '{text}' (no renderable characters)"
@@ -94,7 +94,7 @@ fn convert_figlet(font: &FIGlet, text: &str, font_name: &str) -> anyhow::Result<
 
 fn convert_toilet(font: &Toilet, text: &str, font_name: &str) -> anyhow::Result<String> {
     font.convert(text)
-        .map(|fig| fig.as_str().to_string())
+        .map(|fig| fig.as_str())
         .ok_or_else(|| {
             anyhow::Error::from(lynx_core::error::LynxError::Theme(format!(
                 "figlet: font '{font_name}' could not render '{text}' (no renderable characters)"

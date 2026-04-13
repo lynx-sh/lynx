@@ -53,8 +53,7 @@ pub fn render(template: &str, values: &HashMap<String, String>) -> Result<String
                 Some(v) => out.push_str(v),
                 None => {
                     return Err(LynxError::Config(format!(
-                        "template: unknown token '{{{{{}}}}}' — no value provided",
-                        token
+                        "template: unknown token '{{{{{token}}}}}' — no value provided"
                     )));
                 }
             }

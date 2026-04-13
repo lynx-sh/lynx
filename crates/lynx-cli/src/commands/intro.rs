@@ -326,7 +326,7 @@ fn cmd_preview(slug: Option<&str>) -> Result<()> {
     let tokens = lynx_intro::build_token_map(&env);
     let rendered = lynx_intro::render_intro(&intro, &tokens);
 
-    print!("{}", rendered);
+    print!("{rendered}");
     Ok(())
 }
 
@@ -346,7 +346,7 @@ fn cmd_logo(text: &str, font: &str, list_fonts: bool, append: bool) -> Result<()
         append_logo_to_active_intro(font, text)?;
         println!("logo appended to active intro");
     } else {
-        print!("{}", ascii);
+        print!("{ascii}");
     }
     Ok(())
 }

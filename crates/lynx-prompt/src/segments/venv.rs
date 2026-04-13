@@ -27,7 +27,7 @@ impl Segment for VenvSegment {
             .and_then(|n| n.to_str())
             .unwrap_or(path.as_str());
         let text = match cfg.symbol {
-            Some(ref sym) => format!("{} {}", sym, name),
+            Some(ref sym) => format!("{sym} {name}"),
             None => name.to_string(),
         };
         Some(RenderedSegment::new(text))

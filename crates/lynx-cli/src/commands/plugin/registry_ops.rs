@@ -122,7 +122,7 @@ pub(super) async fn cmd_update(name: Option<&str>, all: bool) -> Result<()> {
         for plugin_name in &registry_names {
             match update_one(plugin_name).await {
                 Ok(_) => {}
-                Err(e) => println!("warning: failed to update '{}': {e}", plugin_name),
+                Err(e) => println!("warning: failed to update '{plugin_name}': {e}"),
             }
         }
         return Ok(());
@@ -195,8 +195,7 @@ fn verify_installed_plugin_checksum(
 ) -> Result<(String, String, PathBuf)> {
     let locked = lock.find(name).with_context(|| {
         format!(
-            "plugin '{}' not found in lynx.lock (install it from registry first)",
-            name
+            "plugin '{name}' not found in lynx.lock (install it from registry first)"
         )
     })?;
     let expected = locked

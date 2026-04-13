@@ -22,7 +22,7 @@ struct BenchResult {
 
 pub async fn run(args: BenchmarkArgs) -> Result<()> {
     let runs = args.runs.max(1);
-    println!("Running {} benchmark run(s)...", runs);
+    println!("Running {runs} benchmark run(s)...");
 
     // Collect timings across runs.
     let mut all_runs: Vec<Vec<(String, Duration)>> = Vec::new();

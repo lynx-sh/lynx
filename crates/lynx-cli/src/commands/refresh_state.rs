@@ -28,7 +28,7 @@ pub struct RefreshStateArgs {}
 pub async fn run(_args: RefreshStateArgs) -> Result<()> {
     let enabled = read_enabled_plugins();
     let output = gather_all(&enabled);
-    print!("{}", output);
+    print!("{output}");
     Ok(())
 }
 

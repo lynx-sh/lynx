@@ -21,7 +21,7 @@ pub fn filter_for_context(
         {
             disabled.push((
                 m.plugin.name.clone(),
-                format!("disabled in {} context", ctx_str),
+                format!("disabled in {ctx_str} context"),
             ));
         } else {
             allowed.push(m.clone());

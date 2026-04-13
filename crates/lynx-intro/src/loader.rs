@@ -94,7 +94,7 @@ pub fn list_all() -> Vec<IntroEntry> {
         user_slugs.sort();
         for slug in user_slugs {
             let name = load_user(&slug)
-                .map(|i| i.meta.name.clone())
+                .map(|i| i.meta.name)
                 .unwrap_or_else(|_| slug.clone());
             entries.push(IntroEntry { slug, name, is_builtin: false });
         }
@@ -107,7 +107,7 @@ pub fn list_all() -> Vec<IntroEntry> {
             continue;
         }
         let name = toml::from_str::<Intro>(content)
-            .map(|i| i.meta.name.clone())
+            .map(|i| i.meta.name)
             .unwrap_or_else(|_| slug.to_string());
         entries.push(IntroEntry {
             slug: slug.to_string(),

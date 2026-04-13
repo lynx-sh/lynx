@@ -145,8 +145,6 @@ pub fn generate_init_script(params: &InitParams<'_>) -> String {
             let full_plugin_dir = shell_quote(&format!("{}/{}", params.plugin_dir, plugin));
             out.push_str(&format!(
                 "  if [[ -z \"${{{guard}}}\" ]]; then\n    LYNX_PLUGIN_DIR={full_plugin_dir}\n    source \"$LYNX_PLUGIN_DIR/shell/init.zsh\" 2>/dev/null\n    typeset -g {guard}=1\n  fi\n",
-                guard = guard,
-                full_plugin_dir = full_plugin_dir,
             ));
         } else {
             out.push_str(&format!("  lynx_eval_plugin {}\n", shell_quote(plugin)));

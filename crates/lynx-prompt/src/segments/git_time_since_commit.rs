@@ -86,11 +86,11 @@ fn format_elapsed(secs: u64) -> String {
     let days = hours / 24;
 
     if days > 0 {
-        format!("{}d", days)
+        format!("{days}d")
     } else if hours > 0 {
         format!("{}h{}m", hours, minutes % 60)
     } else {
-        format!("{}m", minutes)
+        format!("{minutes}m")
     }
 }
 
