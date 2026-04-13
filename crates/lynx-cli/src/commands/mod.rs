@@ -1,5 +1,6 @@
 pub mod alias;
 pub mod audit;
+pub mod completions;
 pub mod benchmark;
 pub mod browse;
 pub mod config;
@@ -132,6 +133,7 @@ pub async fn dispatch(cli: Cli) -> Result<()> {
         Command::Onboard(args) => onboard::run(args),
         Command::Alias(args) => alias::run(args),
         Command::Path(args) => path::run(args),
+        Command::Completions(args) => completions::run(args).map(|_| ()),
     }
 }
 

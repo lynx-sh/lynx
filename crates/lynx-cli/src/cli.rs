@@ -85,4 +85,6 @@ pub enum Command {
     Alias(crate::commands::alias::AliasArgs),
     /// Manage user-defined PATH entries
     Path(crate::commands::path::PathArgs),
+    /// Generate shell tab-completion scripts
+    Completions(crate::commands::completions::CompletionsArgs),
 }

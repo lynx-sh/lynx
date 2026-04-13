@@ -39,6 +39,7 @@ toml = "0.8"
 
 # CLI
 clap = { version = "4", features = ["derive", "color"] }
+clap_complete = "4"
 owo-colors = { version = "4", features = ["supports-colors"] }
 
 # Async

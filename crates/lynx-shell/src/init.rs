@@ -31,6 +31,9 @@ pub struct InitParams<'a> {
     /// Preferred editor binary from config (e.g. `code`, `zed`, `vim`).
     /// When set, exported as `$VISUAL` only if `$VISUAL` is not already set in the environment.
     pub editor: Option<&'a str>,
+    /// Pre-generated zsh completion script from `lx completions zsh`.
+    /// Inlined into the init script so completions are always current.
+    pub completions_zsh: Option<&'a str>,
 }
 
 /// Generate the zsh init script that the shell evals on startup.
@@ -173,6 +176,14 @@ pub fn generate_init_script(params: &InitParams<'_>) -> String {
         }
     }
 
+    // lx tab completions — inline the generated zsh completion function and register
+    // it with compdef so `lx <Tab>` shows subcommands instead of falling back to files.
+    if let Some(completions) = params.completions_zsh {
+        out.push_str(completions);
+        out.push('\n');
+        out.push_str("  compdef _lx lx\n");
+    }
+
     // Editor preference from config — exported as $VISUAL only if not already set.
     // Uses ${VISUAL:-} so the user's existing env always wins over the config value.
     // Works with any editor binary: code, zed, vim, nano, etc.
@@ -222,6 +233,7 @@ mod tests {
             user_aliases: &[],
             user_paths: &[],
             editor: None,
+            completions_zsh: None,
         }
     }
 
