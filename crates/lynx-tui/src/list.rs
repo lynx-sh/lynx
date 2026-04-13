@@ -430,7 +430,7 @@ fn item_style(is_selected: bool, is_active: bool, colors: &TuiColors) -> Style {
 pub fn print_plain<T: ListItem>(items: &[T], title: &str) {
     println!("{title} ({} items)", items.len());
     for item in items {
-        let marker = if item.is_active() { "●" } else { " " };
+        let marker = if item.is_active() { "*" } else { " " };
         let subtitle = item.subtitle();
         if subtitle.is_empty() {
             println!("  {marker} {}", item.title());
