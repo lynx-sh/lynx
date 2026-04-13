@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
-use anyhow::{bail, Context as _, Result};
+use anyhow::{Context as _, Result};
+use lynx_core::error::LynxError;
 
 use super::open_in_vscode;
 use clap::{Args, Subcommand};
@@ -129,7 +130,7 @@ pub async fn run(args: ThemeArgs) -> Result<()> {
             if args.len() == 1 {
                 cmd_set(&args[0]).await
             } else {
-                bail!("unknown theme command '{}' — run `lx theme` for help", args.first().map(|s| s.as_str()).unwrap_or(""))
+                Err(LynxError::unknown_command(args.first().map(|s| s.as_str()).unwrap_or(""), "theme").into())
             }
         }
     }
@@ -262,7 +263,7 @@ async fn cmd_random() -> Result<()> {
     let available: Vec<String> = list().into_iter().filter(|n| n != current).collect();
 
     if available.is_empty() {
-        bail!("no other themes available to switch to");
+        return Err(LynxError::Theme("no other themes available to switch to".into()).into());
     }
 
     // Simple pseudo-random: pick by (unix timestamp % len).
@@ -391,7 +392,7 @@ async fn cmd_edit() -> Result<()> {
     // Determine the path: prefer user theme dir, else error (built-ins are read-only).
     let user_path = user_theme_dir().join(format!("{theme_name}.toml"));
     if !user_path.exists() {
-        bail!("theme '{theme_name}' not found — run `lx setup` to set up default themes");
+        return Err(LynxError::NotFound { item_type: "Theme".into(), name: theme_name.to_string(), hint: "run `lx setup` to set up default themes".into() }.into());
     }
     let path = user_path;
 
@@ -410,7 +411,7 @@ async fn cmd_edit() -> Result<()> {
             // Roll back to snapshot.
             std::fs::write(&path, &snapshot)
                 .context("CRITICAL: failed to restore theme snapshot")?;
-            bail!("theme validation failed — rolled back: {e}");
+            return Err(LynxError::Theme(format!("theme validation failed — rolled back: {e}")).into());
         }
     }
 
@@ -439,7 +440,7 @@ async fn cmd_patch(dot_path: &str, value: &str) -> Result<()> {
         Err(e) => {
             std::fs::write(&path, &snapshot)
                 .context("CRITICAL: failed to restore theme snapshot after validation failure")?;
-            bail!("theme validation failed — rolled back: {e}");
+            return Err(LynxError::Theme(format!("theme validation failed — rolled back: {e}")).into());
         }
     }
 
@@ -491,7 +492,7 @@ async fn cmd_segment(cmd: SegmentCommand) -> Result<()> {
         Err(e) => {
             std::fs::write(&path, &snapshot)
                 .context("CRITICAL: failed to restore theme snapshot after validation failure")?;
-            bail!("theme validation failed — rolled back: {e}");
+            return Err(LynxError::Theme(format!("theme validation failed — rolled back: {e}")).into());
         }
     }
 
@@ -504,7 +505,7 @@ fn resolve_user_theme_path(theme_name: &str) -> Result<PathBuf> {
     if user_path.exists() {
         Ok(user_path)
     } else {
-        bail!("theme '{theme_name}' not found — run `lx setup` to set up default themes")
+        Err(LynxError::NotFound { item_type: "Theme".into(), name: theme_name.to_string(), hint: "run `lx setup` to set up default themes".into() }.into())
     }
 }
 
@@ -545,11 +546,7 @@ async fn cmd_convert(source: &str, name: Option<&str>, force: bool) -> Result<()
     // Check for existing file.
     let out_path = user_theme_dir().join(format!("{theme_name}.toml"));
     if out_path.exists() && !force {
-        bail!(
-            "theme '{}' already exists at {}. Use --force to overwrite.",
-            theme_name,
-            out_path.display()
-        );
+        return Err(LynxError::Theme(format!("theme '{}' already exists at {}. Use --force to overwrite.", theme_name, out_path.display())).into());
     }
 
     // Fetch content.

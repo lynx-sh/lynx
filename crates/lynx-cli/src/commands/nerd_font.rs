@@ -1,3 +1,4 @@
+use lynx_core::error::LynxError;
 use std::io::Read as _;
 use std::path::PathBuf;
 use std::process::Command;
@@ -293,7 +294,7 @@ pub fn configure_iterm2_font(font_family: &str, size: u32) -> Result<()> {
         .context("failed to run PlistBuddy")?;
 
     if !status.success() {
-        anyhow::bail!("PlistBuddy failed to update iTerm2 font");
+        return Err(LynxError::Shell("PlistBuddy failed to update iTerm2 font".into()).into());
     }
 
     // Tell iTerm2 to reload preferences.

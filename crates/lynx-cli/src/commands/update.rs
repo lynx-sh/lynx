@@ -1,7 +1,8 @@
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use anyhow::{bail, Result};
+use anyhow::{Result};
+use lynx_core::error::LynxError;
 use clap::Args;
 
 use lynx_core::brand;
@@ -102,7 +103,7 @@ async fn fetch_latest_version() -> Result<String> {
 
 async fn download(_url: &str) -> Result<Vec<u8>> {
     // Real: HTTP GET the binary URL.
-    bail!("download not implemented — build from source or use the install script");
+    Err(LynxError::Shell("download not implemented — build from source or use the install script".into()).into())
 }
 
 fn verify_checksum(_bytes: &[u8], _version: &str) -> Result<()> {

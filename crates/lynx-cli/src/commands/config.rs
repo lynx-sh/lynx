@@ -1,10 +1,11 @@
-use anyhow::{bail, Result};
+use anyhow::Result;
 
 use super::open_in_vscode;
 use clap::{Args, Subcommand};
 
 use lynx_config::snapshot::{create as snapshot, mutate_config_transaction};
 use lynx_config::{config_path, load};
+use lynx_core::error::LynxError;
 use lynx_core::redact;
 
 #[derive(Args)]
@@ -47,7 +48,11 @@ pub async fn run(args: ConfigArgs) -> Result<()> {
             .await
         }
         ConfigCommand::Other(args) => {
-            bail!("unknown config command '{}' — run `lx config` for help", args.first().map(|s| s.as_str()).unwrap_or(""))
+            Err(LynxError::NotFound {
+                item_type: "Command".into(),
+                name: args.first().map(|s| s.as_str()).unwrap_or("").into(),
+                hint: "run `lx config` for help".into(),
+            }.into())
         }
     }
 }
@@ -80,7 +85,7 @@ fn cmd_edit() -> Result<()> {
         Err(e) => {
             std::fs::write(&path, &snapshot_content)
                 .map_err(|_| anyhow::anyhow!("CRITICAL: failed to restore config snapshot"))?;
-            bail!("config validation failed — rolled back: {e}");
+            return Err(LynxError::Config(format!("config validation failed — rolled back: {e}")).into());
         }
     }
     Ok(())
@@ -90,7 +95,7 @@ fn cmd_validate() -> Result<()> {
     let path = config_path();
     let content = match std::fs::read_to_string(&path) {
         Ok(c) => c,
-        Err(e) => bail!("cannot read config: {e}"),
+        Err(e) => return Err(LynxError::Config(format!("cannot read config: {e}")).into()),
     };
 
     // Validate TOML parse.
@@ -98,14 +103,14 @@ fn cmd_validate() -> Result<()> {
         Ok(_) => {}
         Err(e) => {
             // toml errors include line/col info.
-            bail!("TOML parse error: {e}");
+            return Err(LynxError::Config(format!("TOML parse error: {e}")).into());
         }
     }
 
     // Validate schema.
     match load() {
         Ok(_) => println!("config is valid"),
-        Err(e) => bail!("schema validation error: {e}"),
+        Err(e) => return Err(LynxError::Config(format!("schema validation error: {e}")).into()),
     }
     Ok(())
 }
@@ -117,7 +122,11 @@ fn cmd_get(key: &str) -> Result<()> {
         "active_context" => format!("{:?}", cfg.active_context).to_lowercase(),
         "schema_version" => cfg.schema_version.to_string(),
         "sync.remote" => cfg.sync.remote.clone().unwrap_or_default(),
-        other => bail!("unknown config key '{}' — known: active_theme, active_context, schema_version, sync.remote", other),
+        other => return Err(LynxError::NotFound {
+            item_type: "Config key".into(),
+            name: other.into(),
+            hint: "known keys: active_theme, active_context, schema_version, sync.remote".into(),
+        }.into()),
     };
     println!("{value}");
     Ok(())

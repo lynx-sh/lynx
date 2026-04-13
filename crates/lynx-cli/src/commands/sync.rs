@@ -1,7 +1,8 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use anyhow::{bail, Context as _, Result};
+use anyhow::{Context as _, Result};
+use lynx_core::error::LynxError;
 use clap::{Args, Subcommand};
 
 use lynx_config::snapshot::mutate_config_transaction;
@@ -36,7 +37,7 @@ pub async fn run(args: SyncArgs) -> Result<()> {
         SyncCommand::Pull => cmd_pull(),
         SyncCommand::Status => cmd_status(),
         SyncCommand::Other(args) => {
-            bail!("unknown sync command '{}' — run `lx sync` for help", args.first().map(|s| s.as_str()).unwrap_or(""))
+            Err(LynxError::unknown_command(args.first().map(|s| s.as_str()).unwrap_or(""), "sync").into())
         }
     }
 }
@@ -147,7 +148,7 @@ fn cmd_status() -> Result<()> {
 
 fn ensure_git_repo(dir: &Path) -> Result<()> {
     if !dir.join(".git").exists() {
-        bail!("config dir is not a git repo — run: lx sync init <remote>");
+        return Err(LynxError::Config("config dir is not a git repo — run: lx sync init <remote>".into()).into());
     }
     Ok(())
 }
@@ -159,7 +160,7 @@ fn git(dir: &Path, args: &[&str]) -> Result<()> {
         .status()
         .context("failed to run git")?;
     if !status.success() {
-        bail!("git {} failed", args.join(" "));
+        return Err(LynxError::Shell(format!("git {} failed", args.join(" "))).into());
     }
     Ok(())
 }

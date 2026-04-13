@@ -1,7 +1,8 @@
 use std::path::Path;
 use std::process::Command;
 
-use anyhow::{bail, Context as _, Result};
+use anyhow::{Context as _, Result};
+use lynx_core::error::LynxError;
 use clap::{Args, Subcommand};
 
 use lynx_core::paths::{lynx_dir, themes_dir};
@@ -32,7 +33,7 @@ pub async fn run(args: DevArgs) -> Result<()> {
     match args.command {
         DevCommand::Sync { source } => cmd_sync(source.as_deref()),
         DevCommand::Other(args) => {
-            bail!("unknown dev command '{}' — run `lx dev` for help", args.first().map(|s| s.as_str()).unwrap_or(""))
+            Err(LynxError::unknown_command(args.first().map(|s| s.as_str()).unwrap_or(""), "dev").into())
         }
     }
 }
@@ -50,19 +51,18 @@ fn cmd_sync(source: Option<&str>) -> Result<()> {
 
     // Verify it's actually a Lynx source tree.
     if !src.join("Cargo.toml").exists() || !src.join("themes").exists() {
-        bail!(
-            "'{}' does not look like a Lynx source tree \
-             (expected Cargo.toml and themes/ directory)",
+        return Err(LynxError::Config(format!(
+            "'{}' does not look like a Lynx source tree (expected Cargo.toml and themes/ directory)",
             src.display()
-        );
+        )).into());
     }
 
     let lynx_dir = lynx_dir();
     if !lynx_dir.exists() {
-        bail!(
+        return Err(LynxError::Config(format!(
             "LYNX_DIR not installed at {} — run `lx setup` first",
             lynx_dir.display()
-        );
+        )).into());
     }
 
     // Step 1: Rebuild the binary.
@@ -73,7 +73,7 @@ fn cmd_sync(source: Option<&str>) -> Result<()> {
         .status()
         .context("failed to run cargo build")?;
     if !build.success() {
-        bail!("cargo build failed — fix errors and retry");
+        return Err(LynxError::Shell("cargo build failed — fix errors and retry".into()).into());
     }
 
     // Step 2: Install the binary.

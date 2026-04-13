@@ -1,4 +1,5 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
+use lynx_core::error::LynxError;
 use clap::{Args, Subcommand};
 use lynx_task::{
     parse_tasks_file, read_last_run, read_tasks_file, write_tasks_file,
@@ -105,7 +106,7 @@ pub async fn run(args: CronArgs) -> Result<()> {
             .await
         }
         CronCommand::Other(args) => {
-            bail!("unknown cron command '{}' — run `lx cron` for help", args.first().map(|s| s.as_str()).unwrap_or(""))
+            Err(LynxError::unknown_command(args.first().map(|s| s.as_str()).unwrap_or(""), "cron").into())
         }
     }
 }
@@ -157,7 +158,7 @@ async fn cmd_add(
         "notify" => OnFail::Notify,
         "ignore" => OnFail::Ignore,
         "log" | "" => OnFail::Log,
-        other => bail!("unknown on_fail value '{other}': use log, notify, or ignore"),
+        other => return Err(LynxError::Task(format!("unknown on_fail value '{other}': use log, notify, or ignore")).into()),
     };
 
     let task = Task {
@@ -179,7 +180,7 @@ async fn cmd_add(
     let mut file = parse_tasks_file(&content)?;
 
     if file.tasks.iter().any(|t| t.name == name) {
-        bail!("task '{name}' already exists — use 'lx cron remove {name}' first");
+        return Err(LynxError::Task(format!("task '{name}' already exists — use 'lx cron remove {name}' first")).into());
     }
 
     file.tasks.push(task);
@@ -254,7 +255,7 @@ async fn cmd_logs(name: String, tail_n: usize, follow: bool) -> Result<()> {
             .context("tail -f failed")?;
 
         if !status.success() {
-            bail!("tail exited with error");
+            return Err(LynxError::Task("tail exited with error".into()).into());
         }
     } else {
         // Read last N lines.
@@ -364,7 +365,7 @@ async fn cmd_remove(name: String) -> Result<()> {
     file.tasks.retain(|t| t.name != name);
 
     if file.tasks.len() == before {
-        bail!("task '{name}' not found");
+        return Err(LynxError::NotFound { item_type: "Task".into(), name: name.clone(), hint: "run `lx cron list` to see available tasks".into() }.into());
     }
 
     write_tasks_file(&path, &file)?;
