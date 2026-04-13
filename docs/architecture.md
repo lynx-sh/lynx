@@ -64,8 +64,8 @@ in Rust and keeps the shell layer thin and testable.
 ```
 
 **Shell layer constraints** (enforced, violations are P0):
-- Each file in `shell/` must be under 60 lines
-- No conditional logic in shell files — logic lives in Rust
+- Shell files must be thin eval-bridges with no conditional logic — logic lives in Rust
+- Single responsibility per file (see `pt decisions core`)
 - All `lx` calls use `2>/dev/null` — failures are always silent
 - Never source Rust output with `source` — always use `eval "$(...)"` 
 
@@ -151,7 +151,7 @@ lx prompt render
 ## Config Mutation Protocol
 
 Every command that mutates config must follow this sequence. Skipping any step
-is a P0 violation (D-007).
+is a P0 violation (see `pt decisions config`).
 
 ```
 lx <mutating command>
@@ -189,7 +189,7 @@ across 5 architectural drift classes and must pass before every PR merge.
 
 | Class | What drifts | Where enforced |
 |---|---|---|
-| Shell protocol | Static shell files grow > line limit or gain branching logic | `test_init.bats` |
+| Shell protocol | Static shell files gain conditional logic or non-eval operations | `test_init.bats` |
 | Context mismatch | `CLAUDECODE`/`CURSOR_CLI`/`CI` constants removed from detector | `test_context.bats` |
 | Dep map drift | Forbidden crate dep pairs introduced (circular or upward) | `test_doctor.bats` |
 | Checksum enforcement | `validate_index` removed from `fetch_plugin` pipeline | `test_doctor.bats` |

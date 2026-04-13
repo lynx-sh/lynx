@@ -154,7 +154,7 @@ color       = { fg = "$success" }
 error_color = { fg = "$error" }
 ```
 
-**Rules (D-015):**
+**Rules (see `pt decisions themes`):**
 - Segment configs MUST reference palette vars rather than hardcoding hex values.
 - The `[colors]` table is the only place raw color values should appear.
 - This makes the entire theme recolorable by changing `[colors]` only.
@@ -197,7 +197,7 @@ order = ["dir", "git_branch", "git_status"]
 
 Every segment accepts `show_in` and `hide_in` fields in its `[segment.*]` config.
 These are evaluated by the renderer before the segment is called — a hidden
-segment costs zero evaluation time (D-017).
+segment costs zero evaluation time.
 
 ```toml
 [segment.username]
@@ -1010,7 +1010,7 @@ The OMZ converter maps `%` tokens and `$(function)` calls to Lynx segments.
 Agnoster-style themes produce partial output with notes for manual tuning.
 
 The OMP converter parses JSON v2+ themes, maps segment types to Lynx equivalents,
-extracts colors into a `[colors]` palette (per D-038), and handles two-line layouts,
+extracts colors into a `[colors]` palette, and handles two-line layouts,
 diamond/powerline separators, transient prompts, and filler segments. Language segments
 (node, python, go, etc.) map to `lang_version_<lang>` with per-language colors.
 OMP-only features (Go templates, tooltips) are noted as comments.

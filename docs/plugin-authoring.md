@@ -91,7 +91,7 @@ functions = ["my_func"]       # public functions
 aliases   = ["mf"]            # aliases — must also be in [contexts].disabled_in
 
 [contexts]
-# Aliases must NEVER load in agent or minimal context (rule D-010).
+# Aliases must NEVER load in agent or minimal context (see `pt decisions plugins`).
 # Add "interactive" to skip the entire plugin in non-interactive shells.
 disabled_in = ["agent", "minimal"]
 
@@ -163,7 +163,7 @@ call `compinit` inside a plugin — Lynx calls it once during `lx init`.
 **`[shell].widgets`** — ZLE widget names that Lynx registers with `zle -N`
 after sourcing `init.zsh`. The widget function must be defined in
 `shell/functions.zsh` and listed in `exports.functions`. Registering here
-(not in init.zsh) keeps the shell layer logic-free (D-001).
+(not in init.zsh) keeps the shell layer logic-free (see `pt decisions arch`).
 
 **`[shell].keybindings`** — An array of `{key, widget}` tables. Lynx emits
 `bindkey '<key>' <widget>` for each entry, in order, after all `zle -N`
