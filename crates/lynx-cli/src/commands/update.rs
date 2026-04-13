@@ -174,9 +174,14 @@ fn cache_version(version: &str) {
     let json = serde_json::json!({ "latest": version, "checked_at": now });
     let path = cache_path();
     if let Some(parent) = path.parent() {
-        let _ = std::fs::create_dir_all(parent);
+        if let Err(e) = std::fs::create_dir_all(parent) {
+            tracing::warn!("failed to create update cache dir: {e}");
+            return;
+        }
     }
-    let _ = std::fs::write(path, json.to_string());
+    if let Err(e) = std::fs::write(&path, json.to_string()) {
+        tracing::warn!("failed to write update cache: {e}");
+    }
 }
 
 #[cfg(test)]

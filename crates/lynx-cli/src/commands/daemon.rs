@@ -81,8 +81,9 @@ pub async fn run(args: DaemonArgs) -> Result<()> {
         }
         DaemonCommand::Stop => {
             let backend = platform_backend();
-            let _ = backend.stop();
-            let _ = stop_detached()?;
+            // Best-effort: try both service manager and detached; check is_running() for result.
+            let _ = backend.stop(); // may fail if service not installed
+            let _ = stop_detached()?; // may fail if no detached process
             if !is_running()? {
                 println!("✓ lynx-daemon stopped");
             } else {
@@ -92,7 +93,7 @@ pub async fn run(args: DaemonArgs) -> Result<()> {
         DaemonCommand::Restart => {
             let backend = platform_backend();
             let restarted_service = backend.restart().is_ok();
-            let _ = stop_detached()?;
+            let _ = stop_detached()?; // clean up detached process if any
             if restarted_service {
                 println!("✓ lynx-daemon restarted");
             } else {
@@ -102,8 +103,11 @@ pub async fn run(args: DaemonArgs) -> Result<()> {
         }
         DaemonCommand::Uninstall => {
             let backend = platform_backend();
-            let _ = backend.uninstall();
-            let _ = stop_detached()?;
+            // Best-effort cleanup: uninstall service + kill detached process.
+            if let Err(e) = backend.uninstall() {
+                tracing::warn!("service uninstall failed (may not be installed): {e}");
+            }
+            let _ = stop_detached()?; // clean up detached process if any
             println!("✓ lynx-daemon removed");
         }
         DaemonCommand::Other(args) => {

@@ -298,6 +298,7 @@ pub fn configure_iterm2_font(font_family: &str, size: u32) -> Result<()> {
     }
 
     // Tell iTerm2 to reload preferences.
+    // Best-effort: secondary iTerm2 pref write, non-critical
     let _ = Command::new("defaults")
         .args(["read", "com.googlecode.iterm2"])
         .output();
@@ -355,6 +356,7 @@ pub fn install_nerd_font() -> Result<String> {
     }
 
     if cfg!(target_os = "linux") {
+        // Advisory font cache refresh — failure is non-critical
         let _ = Command::new("fc-cache").arg("-f").status();
     }
 

@@ -24,7 +24,9 @@ pub(super) async fn cmd_exec(name: &str) -> Result<()> {
     if let Some(plugin_dir) = resolve_plugin_dir(name) {
         if let Ok(Some(manifest)) = read_plugin_manifest(&plugin_dir) {
             let bus = Arc::new(lynx_events::EventBus::new());
-            let _ = lifecycle::activate(name, &manifest, Arc::clone(&bus));
+            if let Err(e) = lifecycle::activate(name, &manifest, Arc::clone(&bus)) {
+                tracing::warn!("plugin '{name}' activation failed: {e}");
+            }
             bus.emit(Event::new(PLUGIN_LOADED, name)).await;
         }
     }
