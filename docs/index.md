@@ -54,6 +54,12 @@ pt decisions registry     # ecosystem/registry decisions
 pt decisions cli          # CLI decisions
 ```
 
+## Troubleshooting
+
+| Document | Audience | What it covers |
+|---|---|---|
+| [Troubleshooting](troubleshooting.md) | Users | Shell startup errors, eval failures, `lx doctor`, diagnostic tools |
+
 ## Quick Links
 
 - [README](../README.md) — install and quickstart
