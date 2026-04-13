@@ -435,6 +435,7 @@ fn resolve_user_theme_path(theme_name: &str) -> Result<PathBuf> {
 
 async fn emit_theme_changed(name: &str) {
     use lynx_events::types::{Event, THEME_CHANGED};
+    lynx_theme::loader::invalidate_theme_cache();
     let bus = crate::bus::build_active_bus();
     let data = serde_json::json!({ "theme": name }).to_string();
     bus.emit(Event::new(THEME_CHANGED, data)).await;
