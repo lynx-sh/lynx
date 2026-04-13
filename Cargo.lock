@@ -1112,6 +1112,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "hex",
  "lynx-config",
  "lynx-convert",
  "lynx-core",
@@ -1133,6 +1134,7 @@ dependencies = [
  "lynx-workflow",
  "owo-colors",
  "serde_json",
+ "sha2",
  "tempfile",
  "tokio",
  "toml",
