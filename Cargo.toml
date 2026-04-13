@@ -79,5 +79,8 @@ tar = "0.4"
 ratatui = "0.29"
 crossterm = "0.28"
 
+# PTY (pseudo-terminal for interactive workflow streaming)
+portable-pty = "0.8"
+
 # Testing utilities
 tempfile = "3"

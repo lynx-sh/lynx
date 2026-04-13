@@ -21,6 +21,13 @@ pub enum ExecMode {
     Background,
 }
 
+/// Maximum lines buffered per step (stdout or stderr). Lines beyond this cap are
+/// dropped (newest-first drop) and a warning is emitted.
+pub const STEP_OUTPUT_LINE_CAP: usize = 10_000;
+
+/// Number of stderr tail lines included in the agent failure excerpt.
+pub const AGENT_FAILURE_EXCERPT_LINES: usize = 20;
+
 /// Result of a step execution.
 #[derive(Debug, Clone)]
 pub struct StepResult {
@@ -28,6 +35,10 @@ pub struct StepResult {
     pub status: StepStatus,
     pub exit_code: Option<i32>,
     pub duration_ms: u64,
+    /// Buffered stdout lines (capped at [`STEP_OUTPUT_LINE_CAP`]).
+    pub output_lines: Vec<String>,
+    /// Buffered stderr lines (capped at [`STEP_OUTPUT_LINE_CAP`]).
+    pub stderr_lines: Vec<String>,
 }
 
 /// Step execution status.
@@ -106,6 +117,7 @@ async fn execute_workflow_impl(
     let started_at = epoch_ms();
     let mut step_results = Vec::new();
     let mut aborted = false;
+    let agent_mode = crate::context::is_agent_context();
 
     // Resolve workflow-level path once (supports param substitution).
     let workflow_path: Option<String> = workflow
@@ -132,6 +144,8 @@ async fn execute_workflow_impl(
                     status: StepStatus::Skipped,
                     exit_code: None,
                     duration_ms: 0,
+                    output_lines: vec![],
+                    stderr_lines: vec![],
                 });
             }
             continue;
@@ -145,7 +159,7 @@ async fn execute_workflow_impl(
                     name: step.name.clone(),
                 },
             );
-            let result = execute_step(step, params, &mode, stream_tx.clone(), workflow_path.as_deref()).await;
+            let result = execute_step(step, params, &mode, stream_tx.clone(), workflow_path.as_deref(), agent_mode).await;
             emit(
                 &stream_tx,
                 StreamEvent::StepFinished {
@@ -183,7 +197,7 @@ async fn execute_workflow_impl(
                 tokio::spawn(async move {
                     // Semaphore is Arc-owned by the enclosing scope — never closed.
                     let _permit = sem.acquire().await.expect("semaphore is never closed");
-                    let result = execute_step(&step, &params, &mode, tx.clone(), wf_path.as_deref()).await;
+                    let result = execute_step(&step, &params, &mode, tx.clone(), wf_path.as_deref(), agent_mode).await;
                     if let Some(sender) = tx {
                         let _ = sender.send(StreamEvent::StepFinished {
                             name: result.name.clone(),
@@ -202,6 +216,8 @@ async fn execute_workflow_impl(
                 status: StepStatus::Failed,
                 exit_code: None,
                 duration_ms: 0,
+                output_lines: vec![],
+                stderr_lines: vec![],
             });
             if should_abort_on_failed_result(batch, &result) {
                 aborted = true;
@@ -256,6 +272,45 @@ fn emit(tx: &Option<std::sync::mpsc::Sender<StreamEvent>>, event: StreamEvent) {
     }
 }
 
+/// In agent mode, emit a single `StepOutput` event with the last
+/// [`AGENT_FAILURE_EXCERPT_LINES`] lines of stderr so the agent can diagnose
+/// the failure without receiving every output line.
+fn emit_agent_failure_excerpt(
+    agent_mode: bool,
+    step_name: &str,
+    stderr_lines: &[String],
+    tx: &Option<std::sync::mpsc::Sender<StreamEvent>>,
+) {
+    if !agent_mode {
+        return;
+    }
+    let tail: Vec<&str> = stderr_lines
+        .iter()
+        .rev()
+        .take(AGENT_FAILURE_EXCERPT_LINES)
+        .map(|s| s.as_str())
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect();
+    let excerpt = if tail.is_empty() {
+        format!("--- failure excerpt (last {AGENT_FAILURE_EXCERPT_LINES} lines) ---\n(no stderr output)")
+    } else {
+        format!(
+            "--- failure excerpt (last {AGENT_FAILURE_EXCERPT_LINES} lines) ---\n{}",
+            tail.join("\n")
+        )
+    };
+    emit(
+        tx,
+        StreamEvent::StepOutput {
+            name: step_name.to_string(),
+            line: excerpt,
+            is_stderr: true,
+        },
+    );
+}
+
 /// Execute a single step.
 /// `workflow_path` is the resolved `[workflow] path` value — used as the cwd
 /// fallback when the step does not specify its own `cwd`.
@@ -265,6 +320,7 @@ async fn execute_step(
     mode: &ExecMode,
     stream_tx: Option<std::sync::mpsc::Sender<StreamEvent>>,
     workflow_path: Option<&str>,
+    agent_mode: bool,
 ) -> StepResult {
     let start = epoch_ms();
 
@@ -275,6 +331,8 @@ async fn execute_step(
                 status: StepStatus::Skipped,
                 exit_code: None,
                 duration_ms: epoch_ms() - start,
+                output_lines: vec![],
+                stderr_lines: vec![],
             };
         }
     }
@@ -298,6 +356,8 @@ async fn execute_step(
                 status: StepStatus::Failed,
                 exit_code: None,
                 duration_ms: epoch_ms() - start,
+                output_lines: vec![],
+                stderr_lines: vec![format!("runner resolve failed: {e}")],
             };
         }
     };
@@ -332,31 +392,39 @@ async fn execute_step(
         let resolved_cwd: Option<String> = step_cwd
             .or_else(|| workflow_path.map(|p| substitute_params(p, params)));
 
-        match run_command(&cmd, step, mode, &step.name, stream_tx.as_ref(), resolved_cwd.as_deref()).await {
-            Ok(code) => {
+        match run_command(&cmd, step, mode, &step.name, stream_tx.as_ref(), resolved_cwd.as_deref(), agent_mode).await {
+            Ok((code, out, err)) => {
                 if code == 0 {
                     return StepResult {
                         name: step.name.clone(),
                         status: StepStatus::Passed,
                         exit_code: Some(code),
                         duration_ms: epoch_ms() - start,
+                        output_lines: out,
+                        stderr_lines: err,
                     };
                 }
                 if attempt + 1 >= max_attempts {
+                    emit_agent_failure_excerpt(agent_mode, &step.name, &err, &stream_tx);
                     return StepResult {
                         name: step.name.clone(),
                         status: StepStatus::Failed,
                         exit_code: Some(code),
                         duration_ms: epoch_ms() - start,
+                        output_lines: out,
+                        stderr_lines: err,
                     };
                 }
             }
             Err(_) => {
+                emit_agent_failure_excerpt(agent_mode, &step.name, &[], &stream_tx);
                 return StepResult {
                     name: step.name.clone(),
                     status: StepStatus::TimedOut,
                     exit_code: None,
                     duration_ms: epoch_ms() - start,
+                    output_lines: vec![],
+                    stderr_lines: vec![],
                 };
             }
         }
@@ -367,10 +435,16 @@ async fn execute_step(
         status: StepStatus::Failed,
         exit_code: None,
         duration_ms: epoch_ms() - start,
+        output_lines: vec![],
+        stderr_lines: vec![],
     }
 }
 
-/// Spawn and run a resolved command. Returns exit code or error on timeout.
+/// Spawn and run a resolved command.
+///
+/// Returns `(exit_code, stdout_lines, stderr_lines)` on success, or `Err(())`
+/// on spawn failure or timeout. Lines are buffered up to [`STEP_OUTPUT_LINE_CAP`]
+/// per stream; excess lines are dropped (newest-first) with a tracing warning.
 async fn run_command(
     cmd: &runner::ResolvedCommand,
     step: &Step,
@@ -378,14 +452,28 @@ async fn run_command(
     step_name: &str,
     stream_tx: Option<&std::sync::mpsc::Sender<StreamEvent>>,
     effective_cwd: Option<&str>,
-) -> Result<i32, ()> {
+    agent_mode: bool,
+) -> Result<(i32, Vec<String>, Vec<String>), ()> {
+    // Interactive foreground: try PTY first so the child sees a real terminal.
+    // Agent mode: skip PTY — output is suppressed anyway, piped is cheaper.
+    if !agent_mode {
+        if let Some(tx) = stream_tx {
+            match crate::pty_runner::run_in_pty(cmd, step, effective_cwd, tx, step_name).await {
+                Ok(result) => return Ok(result),
+                Err(()) => {
+                    // PTY failed (e.g. container without /dev/ptmx) — fall through to piped.
+                    tracing::warn!(step = %step_name, "PTY unavailable; falling back to Stdio::piped()");
+                }
+            }
+        }
+    }
+
     let mut command = tokio::process::Command::new(&cmd.binary);
     command.args(&cmd.args);
 
-    if stream_tx.is_some() {
-        command.stdout(Stdio::piped());
-        command.stderr(Stdio::piped());
-    }
+    // Always pipe so we can buffer output for the job log.
+    command.stdout(Stdio::piped());
+    command.stderr(Stdio::piped());
 
     for (k, v) in &step.env {
         command.env(k, v);
@@ -408,49 +496,63 @@ async fn run_command(
         }
     };
 
-    let mut stdout_handle = None;
-    let mut stderr_handle = None;
+    use tokio::io::{AsyncBufReadExt, BufReader};
 
-    if let Some(tx) = stream_tx {
-        use tokio::io::{AsyncBufReadExt, BufReader};
+    let stdout = child.stdout.take();
+    let stderr = child.stderr.take();
 
-        let stdout = child.stdout.take();
-        let stderr = child.stderr.take();
-
-        let name_out = step_name.to_string();
-        let tx_out = tx.clone();
-        stdout_handle = Some(tokio::spawn(async move {
-            if let Some(stdout) = stdout {
-                let reader = BufReader::new(stdout);
-                let mut lines = reader.lines();
-                while let Ok(Some(line)) = lines.next_line().await {
-                    let _ = tx_out.send(StreamEvent::StepOutput {
+    let name_out = step_name.to_string();
+    // In agent mode we suppress StepOutput events — collect only, no send.
+    let tx_out = if agent_mode { None } else { stream_tx.cloned() };
+    let stdout_handle: tokio::task::JoinHandle<Vec<String>> = tokio::spawn(async move {
+        let mut collected: Vec<String> = Vec::new();
+        if let Some(stdout) = stdout {
+            let reader = BufReader::new(stdout);
+            let mut lines = reader.lines();
+            while let Ok(Some(line)) = lines.next_line().await {
+                if let Some(ref tx) = tx_out {
+                    let _ = tx.send(StreamEvent::StepOutput {
                         name: name_out.clone(),
-                        line,
+                        line: line.clone(),
                         is_stderr: false,
                     });
                 }
+                if collected.len() < STEP_OUTPUT_LINE_CAP {
+                    collected.push(line);
+                } else if collected.len() == STEP_OUTPUT_LINE_CAP {
+                    tracing::warn!(step = %name_out, "stdout exceeded {STEP_OUTPUT_LINE_CAP} lines; dropping further lines from log buffer");
+                }
             }
-        }));
+        }
+        collected
+    });
 
-        let name_err = step_name.to_string();
-        let tx_err = tx.clone();
-        stderr_handle = Some(tokio::spawn(async move {
-            if let Some(stderr) = stderr {
-                let reader = BufReader::new(stderr);
-                let mut lines = reader.lines();
-                while let Ok(Some(line)) = lines.next_line().await {
-                    let _ = tx_err.send(StreamEvent::StepOutput {
+    let name_err = step_name.to_string();
+    let tx_err = if agent_mode { None } else { stream_tx.cloned() };
+    let stderr_handle: tokio::task::JoinHandle<Vec<String>> = tokio::spawn(async move {
+        let mut collected: Vec<String> = Vec::new();
+        if let Some(stderr) = stderr {
+            let reader = BufReader::new(stderr);
+            let mut lines = reader.lines();
+            while let Ok(Some(line)) = lines.next_line().await {
+                if let Some(ref tx) = tx_err {
+                    let _ = tx.send(StreamEvent::StepOutput {
                         name: name_err.clone(),
-                        line,
+                        line: line.clone(),
                         is_stderr: true,
                     });
                 }
+                if collected.len() < STEP_OUTPUT_LINE_CAP {
+                    collected.push(line);
+                } else if collected.len() == STEP_OUTPUT_LINE_CAP {
+                    tracing::warn!(step = %name_err, "stderr exceeded {STEP_OUTPUT_LINE_CAP} lines; dropping further lines from log buffer");
+                }
             }
-        }));
-    }
+        }
+        collected
+    });
 
-    let result = if let Some(timeout_sec) = step.timeout_sec {
+    let exit_result = if let Some(timeout_sec) = step.timeout_sec {
         let timeout = std::time::Duration::from_secs(timeout_sec);
         match tokio::time::timeout(timeout, child.wait()).await {
             Ok(Ok(status)) => Ok(status.code().unwrap_or(-1)),
@@ -474,12 +576,8 @@ async fn run_command(
         }
     };
 
-    if let Some(handle) = stdout_handle {
-        let _ = handle.await;
-    }
-    if let Some(handle) = stderr_handle {
-        let _ = handle.await;
-    }
+    let out = stdout_handle.await.unwrap_or_default();
+    let err = stderr_handle.await.unwrap_or_default();
 
-    result
+    exit_result.map(|code| (code, out, err))
 }

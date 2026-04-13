@@ -93,6 +93,8 @@ pub fn persist_job_result(result: &JobResult, log_dir: &std::path::Path) {
             "status": format!("{:?}", s.status).to_lowercase(),
             "exit_code": s.exit_code,
             "duration_ms": s.duration_ms,
+            "output": s.output_lines,
+            "stderr": s.stderr_lines,
         })).collect::<Vec<_>>(),
     });
     if let Err(e) = std::fs::write(

@@ -7,6 +7,8 @@ authors.workspace = true
 
 [dependencies]
 lynx-core = { path = "../lynx-core" }
+lynx-shell = { path = "../lynx-shell" }
+portable-pty = { workspace = true }
 serde.workspace = true
 serde_json.workspace = true
 toml.workspace = true

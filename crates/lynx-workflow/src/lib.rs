@@ -3,7 +3,9 @@
 //! Workflows are data, not code. Each step declares a runner and a command.
 //! Lynx orchestrates execution order, concurrency, signals, and logging.
 
+pub mod context;
 pub mod executor;
+pub mod pty_runner;
 pub mod job;
 pub mod jobs;
 pub mod params;
