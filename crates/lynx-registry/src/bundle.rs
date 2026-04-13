@@ -4,7 +4,8 @@
 //! `packages` list of other entry names. `resolve_bundle` expands the
 //! list and validates that no nested bundles exist.
 
-use anyhow::{bail, Result};
+use anyhow::Result;
+use lynx_core::error::LynxError;
 
 use crate::schema::{PackageType, RegistryEntry, RegistryIndex};
 
@@ -17,11 +18,11 @@ pub fn resolve_bundle<'a>(
     index: &'a RegistryIndex,
 ) -> Result<Vec<&'a RegistryEntry>> {
     if bundle.package_type != PackageType::Bundle {
-        bail!("'{}' is not a bundle", bundle.name);
+        return Err(LynxError::Registry(format!("'{}' is not a bundle", bundle.name)).into());
     }
 
     if bundle.packages.is_empty() {
-        bail!("bundle '{}' has no packages listed", bundle.name);
+        return Err(LynxError::Registry(format!("bundle '{}' has no packages listed", bundle.name)).into());
     }
 
     let mut resolved = Vec::new();
@@ -29,18 +30,17 @@ pub fn resolve_bundle<'a>(
     for name in &bundle.packages {
         let entry = index
             .find(name)
-            .ok_or_else(|| anyhow::anyhow!(
-                "bundle '{}' references package '{}' which is not in the index",
-                bundle.name,
-                name
-            ))?;
+            .ok_or_else(|| LynxError::NotFound {
+                item_type: "Package".into(),
+                name: name.clone(),
+                hint: format!("bundle '{}' references '{}' which is not in the index", bundle.name, name),
+            })?;
 
         if entry.package_type == PackageType::Bundle {
-            bail!(
+            return Err(LynxError::Registry(format!(
                 "bundle '{}' contains nested bundle '{}' — nesting is not allowed",
-                bundle.name,
-                name
-            );
+                bundle.name, name
+            )).into());
         }
 
         resolved.push(entry);

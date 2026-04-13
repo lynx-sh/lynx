@@ -7,7 +7,8 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
+use lynx_core::error::LynxError;
 use tracing::info;
 
 use crate::schema::{InstallMethods, RegistryEntry};
@@ -98,7 +99,7 @@ pub fn install_tool_via_pm(entry: &RegistryEntry) -> Result<String> {
     let install = entry
         .install
         .as_ref()
-        .ok_or_else(|| anyhow::anyhow!("package '{}' has no install methods defined", entry.name))?;
+        .ok_or_else(|| LynxError::Registry(format!("package '{}' has no install methods defined", entry.name)))?;
 
     let pm = detect_package_manager();
 
@@ -111,12 +112,10 @@ pub fn install_tool_via_pm(entry: &RegistryEntry) -> Result<String> {
             .with_context(|| format!("failed to run: {} {}", cmd, args.join(" ")))?;
 
         if !status.success() {
-            bail!(
+            return Err(LynxError::Registry(format!(
                 "{} {} failed with exit code {}",
-                cmd,
-                args.join(" "),
-                status.code().unwrap_or(-1)
-            );
+                cmd, args.join(" "), status.code().unwrap_or(-1)
+            )).into());
         }
 
         // Verify the binary exists after install.
@@ -140,11 +139,10 @@ pub fn install_tool_via_pm(entry: &RegistryEntry) -> Result<String> {
         return install_tool_via_url(url, &entry.name);
     }
 
-    bail!(
+    Err(LynxError::Registry(format!(
         "no install method available for '{}' on {} — try installing manually",
-        entry.name,
-        pm.label()
-    )
+        entry.name, pm.label()
+    )).into())
 }
 
 /// Download a tool binary from a URL to ~/.local/bin/.
@@ -160,7 +158,7 @@ fn install_tool_via_url(url: &str, name: &str) -> Result<String> {
         .call()
         .with_context(|| format!("GET {url}"))?;
     if resp.status() >= 400 {
-        bail!("server returned status {} for {url}", resp.status());
+        return Err(LynxError::Registry(format!("server returned status {} for {url}", resp.status())).into());
     }
 
     let mut reader = resp.into_reader();
@@ -188,7 +186,7 @@ fn install_tool_via_url(url: &str, name: &str) -> Result<String> {
 pub fn install_theme(name: &str, url: &str, force: bool) -> Result<PathBuf> {
     let dest = lynx_core::paths::themes_dir().join(format!("{name}.toml"));
     if dest.exists() && !force {
-        bail!("theme '{name}' already exists at {} — use --force to overwrite", dest.display());
+        return Err(LynxError::AlreadyInstalled(format!("theme '{name}'")).into());
     }
 
     let body = download_text(url)
@@ -196,7 +194,7 @@ pub fn install_theme(name: &str, url: &str, force: bool) -> Result<PathBuf> {
 
     // Validate before writing.
     if let Err(e) = toml::from_str::<toml::Value>(&body) {
-        bail!("downloaded theme '{name}' is invalid TOML: {e}");
+        return Err(LynxError::Theme(format!("downloaded theme '{name}' is invalid TOML: {e}")).into());
     }
 
     if let Some(parent) = dest.parent() {
@@ -214,14 +212,14 @@ pub fn install_intro(name: &str, url: &str, force: bool) -> Result<PathBuf> {
     let intros_dir = lynx_core::paths::lynx_dir().join("intros");
     let dest = intros_dir.join(format!("{name}.toml"));
     if dest.exists() && !force {
-        bail!("intro '{name}' already exists at {} — use --force to overwrite", dest.display());
+        return Err(LynxError::AlreadyInstalled(format!("intro '{name}'")).into());
     }
 
     let body = download_text(url)
         .with_context(|| format!("failed to download intro '{name}' from {url}"))?;
 
     if let Err(e) = toml::from_str::<toml::Value>(&body) {
-        bail!("downloaded intro '{name}' is invalid TOML: {e}");
+        return Err(LynxError::Theme(format!("downloaded intro '{name}' is invalid TOML: {e}")).into());
     }
 
     std::fs::create_dir_all(&intros_dir).context("create intros dir")?;
@@ -237,7 +235,7 @@ fn download_text(url: &str) -> Result<String> {
         .call()
         .with_context(|| format!("GET {url}"))?;
     if resp.status() >= 400 {
-        bail!("server returned status {} for {url}", resp.status());
+        return Err(LynxError::Registry(format!("server returned status {} for {url}", resp.status())).into());
     }
     resp.into_string().context("read response body")
 }

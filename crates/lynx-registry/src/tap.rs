@@ -6,7 +6,8 @@
 
 use std::path::Path;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
+use lynx_core::error::LynxError;
 use serde::{Deserialize, Serialize};
 
 use lynx_core::brand;
@@ -120,12 +121,16 @@ pub fn add_tap(list: &mut TapList, name: &str, url: &str) -> Result<()> {
 /// Remove a tap by name. Refuses to remove the official tap.
 pub fn remove_tap(list: &mut TapList, name: &str) -> Result<()> {
     if name == "official" {
-        bail!("cannot remove the official tap");
+        return Err(LynxError::Registry("cannot remove the official tap".into()).into());
     }
     let before = list.taps.len();
     list.taps.retain(|t| t.name != name);
     if list.taps.len() == before {
-        bail!("tap '{name}' not found");
+        return Err(LynxError::NotFound {
+            item_type: "Tap".into(),
+            name: name.into(),
+            hint: "run `lx tap list` to see available taps".into(),
+        }.into());
     }
     Ok(())
 }
@@ -240,7 +245,7 @@ fn fetch_tap_index(url: &str) -> Result<RegistryIndex> {
         .call()
         .with_context(|| format!("HTTP GET failed for {url}"))?;
     if resp.status() >= 400 {
-        bail!("registry returned status {} from {url}", resp.status());
+        return Err(LynxError::Registry(format!("registry returned status {} from {url}", resp.status())).into());
     }
     let body = resp.into_string().context("failed to read response")?;
     parse_index(&body)
