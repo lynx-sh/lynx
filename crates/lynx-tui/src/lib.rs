@@ -23,6 +23,17 @@ pub mod workflow;
 pub use item::{ListAction, ListItem, TuiColors};
 pub use list::{print_plain, print_plain_multi, run, run_multi, show, show_multi, ListResult};
 
+/// Returns `true` if interactive TUI mode is currently active.
+///
+/// Checks TTY state, agent environment variables, `LYNX_NO_TUI`, and the
+/// config `[tui] enabled` flag (best-effort, falls back to `true`).
+///
+/// Use this to gate any non-list TUI output (e.g. auto-launching a wizard).
+pub fn is_tui_active() -> bool {
+    let config_enabled = lynx_config::load().ok().map(|c| c.tui.enabled);
+    gate::tui_enabled(config_enabled)
+}
+
 /// Default palette colors (Tokyo Night) — used when theme has no [colors] table.
 pub mod defaults {
     pub const ACCENT: &str = "#7aa2f7";

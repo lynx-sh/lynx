@@ -97,18 +97,27 @@ pub fn run(args: SetupArgs) -> Result<()> {
     println!();
     println!("Lynx installed to {}.", lynx_dir.display());
 
-    if !args.zshrc {
+    // Auto-launch the onboarding wizard if:
+    // - stdout is a TTY (not a pipe or agent context)
+    // - onboarding has not already been completed
+    // Errors in onboard are non-fatal — always fall through to the manual instruction.
+    let already_onboarded = lynx_config::load()
+        .map(|c| c.onboarding_complete)
+        .unwrap_or(false);
+
+    if !already_onboarded && lynx_tui::is_tui_active() {
         println!();
-        println!("Add this to your ~/.zshrc to activate Lynx:");
+        println!("Starting setup wizard...");
         println!();
-        println!("    {ZSHRC_INIT_LINE}");
+        let onboard_args = super::onboard::OnboardArgs { force: false };
+        if let Err(e) = super::onboard::run(onboard_args) {
+            eprintln!("  ⚠ Wizard encountered an error: {e}");
+            eprintln!("    Run `lx onboard` to complete setup manually.");
+        }
+    } else if !already_onboarded {
+        // Non-interactive or agent context — print the manual instruction.
         println!();
-        println!("Or run `lx setup --zshrc` to do it automatically.");
-    } else {
-        println!();
-        println!("Restart your shell or run:");
-        println!();
-        println!("    source ~/.zshrc");
+        println!("Run `lx onboard` to complete setup.");
     }
 
     Ok(())
