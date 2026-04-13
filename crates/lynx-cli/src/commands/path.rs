@@ -1,7 +1,8 @@
 use anyhow::Result;
 use clap::{Args, Subcommand};
 use lynx_config::schema::UserPath;
-use lynx_shell::path::{add_path, list_paths, remove_path};
+use lynx_shell::path::{add_path, list_paths, remove_path, ResolvedPath};
+use lynx_tui::{ListItem, TuiColors};
 
 #[derive(Args)]
 pub struct PathArgs {
@@ -36,6 +37,36 @@ pub fn run(args: PathArgs) -> Result<()> {
     }
 }
 
+// ── TUI wrapper ────────────────────────────────────────────────────────────
+
+/// Display wrapper so ResolvedPath satisfies the ListItem trait.
+struct PathRow(ResolvedPath);
+
+impl ListItem for PathRow {
+    fn title(&self) -> &str {
+        &self.0.path
+    }
+
+    fn subtitle(&self) -> String {
+        self.0.label.clone().unwrap_or_default()
+    }
+
+    fn detail(&self) -> String {
+        let label = self.0.label.as_deref().unwrap_or("-");
+        format!("path:  {}\nlabel: {label}", self.0.path)
+    }
+
+    fn category(&self) -> Option<&str> {
+        Some("user")
+    }
+
+    fn is_active(&self) -> bool {
+        true
+    }
+}
+
+// ── Command handlers ───────────────────────────────────────────────────────
+
 fn cmd_list() -> Result<()> {
     let cfg = lynx_config::load()?;
     let paths = list_paths(&cfg);
@@ -45,13 +76,10 @@ fn cmd_list() -> Result<()> {
         return Ok(());
     }
 
-    // Plain table — TUI upgrade in P05.
-    println!("{:<50} LABEL", "PATH");
-    println!("{}", "-".repeat(60));
-    for p in &paths {
-        let label = p.label.as_deref().unwrap_or("-");
-        println!("{:<50} {}", p.path, label);
-    }
+    let rows: Vec<PathRow> = paths.into_iter().map(PathRow).collect();
+    let colors = TuiColors::default();
+    // show() calls gate::tui_enabled() internally — no custom TTY check needed.
+    lynx_tui::show(&rows, "Managed Paths", &colors).ok();
     Ok(())
 }
 

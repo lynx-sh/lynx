@@ -1,7 +1,8 @@
 use anyhow::Result;
 use clap::{Args, Subcommand};
 use lynx_config::schema::{AliasContext, UserAlias};
-use lynx_shell::alias::{add_alias, list_aliases, remove_alias, AliasSrc};
+use lynx_shell::alias::{add_alias, list_aliases, remove_alias, AliasSrc, ResolvedAlias};
+use lynx_tui::{ListItem, TuiColors};
 
 #[derive(Args)]
 pub struct AliasArgs {
@@ -46,6 +47,63 @@ pub fn run(args: AliasArgs) -> Result<()> {
     }
 }
 
+// ── TUI wrapper ────────────────────────────────────────────────────────────
+
+/// Display wrapper so ResolvedAlias satisfies the ListItem trait.
+struct AliasRow(ResolvedAlias);
+
+impl ListItem for AliasRow {
+    fn title(&self) -> &str {
+        &self.0.name
+    }
+
+    fn subtitle(&self) -> String {
+        self.0.command.clone()
+    }
+
+    fn detail(&self) -> String {
+        let context = match self.0.context {
+            AliasContext::Interactive => "interactive",
+            AliasContext::All => "all",
+        };
+        let source = match &self.0.source {
+            AliasSrc::User => "user".to_string(),
+            AliasSrc::Plugin(name) => format!("plugin: {name}"),
+        };
+        let mut lines = vec![
+            format!("name:    {}", self.0.name),
+            format!("command: {}", self.0.command),
+            format!("context: {context}"),
+            format!("source:  {source}"),
+        ];
+        if let Some(desc) = &self.0.description {
+            lines.push(format!("note:    {desc}"));
+        }
+        lines.join("\n")
+    }
+
+    fn category(&self) -> Option<&str> {
+        Some(match &self.0.source {
+            AliasSrc::User => "user",
+            AliasSrc::Plugin(_) => "plugin",
+        })
+    }
+
+    fn tags(&self) -> Vec<&str> {
+        self.0
+            .description
+            .as_deref()
+            .map(|d| vec![d])
+            .unwrap_or_default()
+    }
+
+    fn is_active(&self) -> bool {
+        matches!(self.0.source, AliasSrc::User)
+    }
+}
+
+// ── Command handlers ───────────────────────────────────────────────────────
+
 fn cmd_list() -> Result<()> {
     let cfg = lynx_config::load()?;
     let plugin_dir = lynx_core::paths::installed_plugins_dir();
@@ -56,20 +114,10 @@ fn cmd_list() -> Result<()> {
         return Ok(());
     }
 
-    // Plain table — TUI upgrade in P05.
-    println!("{:<20} {:<40} {:<14} SOURCE", "NAME", "COMMAND", "CONTEXT");
-    println!("{}", "-".repeat(84));
-    for a in &aliases {
-        let context = match a.context {
-            AliasContext::Interactive => "interactive",
-            AliasContext::All => "all",
-        };
-        let source = match &a.source {
-            AliasSrc::User => "user".to_string(),
-            AliasSrc::Plugin(name) => format!("plugin:{name}"),
-        };
-        println!("{:<20} {:<40} {:<14} {}", a.name, a.command, context, source);
-    }
+    let rows: Vec<AliasRow> = aliases.into_iter().map(AliasRow).collect();
+    let colors = TuiColors::default();
+    // show() calls gate::tui_enabled() internally — no custom TTY check needed.
+    lynx_tui::show(&rows, "Aliases", &colors).ok();
     Ok(())
 }
 
