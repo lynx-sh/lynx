@@ -214,7 +214,11 @@ async fn install_plugin(
 pub async fn run_uninstall(args: UninstallPkgArgs) -> Result<()> {
     let name = &args.name;
     let plugins_dir = paths::installed_plugins_dir();
-    uninstall_tool(name, &plugins_dir)?;
+    let result = uninstall_tool(name, &plugins_dir)?;
+    if result.plugin_removed {
+        println!("removed Lynx plugin for '{name}'");
+    }
+    println!("system binary preserved — to remove it: {}", result.system_uninstall_hint);
 
     let config = lynx_config::load()?;
     if config.enabled_plugins.iter().any(|p| p == name) {

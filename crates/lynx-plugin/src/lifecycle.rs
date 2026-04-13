@@ -35,7 +35,7 @@ pub fn declare(plugins_dir: &Path) -> PluginRegistry {
                 registry.insert(plugin_entry);
             }
             Err(e) => {
-                eprintln!("[lynx] warn: failed to parse {manifest_path:?}: {e}");
+                tracing::warn!("failed to parse {manifest_path:?}: {e}");
             }
         }
     }
