@@ -125,20 +125,20 @@ pub fn generate_init_script(params: &InitParams<'_>) -> String {
 
     // Source hook bridge (registered once per session)
     out.push_str(&format!(
-        "  source {dir}/shell/core/hooks.zsh 2>/dev/null\n",
+        "  if [[ -f {dir}/shell/core/hooks.zsh ]]; then source {dir}/shell/core/hooks.zsh; else echo 'lynx: critical file missing: shell/core/hooks.zsh — run lx setup' >&2; fi\n",
         dir = shell_quote(params.lynx_dir),
     ));
 
     // Source eval-bridge so lynx_eval_plugin / lynx_eval_safe are available
     out.push_str(&format!(
-        "  source {dir}/shell/lib/eval-bridge.zsh 2>/dev/null\n",
+        "  if [[ -f {dir}/shell/lib/eval-bridge.zsh ]]; then source {dir}/shell/lib/eval-bridge.zsh; else echo 'lynx: critical file missing: shell/lib/eval-bridge.zsh — run lx setup' >&2; fi\n",
         dir = shell_quote(params.lynx_dir),
     ));
 
     // Source command dispatch — defines lx() wrapper that evals output for
     // subcommands like `theme set` and `context set` that emit shell assignments.
     out.push_str(&format!(
-        "  source {dir}/shell/lib/commands.zsh 2>/dev/null\n",
+        "  if [[ -f {dir}/shell/lib/commands.zsh ]]; then source {dir}/shell/lib/commands.zsh; else echo 'lynx: critical file missing: shell/lib/commands.zsh — run lx setup' >&2; fi\n",
         dir = shell_quote(params.lynx_dir),
     ));
 
