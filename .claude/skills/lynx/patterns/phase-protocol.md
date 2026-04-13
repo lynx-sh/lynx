@@ -1,54 +1,22 @@
-# Block & Phase Protocol — Lynx
+# Phase Protocol
 
-## Before Scaffolding Any Block
+## Before Scaffolding
+1. Verify every file listed exists — mark non-existent files as `wiring_required`
+2. `pt decisions <component>` for each affected component — reflect in `do`/`dont`
+3. Read the crate before designing phases — don't design "add X" if X exists
 
-1. **Verify every file you list exists:** `ls path/to/file.rs` — if it doesn't exist, mark it as `produces` with `wiring_required`
-2. **Run `pt decisions <component>`** for each affected component — reflect constraints in phase `do`/`dont` fields
-3. **Check for existing infrastructure** before designing phases to "add X" — read the crate first
-
-## Scaffolding Commands
-
+## Commands
 ```bash
 pt block-add B<N> "Title" "Acceptance criteria"
-pt scaffold-phases B<N> < phases.json    # top-level array of phase objects
-
-# After — mandatory self-review
-pt phases B<N>                           # verify all phases
-pt phase B<N>-P01                        # read each cold — would a new agent know what to do?
+pt scaffold-phases B<N> < phases.json   # top-level array of phase objects
+pt phases B<N>                          # verify after — read each phase cold
 ```
 
 ## Phase Field Requirements
-
-### `do` field (min 40 chars)
-- Name the specific function/file/location
-- State WHY, not just WHAT
-- If replacing code: state what to DELETE and require a grep to confirm
-
-### `dont` field
-- List the most dangerous wrong approaches
-- Reference the reason (decision ID, past incident)
-
-### `verify` field
-- At least 2 specific test scenarios
-- At least one negative case
-- Include `cargo nextest run -p lynx-<crate>` with the relevant crate
-
-### `files` field
-- Only files that will actually be modified
-- New files require `wiring_required`
-
-## Responsibility Check (D-042) — Required for Every Phase
-
-Every phase that creates or significantly modifies files must include:
-```
-Responsibility check:
-  <file>: does ____ (one domain) — ok
-  <file>: does ____ and ____ — SPLIT REQUIRED before proceeding
-```
+- **`do`**: name the exact file/function, state why, state what to delete if replacing
+- **`dont`**: the most dangerous wrong approach + reason (decision ID or incident)
+- **`verify`**: at least one negative case + `cargo nextest run -p lynx-<crate>`
+- **`files`**: only files actually modified — new files require `wiring_required`
 
 ## Issues Found During Phases
-
-1. Do NOT silently fix bugs found during phase work
-2. `pt add` immediately — file the issue
-3. If blocking: `pt claim` and fix inline
-4. If not blocking: file and leave for next agent
+File with `pt add` immediately. If blocking: claim and fix inline. Never silently fix.

@@ -1,29 +1,14 @@
-# Shell Protocol — Lynx
+# Shell Protocol (D-001)
 
-## The Rule (D-001)
-**No logic in `shell/`.** The zsh layer is a thin eval-bridge (~200 lines). It evals output from `lx`. That's it.
+**No logic in shell/.** The zsh layer evals `lx` output only. Computation belongs in Rust.
 
-## What Goes Where
-
-| Belongs in `shell/` | Belongs in Rust (`crates/`) |
-|---|---|
-| `eval "$(lx init)"` bootstrap | All init logic |
-| Hook wiring (`precmd`, `preexec`, `chpwd`) | Hook handlers and output |
-| PROMPT/RPROMPT assignment from lx output | Prompt rendering |
+| shell/ | Rust (crates/) |
+|--------|----------------|
+| `eval "$(lx ...)"` bootstrap | All init logic |
+| Hook wiring (precmd/preexec/chpwd) | Hook handlers and output |
+| PROMPT/RPROMPT assignment from lx | Prompt rendering |
 | Nothing else | Everything else |
 
-## Before Touching `shell/`
+Any conditional logic, string manipulation, or control flow added to a `.zsh` file is a D-001 violation. Move it to Rust.
 
-```bash
-pt decisions shell
-pt decisions arch
-```
-
-If your change adds conditional logic, string manipulation, array operations, or any control flow to a `.zsh` file — **stop**. Move that logic to Rust and have the shell eval the output.
-
-## Verification
-
-```bash
-bats tests/integration/shell/
-cargo nextest run -p lynx-shell
-```
+**Verify:** `lx run lynx-ai-shell`
