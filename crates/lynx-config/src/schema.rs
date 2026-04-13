@@ -70,6 +70,11 @@ pub struct LynxConfig {
     /// User-defined PATH entries, stored under `[[paths]]` in `config.toml`.
     #[serde(default)]
     pub paths: Vec<UserPath>,
+    /// Preferred editor binary (e.g. `code`, `zed`, `vim`, `nano`).
+    /// When set, Lynx exports it as `$VISUAL` at shell init (if `$VISUAL` is not already set).
+    /// Leave unset to let `$VISUAL`/`$EDITOR` from your environment take precedence.
+    #[serde(default)]
+    pub editor: Option<String>,
 }
 
 fn default_schema_version() -> u32 {

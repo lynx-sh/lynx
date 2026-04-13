@@ -24,6 +24,7 @@ Lynx config lives at `~/.config/lynx/config.toml`. All subcommands operate on th
 | `active_context` | `interactive` \| `agent` \| `minimal` | `lx config set active_context agent` |
 | `sync.remote`    | Git remote URL (or empty to clear)    | `lx config set sync.remote git@github.com:you/dotfiles.git` |
 | `tui.enabled`    | `true` \| `false` (default: `true`)   | `lx config set tui.enabled false` |
+| `editor`         | Editor binary name (any editor)       | `lx config set editor code` |
 
 Read-only keys (via `lx config get` only): `schema_version`, `onboarding_complete`.
 
@@ -100,9 +101,23 @@ export LYNX_NO_TUI=1           # plain text for the whole session
 When TUI is disabled, all commands fall back to structured plain-text output suitable
 for scripts, CI pipelines, and AI agents.
 
+### Editor
+
+Set your preferred editor once in config and Lynx exports it as `$VISUAL` at shell init:
+
+```bash
+lx config set editor code    # VS Code
+lx config set editor zed     # Zed
+lx config set editor vim     # Vim
+lx config set editor nano    # Nano
+```
+
+Any editor binary works. If `$VISUAL` is already set in your environment, that takes precedence
+over the config value. Unset `editor` to rely entirely on `$VISUAL`/`$EDITOR` from your shell.
+
 ### Edit Safety
 
-`lx config edit` snapshots the config before opening `$EDITOR`. If the saved file fails
+`lx config edit` snapshots the config before opening your editor. If the saved file fails
 TOML parse or schema validation, Lynx automatically restores the snapshot and reports the
 error — your previous config is never lost.
 

@@ -112,6 +112,7 @@ pub fn run(args: InitArgs) -> Result<()> {
         zle_hook_plugins,
         user_aliases: &config.aliases,
         user_paths: &user_paths,
+        editor: config.editor.as_deref(),
     });
 
     print!("{script}");

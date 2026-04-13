@@ -14,6 +14,7 @@ impl Default for LynxConfig {
             onboarding_complete: false,
             aliases: vec![],
             paths: vec![],
+            editor: None,
         }
     }
 }
