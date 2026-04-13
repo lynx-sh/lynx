@@ -107,7 +107,7 @@ pub fn save_taps(list: &TapList, path: &Path) -> Result<()> {
 /// Add a community tap. Returns error if name already exists.
 pub fn add_tap(list: &mut TapList, name: &str, url: &str) -> Result<()> {
     if list.taps.iter().any(|t| t.name == name) {
-        bail!("tap '{name}' already exists");
+        return Err(lynx_core::error::LynxError::Registry(format!("tap '{name}' already exists")).into());
     }
     list.taps.push(TapConfig {
         name: name.to_string(),

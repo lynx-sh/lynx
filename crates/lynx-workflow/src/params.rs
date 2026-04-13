@@ -1,7 +1,8 @@
 //! Parameter resolution, validation, and template expansion.
 
 use crate::schema::{ParamType, WorkflowParam};
-use anyhow::{bail, Result};
+use anyhow::Result;
+use lynx_core::error::LynxError;
 use std::collections::HashMap;
 
 /// Resolve workflow parameters: validate, apply defaults, type-check.
@@ -17,38 +18,37 @@ pub fn resolve_params(
         } else if let Some(ref default) = def.default {
             default.clone()
         } else if def.required {
-            bail!("missing required parameter: '{}'", def.name);
+            return Err(LynxError::Workflow(format!(
+                "missing required parameter: '{}'{}", def.name,
+                if !def.description.is_empty() { format!(" — {}", def.description) } else { String::new() }
+            )).into());
         } else {
             continue;
         };
 
-        // Validate choices
         if !def.choices.is_empty() && !def.choices.contains(&value) {
-            bail!(
+            return Err(LynxError::Workflow(format!(
                 "parameter '{}': '{}' is not a valid choice (expected one of: {})",
-                def.name,
-                value,
-                def.choices.join(", ")
-            );
+                def.name, value, def.choices.join(", ")
+            )).into());
         }
 
-        // Type check
         match def.param_type {
             ParamType::Int => {
                 if value.parse::<i64>().is_err() {
-                    bail!("parameter '{}': '{}' is not a valid integer", def.name, value);
+                    return Err(LynxError::Workflow(format!(
+                        "parameter '{}': '{}' is not a valid integer", def.name, value
+                    )).into());
                 }
             }
             ParamType::Bool => {
                 if !matches!(value.as_str(), "true" | "false" | "1" | "0" | "yes" | "no") {
-                    bail!(
-                        "parameter '{}': '{}' is not a valid boolean (use true/false)",
-                        def.name,
-                        value
-                    );
+                    return Err(LynxError::Workflow(format!(
+                        "parameter '{}': '{}' is not a valid boolean (use true/false)", def.name, value
+                    )).into());
                 }
             }
-            ParamType::String => {} // any string is valid
+            ParamType::String => {}
         }
 
         resolved.insert(def.name.clone(), value);

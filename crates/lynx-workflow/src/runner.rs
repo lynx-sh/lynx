@@ -4,7 +4,8 @@
 //! binary path and argument list that the step executor will spawn.
 
 use crate::schema::RunnerType;
-use anyhow::{bail, Result};
+use anyhow::Result;
+use lynx_core::error::LynxError;
 
 /// Resolved command ready for execution.
 #[derive(Debug, Clone)]
@@ -46,7 +47,7 @@ pub fn resolve(runner: &RunnerType, run_str: &str) -> Result<ResolvedCommand> {
             // Parse: "cargo build --release" → binary=cargo, args=[build, --release]
             let parts: Vec<&str> = run_str.split_whitespace().collect();
             if parts.is_empty() {
-                bail!("cargo runner: empty run string");
+                return Err(LynxError::Workflow("cargo runner: empty run string".into()).into());
             }
             // If run_str starts with "cargo", strip it
             let args = if parts[0] == "cargo" {
