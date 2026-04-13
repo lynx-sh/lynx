@@ -110,24 +110,24 @@ pub enum PluginCommand {
 pub async fn run(args: PluginArgs) -> Result<()> {
     match args.command {
         PluginCommand::Add { path } => cmd_add(&path).await,
-        PluginCommand::Remove { name } => cmd_remove(&name).await,
-        PluginCommand::List { json } => cmd_list(json).await,
-        PluginCommand::New { name } => scaffold::cmd_new(&name).await,
+        PluginCommand::Remove { name } => cmd_remove(&name),
+        PluginCommand::List { json } => cmd_list(json),
+        PluginCommand::New { name } => scaffold::cmd_new(&name),
         PluginCommand::Reinstall { name } => registry_ops::cmd_reinstall(&name).await,
         PluginCommand::Exec { name } => shell_glue::cmd_exec(&name).await,
-        PluginCommand::Unload { name } => shell_glue::cmd_unload(&name).await,
+        PluginCommand::Unload { name } => shell_glue::cmd_unload(&name),
         PluginCommand::Search { query, refresh } => registry_ops::cmd_search(&query, refresh).await,
         PluginCommand::Info { name } => registry_ops::cmd_info(&name).await,
         PluginCommand::Update { name, all } => registry_ops::cmd_update(name.as_deref(), all).await,
-        PluginCommand::Checksum { target } => registry_ops::cmd_checksum(&target).await,
-        PluginCommand::IndexValidate { path } => registry_ops::cmd_index_validate(&path).await,
-        PluginCommand::Enable { name } => cmd_enable(&name).await,
-        PluginCommand::Disable { name } => cmd_disable(&name).await,
+        PluginCommand::Checksum { target } => registry_ops::cmd_checksum(&target),
+        PluginCommand::IndexValidate { path } => registry_ops::cmd_index_validate(&path),
+        PluginCommand::Enable { name } => cmd_enable(&name),
+        PluginCommand::Disable { name } => cmd_disable(&name),
         PluginCommand::Examples => {
             crate::commands::examples::run(crate::commands::examples::ExamplesArgs {
                 command: Some("plugin".into()),
             })
-            .await
+            
         }
         PluginCommand::Other(args) => {
             Err(LynxError::unknown_command(args.first().map(|s| s.as_str()).unwrap_or(""), "plugin").into())
@@ -145,7 +145,7 @@ async fn cmd_add(path: &str) -> Result<()> {
         if installed.join(lynx_core::brand::PLUGIN_MANIFEST).exists()
             || in_repo.join(lynx_core::brand::PLUGIN_MANIFEST).exists()
         {
-            return cmd_enable(name).await;
+            return cmd_enable(name);
         }
         return registry_ops::cmd_add_from_registry(name, false).await;
     }
@@ -179,7 +179,7 @@ async fn cmd_add(path: &str) -> Result<()> {
     Ok(())
 }
 
-async fn cmd_remove(name: &str) -> Result<()> {
+fn cmd_remove(name: &str) -> Result<()> {
     let config = load_config()?;
     if !config.enabled_plugins.iter().any(|p| p == name) {
         return Err(LynxError::NotInstalled(name.to_string()).into());
@@ -193,7 +193,7 @@ async fn cmd_remove(name: &str) -> Result<()> {
     Ok(())
 }
 
-async fn cmd_enable(name: &str) -> Result<()> {
+fn cmd_enable(name: &str) -> Result<()> {
     let config = load_config()?;
     if config.enabled_plugins.iter().any(|p| p == name) {
         println!("Plugin '{name}' is already enabled.");
@@ -204,7 +204,7 @@ async fn cmd_enable(name: &str) -> Result<()> {
     Ok(())
 }
 
-async fn cmd_disable(name: &str) -> Result<()> {
+fn cmd_disable(name: &str) -> Result<()> {
     lynx_config::disable_plugin(name)?;
     println!("Disabled plugin '{name}'. Restart your shell to take effect.");
     Ok(())
@@ -233,7 +233,7 @@ impl lynx_tui::ListItem for PluginListEntry {
     }
 }
 
-async fn cmd_list(json: bool) -> Result<()> {
+fn cmd_list(json: bool) -> Result<()> {
     let config = load_config()?;
     let context_str = format!("{:?}", config.active_context).to_lowercase();
 

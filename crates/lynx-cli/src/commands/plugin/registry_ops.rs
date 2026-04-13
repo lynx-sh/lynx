@@ -154,7 +154,7 @@ async fn update_one(name: &str) -> Result<()> {
     Ok(())
 }
 
-pub(super) async fn cmd_checksum(target: &str) -> Result<()> {
+pub(super) fn cmd_checksum(target: &str) -> Result<()> {
     let path = PathBuf::from(target);
     if path.exists() && path.is_file() {
         let digest = checksum_file(&path)?;
@@ -183,7 +183,7 @@ pub(super) async fn cmd_checksum(target: &str) -> Result<()> {
     }
 }
 
-pub(super) async fn cmd_index_validate(path: &str) -> Result<()> {
+pub(super) fn cmd_index_validate(path: &str) -> Result<()> {
     validate_registry_index_path(Path::new(path))?;
     println!("index is valid: {path}");
     Ok(())

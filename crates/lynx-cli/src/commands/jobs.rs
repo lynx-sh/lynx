@@ -39,7 +39,7 @@ pub enum JobsCommand {
     Other(Vec<String>),
 }
 
-pub async fn run(args: JobsArgs) -> Result<()> {
+pub fn run(args: JobsArgs) -> Result<()> {
     match args.command {
         JobsCommand::List => cmd_list(),
         JobsCommand::View { id } => cmd_view(&id),
@@ -193,7 +193,7 @@ mod tests {
         let args = JobsArgs {
             command: JobsCommand::Other(vec!["bogus".to_string()]),
         };
-        let err = run(args).await.unwrap_err();
+        let err = run(args).unwrap_err();
         assert!(err.to_string().contains("bogus"));
     }
 }

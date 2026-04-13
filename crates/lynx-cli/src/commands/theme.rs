@@ -108,7 +108,6 @@ pub async fn run(args: ThemeArgs) -> Result<()> {
             crate::commands::examples::run(crate::commands::examples::ExamplesArgs {
                 command: Some("theme".into()),
             })
-            .await
         }
         ThemeCommand::Patch { path, value } => cmd_patch(&path, &value).await,
         ThemeCommand::Palette { key, value } => {
@@ -121,7 +120,7 @@ pub async fn run(args: ThemeArgs) -> Result<()> {
             cmd_patch("segment.prompt_char.color.fg", &color).await
         }
         ThemeCommand::Segment(seg) => cmd_segment(seg).await,
-        ThemeCommand::Convert { source, name, force } => super::theme_convert::run(&source, name.as_deref(), force).await,
+        ThemeCommand::Convert { source, name, force } => super::theme_convert::run(&source, name.as_deref(), force),
         ThemeCommand::Studio => {
             eprintln!("Note: `lx theme studio` is deprecated. Use `lx dashboard` instead.");
             lynx_dashboard::run().await

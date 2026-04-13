@@ -20,7 +20,7 @@ pub struct InitArgs {
     pub context: Option<String>,
 }
 
-pub async fn run(args: InitArgs) -> Result<()> {
+pub fn run(args: InitArgs) -> Result<()> {
     // If config fails to load, emit safe mode instead of crashing the shell.
     let config = match load_config() {
         Ok(cfg) => cfg,

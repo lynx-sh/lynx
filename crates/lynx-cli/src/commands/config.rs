@@ -34,7 +34,7 @@ pub enum ConfigCommand {
     Other(Vec<String>),
 }
 
-pub async fn run(args: ConfigArgs) -> Result<()> {
+pub fn run(args: ConfigArgs) -> Result<()> {
     match args.command {
         ConfigCommand::Show => cmd_show(),
         ConfigCommand::Edit => cmd_edit(),
@@ -45,7 +45,7 @@ pub async fn run(args: ConfigArgs) -> Result<()> {
             crate::commands::examples::run(crate::commands::examples::ExamplesArgs {
                 command: Some("config".into()),
             })
-            .await
+            
         }
         ConfigCommand::Other(args) => {
             Err(LynxError::NotFound {
@@ -203,12 +203,12 @@ mod tests {
         let _ = cmd_show();
     }
 
-    #[tokio::test]
-    async fn config_unknown_subcommand_returns_not_found() {
+    #[test]
+    fn config_unknown_subcommand_returns_not_found() {
         let args = ConfigArgs {
             command: ConfigCommand::Other(vec!["bogus".to_string()]),
         };
-        let err = run(args).await.unwrap_err();
+        let err = run(args).unwrap_err();
         let msg = err.to_string();
         assert!(msg.contains("bogus"), "error should mention command: {msg}");
     }

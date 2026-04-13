@@ -21,7 +21,7 @@ pub struct SetupArgs {
     pub source: Option<String>,
 }
 
-pub async fn run(args: SetupArgs) -> Result<()> {
+pub fn run(args: SetupArgs) -> Result<()> {
     let home = home_dir()?;
 
     let lynx_dir: PathBuf = args

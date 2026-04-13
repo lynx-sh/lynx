@@ -17,7 +17,7 @@ pub struct UninstallArgs {
     pub yes: bool,
 }
 
-pub async fn run(args: UninstallArgs) -> Result<()> {
+pub fn run(args: UninstallArgs) -> Result<()> {
     let home = home_dir()?;
 
     println!("Uninstalling Lynx...");

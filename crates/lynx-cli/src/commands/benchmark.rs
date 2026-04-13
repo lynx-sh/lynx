@@ -20,7 +20,7 @@ struct BenchResult {
     avg_ms: u64,
 }
 
-pub async fn run(args: BenchmarkArgs) -> Result<()> {
+pub fn run(args: BenchmarkArgs) -> Result<()> {
     let runs = args.runs.max(1);
     println!("Running {runs} benchmark run(s)...");
 

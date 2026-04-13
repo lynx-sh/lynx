@@ -3,7 +3,7 @@ use lynx_core::error::LynxError;
 use lynx_theme::loader::user_theme_dir;
 
 /// Convert an OMZ .zsh-theme or Oh-My-Posh .omp.json theme to Lynx TOML format.
-pub async fn run(source: &str, name: Option<&str>, force: bool) -> Result<()> {
+pub fn run(source: &str, name: Option<&str>, force: bool) -> Result<()> {
     let resolved = lynx_convert::fetch::resolve_source(source)
         .context("failed to resolve theme source")?;
 

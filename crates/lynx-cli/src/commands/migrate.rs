@@ -12,7 +12,7 @@ pub struct MigrateArgs {
     pub dry_run: bool,
 }
 
-pub async fn run(args: MigrateArgs) -> Result<()> {
+pub fn run(args: MigrateArgs) -> Result<()> {
     let mut cfg = load()?;
 
     if args.dry_run {

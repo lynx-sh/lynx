@@ -22,7 +22,7 @@ pub struct KubectlStateArgs {}
 /// _lynx_kubectl_state=()
 /// export LYNX_CACHE_KUBECTL_STATE=''
 /// ```
-pub async fn run(_args: KubectlStateArgs) -> Result<()> {
+pub fn run(_args: KubectlStateArgs) -> Result<()> {
     let state = gather_kubectl_state();
     print!("{}", render_zsh(&state));
     Ok(())
