@@ -15,6 +15,7 @@
 
 mod item;
 mod list;
+mod preview;
 
 pub use item::{ListAction, ListItem, TuiColors};
 pub use list::{print_plain, run, show, ListResult};
