@@ -93,14 +93,27 @@ lx plugin add git        # install the git integration plugin
 lx plugin list           # confirm it's loaded
 ```
 
-### 4. Switch context
+### 4. Manage aliases and PATH
+
+```bash
+lx alias add gs "git status"         # add an alias (live immediately)
+lx alias add ll "ls -la" --all-contexts  # load in all non-agent contexts
+lx alias list                        # TUI view of all aliases (user + plugin)
+lx alias remove gs                   # remove and unalias in current session
+
+lx path add /usr/local/sbin          # add a PATH entry (next shell start)
+lx path list                         # view managed paths
+lx path remove /usr/local/sbin
+```
+
+### 5. Switch context
 
 ```bash
 lx context set agent     # simulate agent context (aliases unloaded)
 lx context set interactive
 ```
 
-### 5. Run a workflow
+### 6. Run a workflow
 
 ```bash
 lx run deploy env=staging     # execute a workflow with params
@@ -108,14 +121,14 @@ lx run list                   # see available workflows
 lx jobs list                  # check job status
 ```
 
-### 6. Schedule a cron task
+### 7. Schedule a cron task
 
 ```bash
 lx cron add backup --run "tar czf ~/backup.tar.gz ~/code" --cron "0 2 * * *"
 lx cron list
 ```
 
-### 7. Open the dashboard
+### 8. Open the dashboard
 
 ```bash
 lx dashboard                  # full web UI for managing everything

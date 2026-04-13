@@ -27,6 +27,52 @@ Lynx config lives at `~/.config/lynx/config.toml`. All subcommands operate on th
 
 Read-only keys (via `lx config get` only): `schema_version`, `onboarding_complete`.
 
+### User Aliases
+
+User-defined aliases are stored in `config.toml` and managed via `lx alias`:
+
+```bash
+lx alias add gs "git status"              # interactive context only (default)
+lx alias add ll "ls -la" --all-contexts   # all non-agent/minimal contexts
+lx alias list                             # TUI view (user + plugin aliases merged)
+lx alias remove gs
+```
+
+`lx alias add` takes effect immediately in the current shell (eval bridge). Aliases
+persist across sessions via the init script — they are never loaded in `agent` or
+`minimal` contexts (D-010).
+
+TOML representation:
+
+```toml
+[[aliases]]
+name = "gs"
+command = "git status"
+description = "quick git status"   # optional
+context = "interactive"            # "interactive" (default) or "all"
+```
+
+### User PATH Entries
+
+User-managed PATH entries are stored in config and prepended to `$PATH` at shell init:
+
+```bash
+lx path add /usr/local/sbin --label "sbin"   # label is optional
+lx path list
+lx path remove /usr/local/sbin
+```
+
+PATH entries take effect on the next shell start. They are always emitted regardless
+of context (agent shells may still need custom paths).
+
+TOML representation:
+
+```toml
+[[paths]]
+path = "/usr/local/sbin"
+label = "sbin"   # optional, shown in lx path list
+```
+
 ### TUI Output Mode
 
 By default, list commands (`lx theme list`, `lx plugin list`, `lx run list`, etc.) and
