@@ -30,7 +30,7 @@ pub enum SyncCommand {
     Other(Vec<String>),
 }
 
-pub async fn run(args: SyncArgs) -> Result<()> {
+pub fn run(args: SyncArgs) -> Result<()> {
     match args.command {
         SyncCommand::Init { remote } => cmd_init(&remote),
         SyncCommand::Push => cmd_push(),
@@ -220,7 +220,7 @@ mod tests {
         let args = SyncArgs {
             command: SyncCommand::Other(vec!["oops".to_string()]),
         };
-        let err = run(args).await.unwrap_err();
+        let err = run(args).unwrap_err();
         assert!(err.to_string().contains("oops"));
     }
 }

@@ -8,7 +8,7 @@ pub struct ExamplesArgs {
     pub command: Option<String>,
 }
 
-pub async fn run(args: ExamplesArgs) -> Result<()> {
+pub fn run(args: ExamplesArgs) -> Result<()> {
     match args.command.as_deref() {
         Some("plugin") => print_plugin_examples(),
         Some("theme") => print_theme_examples(),
@@ -420,14 +420,14 @@ fn print_jobs_examples() {
 mod tests {
     use super::*;
 
-    #[tokio::test]
-    async fn examples_no_command_does_not_error() {
+    #[test]
+    fn examples_no_command_does_not_error() {
         let args = ExamplesArgs { command: None };
-        assert!(run(args).await.is_ok());
+        assert!(run(args).is_ok());
     }
 
-    #[tokio::test]
-    async fn examples_known_commands_succeed() {
+    #[test]
+    fn examples_known_commands_succeed() {
         let commands = vec![
             "plugin", "theme", "cron", "task", "event", "config",
             "doctor", "context", "daemon", "run", "workflow", "jobs",
@@ -435,14 +435,14 @@ mod tests {
         ];
         for cmd in commands {
             let args = ExamplesArgs { command: Some(cmd.to_string()) };
-            assert!(run(args).await.is_ok(), "examples for '{cmd}' should succeed");
+            assert!(run(args).is_ok(), "examples for '{cmd}' should succeed");
         }
     }
 
-    #[tokio::test]
-    async fn examples_unknown_command_errors() {
+    #[test]
+    fn examples_unknown_command_errors() {
         let args = ExamplesArgs { command: Some("nonexistent".to_string()) };
-        let err = run(args).await.unwrap_err();
+        let err = run(args).unwrap_err();
         assert!(err.to_string().contains("nonexistent"));
     }
 

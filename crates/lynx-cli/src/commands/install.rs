@@ -276,7 +276,7 @@ mod tests {
     }
 }
 
-pub async fn run_uninstall(args: UninstallPkgArgs) -> Result<()> {
+pub fn run_uninstall(args: UninstallPkgArgs) -> Result<()> {
     let name = &args.name;
     let plugins_dir = paths::installed_plugins_dir();
     let result = uninstall_tool(name, &plugins_dir)?;

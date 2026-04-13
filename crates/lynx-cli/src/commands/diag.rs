@@ -30,7 +30,7 @@ pub enum DiagCommand {
     Other(Vec<String>),
 }
 
-pub async fn run(args: DiagArgs) -> Result<()> {
+pub fn run(args: DiagArgs) -> Result<()> {
     match args.command {
         Some(DiagCommand::Clear) => {
             diag::clear()?;
@@ -120,7 +120,7 @@ mod tests {
             command: Some(DiagCommand::Other(vec!["bogus".to_string()])),
             lines: 50,
         };
-        let err = run(args).await.unwrap_err();
+        let err = run(args).unwrap_err();
         assert!(err.to_string().contains("bogus"));
     }
 }

@@ -86,7 +86,7 @@ impl lynx_tui::ListItem for AuditEntry {
     }
 }
 
-pub async fn run(args: AuditArgs) -> Result<()> {
+pub fn run(args: AuditArgs) -> Result<()> {
     let config = load_config()?;
     let plugins_dir = paths::installed_plugins_dir();
 

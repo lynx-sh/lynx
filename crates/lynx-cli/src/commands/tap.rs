@@ -34,7 +34,7 @@ pub enum TapCommand {
     Other(Vec<String>),
 }
 
-pub async fn run(args: TapArgs) -> Result<()> {
+pub fn run(args: TapArgs) -> Result<()> {
     match args.command {
         TapCommand::List => cmd_list(),
         TapCommand::Add { source } => cmd_add(&source),
@@ -245,7 +245,7 @@ mod tests {
         let args = TapArgs {
             command: TapCommand::Other(vec!["nope".to_string()]),
         };
-        let err = run(args).await.unwrap_err();
+        let err = run(args).unwrap_err();
         assert!(err.to_string().contains("nope"));
     }
 }

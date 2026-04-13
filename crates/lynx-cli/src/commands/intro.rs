@@ -57,7 +57,7 @@ pub enum IntroCommand {
     },
 }
 
-pub async fn run(args: IntroArgs) -> Result<()> {
+pub fn run(args: IntroArgs) -> Result<()> {
     match args.command {
         IntroCommand::On => cmd_on(),
         IntroCommand::Off => cmd_off(),
@@ -472,7 +472,7 @@ mod tests {
         let args = IntroArgs {
             command: IntroCommand::Other(vec!["a".to_string(), "b".to_string()]),
         };
-        let err = run(args).await.unwrap_err();
+        let err = run(args).unwrap_err();
         assert!(err.to_string().contains("a"));
     }
 }

@@ -14,7 +14,7 @@ pub struct DoctorArgs {
     pub json: bool,
 }
 
-pub async fn run(args: DoctorArgs) -> Result<()> {
+pub fn run(args: DoctorArgs) -> Result<()> {
     let results = lynx_doctor::run_all();
 
     if args.json {

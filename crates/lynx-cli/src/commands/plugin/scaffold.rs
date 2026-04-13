@@ -9,7 +9,7 @@ use lynx_core::error::LynxError;
 use lynx_plugin::namespace::scaffold_convention_comment;
 use std::path::PathBuf;
 
-pub(super) async fn cmd_new(name: &str) -> Result<()> {
+pub(super) fn cmd_new(name: &str) -> Result<()> {
     let dir = PathBuf::from(name);
     if dir.exists() {
         return Err(LynxError::Plugin(format!("directory '{name}' already exists")).into());
@@ -107,8 +107,8 @@ disabled_in = ["agent", "minimal"]
 mod tests {
     use super::*;
 
-    #[tokio::test]
-    async fn scaffold_refuses_existing_directory() {
+    #[test]
+    fn scaffold_refuses_existing_directory() {
         let tmp = tempfile::tempdir().unwrap();
         let existing = tmp.path().join("existing-plugin");
         std::fs::create_dir_all(&existing).unwrap();
@@ -117,7 +117,7 @@ mod tests {
         let _orig = std::env::current_dir().unwrap();
         std::env::set_current_dir(tmp.path()).unwrap();
 
-        let result = cmd_new("existing-plugin").await;
+        let result = cmd_new("existing-plugin");
         assert!(result.is_err());
         let msg = result.unwrap_err().to_string();
         assert!(msg.contains("already exists"), "unexpected error: {msg}");
@@ -125,13 +125,13 @@ mod tests {
         std::env::set_current_dir(_orig).unwrap();
     }
 
-    #[tokio::test]
-    async fn scaffold_creates_all_files() {
+    #[test]
+    fn scaffold_creates_all_files() {
         let tmp = tempfile::tempdir().unwrap();
         let _orig = std::env::current_dir().unwrap();
         std::env::set_current_dir(tmp.path()).unwrap();
 
-        let result = cmd_new("test-scaffold").await;
+        let result = cmd_new("test-scaffold");
         assert!(result.is_ok(), "scaffold failed: {:?}", result.err());
 
         let dir = tmp.path().join("test-scaffold");
@@ -148,13 +148,13 @@ mod tests {
         std::env::set_current_dir(_orig).unwrap();
     }
 
-    #[tokio::test]
-    async fn scaffold_zsh_files_are_valid_syntax() {
+    #[test]
+    fn scaffold_zsh_files_are_valid_syntax() {
         let tmp = tempfile::tempdir().unwrap();
         let _orig = std::env::current_dir().unwrap();
         std::env::set_current_dir(tmp.path()).unwrap();
 
-        cmd_new("zsh-check").await.unwrap();
+        cmd_new("zsh-check").unwrap();
 
         let dir = tmp.path().join("zsh-check");
         let init = std::fs::read_to_string(dir.join("shell/init.zsh")).unwrap();

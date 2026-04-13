@@ -35,7 +35,7 @@ pub(super) async fn cmd_exec(name: &str) -> Result<()> {
 }
 
 /// Emit zsh that removes the plugin's exported symbols and clears its load guard.
-pub(super) async fn cmd_unload(name: &str) -> Result<()> {
+pub(super) fn cmd_unload(name: &str) -> Result<()> {
     let script = generate_unload_script_for_plugin(name)?;
     print!("{script}");
     Ok(())

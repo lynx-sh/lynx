@@ -60,8 +60,7 @@ pub async fn run(args: EventArgs) -> Result<()> {
         EventCommand::Examples => {
             crate::commands::examples::run(crate::commands::examples::ExamplesArgs {
                 command: Some("event".into()),
-            })
-            .await?;
+            })?;
         }
         EventCommand::Other(args) => {
             return Err(LynxError::unknown_command(args.first().map(|s| s.as_str()).unwrap_or(""), "event").into())

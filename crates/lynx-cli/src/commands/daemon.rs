@@ -41,7 +41,7 @@ pub enum DaemonCommand {
     Other(Vec<String>),
 }
 
-pub async fn run(args: DaemonArgs) -> Result<()> {
+pub fn run(args: DaemonArgs) -> Result<()> {
     match args.command {
         DaemonCommand::Install => {
             let backend = platform_backend();
@@ -268,7 +268,7 @@ mod tests {
         let args = DaemonArgs {
             command: DaemonCommand::Other(vec!["bogus".to_string()]),
         };
-        let err = run(args).await.unwrap_err();
+        let err = run(args).unwrap_err();
         assert!(err.to_string().contains("bogus"));
     }
 

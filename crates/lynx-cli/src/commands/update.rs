@@ -19,7 +19,7 @@ pub struct UpdateArgs {
     pub yes: bool,
 }
 
-pub async fn run(args: UpdateArgs) -> Result<()> {
+pub fn run(args: UpdateArgs) -> Result<()> {
     // Rate-limit GitHub API calls.
     if let Some(cached) = read_cached_version() {
         if cached.is_fresh() {
@@ -27,7 +27,7 @@ pub async fn run(args: UpdateArgs) -> Result<()> {
                 println!("Latest: {} (current: {})", cached.latest, brand::VERSION);
             }
             if !args.check && is_newer(&cached.latest, brand::VERSION) {
-                return do_update(&cached.latest, args.yes).await;
+                return do_update(&cached.latest, args.yes);
             } else if !args.check {
                 println!("lx is up to date ({})", brand::VERSION);
             }
@@ -36,7 +36,7 @@ pub async fn run(args: UpdateArgs) -> Result<()> {
     }
 
     println!("Checking for updates...");
-    let latest = fetch_latest_version().await?;
+    let latest = fetch_latest_version()?;
     cache_version(&latest);
 
     if args.check {
@@ -45,14 +45,14 @@ pub async fn run(args: UpdateArgs) -> Result<()> {
     }
 
     if is_newer(&latest, brand::VERSION) {
-        do_update(&latest, args.yes).await
+        do_update(&latest, args.yes)
     } else {
         println!("lx is up to date ({})", brand::VERSION);
         Ok(())
     }
 }
 
-async fn do_update(version: &str, yes: bool) -> Result<()> {
+fn do_update(version: &str, yes: bool) -> Result<()> {
     if !yes {
         print!("Update lx to {version}? [y/N] ");
         std::io::Write::flush(&mut std::io::stdout())?;
@@ -68,7 +68,7 @@ async fn do_update(version: &str, yes: bool) -> Result<()> {
     let url = format!("{}/releases/download/{version}/lx-{platform}", brand::REPO);
 
     println!("Downloading {version} for {platform}...");
-    let bytes = download(&url).await?;
+    let bytes = download(&url)?;
 
     // Verify checksum (placeholder — real impl fetches .sha256 and compares).
     verify_checksum(&bytes, version)?;
@@ -98,14 +98,14 @@ async fn do_update(version: &str, yes: bool) -> Result<()> {
     Ok(())
 }
 
-async fn fetch_latest_version() -> Result<String> {
+fn fetch_latest_version() -> Result<String> {
     // In a real implementation this calls the GitHub releases API.
     // For now return current version to avoid network calls in tests.
     // Real: GET https://api.github.com/repos/lynx-sh/lynx/releases/latest
     Ok(brand::VERSION.to_string())
 }
 
-async fn download(_url: &str) -> Result<Vec<u8>> {
+fn download(_url: &str) -> Result<Vec<u8>> {
     // Real: HTTP GET the binary URL.
     Err(LynxError::Shell("download not implemented — build from source or use the install script".into()).into())
 }

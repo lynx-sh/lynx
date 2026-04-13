@@ -30,7 +30,7 @@ fn parse_type(s: &str) -> Result<PackageType, String> {
     }
 }
 
-pub async fn run(args: BrowseArgs) -> Result<()> {
+pub fn run(args: BrowseArgs) -> Result<()> {
     let taps_path = paths::taps_config_path();
     let list = load_taps(&taps_path)?;
     let merged = merge_tap_indexes(&list)?;

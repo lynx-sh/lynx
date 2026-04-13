@@ -92,18 +92,17 @@ pub async fn run(args: CronArgs) -> Result<()> {
             on_fail,
             timeout,
             log,
-        } => cmd_add(name, run, cron, description, on_fail, timeout, log).await,
-        CronCommand::List => cmd_list().await,
-        CronCommand::Logs { name, tail, follow } => cmd_logs(name, tail, follow).await,
-        CronCommand::Disable { name } => cmd_set_enabled(name, false).await,
-        CronCommand::Enable { name } => cmd_set_enabled(name, true).await,
+        } => cmd_add(name, run, cron, description, on_fail, timeout, log),
+        CronCommand::List => cmd_list(),
+        CronCommand::Logs { name, tail, follow } => cmd_logs(name, tail, follow),
+        CronCommand::Disable { name } => cmd_set_enabled(name, false),
+        CronCommand::Enable { name } => cmd_set_enabled(name, true),
         CronCommand::Run { name } => cmd_run(name).await,
-        CronCommand::Remove { name } => cmd_remove(name).await,
+        CronCommand::Remove { name } => cmd_remove(name),
         CronCommand::Examples => {
             crate::commands::examples::run(crate::commands::examples::ExamplesArgs {
                 command: Some("cron".into()),
             })
-            .await
         }
         CronCommand::Other(args) => {
             Err(LynxError::unknown_command(args.first().map(|s| s.as_str()).unwrap_or(""), "cron").into())
@@ -146,7 +145,7 @@ fn send_signal(_pid: i32, _sig: i32) {}
 
 // ── subcommand implementations ───────────────────────────────────────────────
 
-async fn cmd_add(
+fn cmd_add(
     name: String,
     run: String,
     cron: String,
@@ -214,7 +213,7 @@ impl lynx_tui::ListItem for CronListEntry {
     fn is_active(&self) -> bool { self.enabled }
 }
 
-async fn cmd_list() -> Result<()> {
+fn cmd_list() -> Result<()> {
     let path = tasks_toml_path();
     let content = read_tasks_file(&path)?;
     let file = parse_tasks_file(&content)?;
@@ -240,7 +239,7 @@ async fn cmd_list() -> Result<()> {
     Ok(())
 }
 
-async fn cmd_logs(name: String, tail_n: usize, follow: bool) -> Result<()> {
+fn cmd_logs(name: String, tail_n: usize, follow: bool) -> Result<()> {
     let log_path = task_logs_dir().join(format!("{name}.jsonl"));
 
     if !log_path.exists() {
@@ -293,7 +292,7 @@ async fn cmd_logs(name: String, tail_n: usize, follow: bool) -> Result<()> {
     Ok(())
 }
 
-async fn cmd_set_enabled(name: String, enabled: bool) -> Result<()> {
+fn cmd_set_enabled(name: String, enabled: bool) -> Result<()> {
     let path = tasks_toml_path();
     let content = read_tasks_file(&path)?;
     let mut file = parse_tasks_file(&content)?;
@@ -357,7 +356,7 @@ async fn cmd_run(name: String) -> Result<()> {
     Ok(())
 }
 
-async fn cmd_remove(name: String) -> Result<()> {
+fn cmd_remove(name: String) -> Result<()> {
     let path = tasks_toml_path();
     let content = read_tasks_file(&path)?;
     let mut file = parse_tasks_file(&content)?;

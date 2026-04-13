@@ -11,7 +11,7 @@ pub struct RollbackArgs {
     pub last: bool,
 }
 
-pub async fn run(args: RollbackArgs) -> Result<()> {
+pub fn run(args: RollbackArgs) -> Result<()> {
     let snaps = list()?;
 
     if snaps.is_empty() {
@@ -62,7 +62,7 @@ mod tests {
         let args = RollbackArgs { last: false };
         // This may or may not error depending on whether list() finds snapshots.
         // At minimum it should not panic.
-        let _ = run(args).await;
+        let _ = run(args);
     }
 
     #[test]
