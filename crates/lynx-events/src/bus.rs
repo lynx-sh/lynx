@@ -31,7 +31,7 @@ impl EventBus {
         let boxed: AsyncHandler = Arc::new(move |ev| Box::pin(handler(ev)));
         self.handlers
             .lock()
-            .expect("event bus mutex poisoned")
+            .unwrap_or_else(|e| e.into_inner())
             .entry(event_name.to_string())
             .or_default()
             .push(boxed);
@@ -43,7 +43,7 @@ impl EventBus {
     /// Returns the number of handlers invoked.
     pub async fn emit(&self, event: Event) -> usize {
         let handlers: Vec<AsyncHandler> = {
-            let lock = self.handlers.lock().expect("event bus mutex poisoned");
+            let lock = self.handlers.lock().unwrap_or_else(|e| e.into_inner());
             match lock.get(&event.name) {
                 None => return 0,
                 Some(hs) => hs.clone(),
