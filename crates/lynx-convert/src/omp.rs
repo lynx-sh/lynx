@@ -140,7 +140,7 @@ pub fn parse(json: &str) -> Result<ConvertedTheme, String> {
         if block.block_type == "rprompt" {
             // Right prompt — map to top_right (OMP right prompts appear on same line).
             for seg in &block.segments {
-                theme.top_right.push(convert_segment(seg, &mut theme.palette, &mut palette_counter));
+                theme.top_right.push(convert_segment(seg, &mut theme.palette, &mut palette_counter, &mut theme.notes));
             }
             continue;
         }
@@ -159,12 +159,12 @@ pub fn parse(json: &str) -> Result<ConvertedTheme, String> {
             match block.alignment.as_str() {
                 "right" => {
                     for seg in &block.segments {
-                        theme.top_right.push(convert_segment(seg, &mut theme.palette, &mut palette_counter));
+                        theme.top_right.push(convert_segment(seg, &mut theme.palette, &mut palette_counter, &mut theme.notes));
                     }
                 }
                 _ => {
                     for seg in &block.segments {
-                        theme.top.push(convert_segment(seg, &mut theme.palette, &mut palette_counter));
+                        theme.top.push(convert_segment(seg, &mut theme.palette, &mut palette_counter, &mut theme.notes));
                     }
                 }
             }
@@ -172,20 +172,20 @@ pub fn parse(json: &str) -> Result<ConvertedTheme, String> {
             // Newline block — this is the input line (second line).
             theme.two_line = true;
             for seg in &block.segments {
-                theme.left.push(convert_segment(seg, &mut theme.palette, &mut palette_counter));
+                theme.left.push(convert_segment(seg, &mut theme.palette, &mut palette_counter, &mut theme.notes));
             }
         } else {
             // Subsequent blocks without newline — right-aligned on first line.
             match block.alignment.as_str() {
                 "right" => {
                     for seg in &block.segments {
-                        theme.top_right.push(convert_segment(seg, &mut theme.palette, &mut palette_counter));
+                        theme.top_right.push(convert_segment(seg, &mut theme.palette, &mut palette_counter, &mut theme.notes));
                     }
                 }
                 _ => {
                     // Additional left block — append to top.
                     for seg in &block.segments {
-                        theme.top.push(convert_segment(seg, &mut theme.palette, &mut palette_counter));
+                        theme.top.push(convert_segment(seg, &mut theme.palette, &mut palette_counter, &mut theme.notes));
                     }
                 }
             }
@@ -226,11 +226,11 @@ pub fn parse(json: &str) -> Result<ConvertedTheme, String> {
     Ok(theme)
 }
 
-#[allow(unused_variables)]
 fn convert_segment(
     seg: &OmpSegment,
     palette: &mut HashMap<String, String>,
     counter: &mut u32,
+    notes: &mut Vec<String>,
 ) -> ConvertedSegment {
     let name = map_segment_type(&seg.seg_type);
 
@@ -242,22 +242,22 @@ fn convert_segment(
         None
     };
 
-    // Extract separator chars based on style.
+    // Extract separator chars based on style, stripping any OMP color tags.
     let (leading_char, trailing_char) = match seg.style.as_str() {
         "diamond" => (
-            non_empty(&seg.leading_diamond),
-            non_empty(&seg.trailing_diamond),
+            non_empty(&strip_omp_tags(&seg.leading_diamond)),
+            non_empty(&strip_omp_tags(&seg.trailing_diamond)),
         ),
         "powerline" => (
             None,
-            non_empty(&seg.powerline_symbol),
+            non_empty(&strip_omp_tags(&seg.powerline_symbol)),
         ),
         _ => (None, None),
     };
 
     // Register colors in palette with semantic names.
-    let fg = resolve_omp_color(&seg.foreground, palette, counter);
-    let bg = resolve_omp_color(&seg.background, palette, counter);
+    let fg = resolve_omp_color(&seg.foreground, palette, counter, &seg.seg_type, "fg", notes);
+    let bg = resolve_omp_color(&seg.background, palette, counter, &seg.seg_type, "bg", notes);
 
     ConvertedSegment {
         name,
@@ -275,11 +275,13 @@ fn convert_segment(
 /// - Hex: "#RRGGBB"
 /// - Palette: "p:name"
 /// - Special: "transparent", "parentBackground", "parentForeground"
-#[allow(unused_variables)]
 fn resolve_omp_color(
     color: &str,
     palette: &mut HashMap<String, String>,
-    counter: &mut u32,
+    _counter: &mut u32,
+    seg_type: &str,
+    role: &str,
+    notes: &mut Vec<String>,
 ) -> Option<String> {
     let color = color.trim();
     if color.is_empty() {
@@ -299,10 +301,18 @@ fn resolve_omp_color(
         return Some(color.to_string());
     }
 
-    // Special OMP keywords
+    // Special OMP keywords — can't map these, add a note.
     match color {
         "transparent" | "parentBackground" | "parentForeground" |
-        "background" | "foreground" => None, // Can't map these meaningfully
+        "background" | "foreground" => {
+            let note = format!(
+                "{seg_type} segment uses '{color}' for {role} — needs manual color assignment"
+            );
+            if !notes.contains(&note) {
+                notes.push(note);
+            }
+            None
+        }
         _ => {
             // Named color — pass through (our color system handles names)
             Some(color.to_string())
@@ -408,9 +418,7 @@ fn extract_static_text(template: &str) -> String {
                 }
                 if j < chars.len() {
                     let tag: String = chars[i + 1..j].iter().collect();
-                    if tag.starts_with('#') || tag.starts_with('/') || tag == "parentBackground"
-                        || tag.starts_with("transparent") || tag.starts_with("p:")
-                    {
+                    if is_omp_color_tag(&tag) {
                         i = j + 1;
                         continue;
                     }
@@ -467,6 +475,52 @@ fn deduplicate_names(segments: &mut [ConvertedSegment]) {
             *idx += 1;
         }
     }
+}
+
+/// Strip OMP inline color tags from a string (e.g. "<transparent,background></>").
+/// Used for separator chars that may contain color wrappers.
+fn strip_omp_tags(s: &str) -> String {
+    let chars: Vec<char> = s.chars().collect();
+    let mut result = String::new();
+    let mut i = 0;
+    while i < chars.len() {
+        if chars[i] == '<' {
+            let mut j = i + 1;
+            while j < chars.len() && chars[j] != '>' {
+                j += 1;
+            }
+            if j < chars.len() {
+                let tag: String = chars[i + 1..j].iter().collect();
+                if is_omp_color_tag(&tag) {
+                    i = j + 1;
+                    continue;
+                }
+            }
+        }
+        result.push(chars[i]);
+        i += 1;
+    }
+    result
+}
+
+/// Check if a `<tag>` inside OMP templates is a color/style tag that should be stripped.
+fn is_omp_color_tag(tag: &str) -> bool {
+    tag.starts_with('#')                    // <#RRGGBB>
+        || tag.starts_with('/')             // </> (closing tag)
+        || tag.starts_with("p:")            // <p:palette_name>
+        || tag == "transparent"
+        || tag == "parentBackground"
+        || tag == "parentForeground"
+        || tag == "background"
+        || tag == "foreground"
+        || tag.starts_with("transparent,")  // <transparent,background>
+        || tag.starts_with("parentBackground,")
+        || tag.starts_with("parentForeground,")
+        || tag.starts_with("background,")
+        || tag.starts_with("foreground,")
+        || tag.contains(",transparent")     // <#hex,transparent>
+        || tag.contains(",parentBackground")
+        || tag.contains(",parentForeground")
 }
 
 fn non_empty(s: &str) -> Option<String> {
