@@ -14,8 +14,10 @@
 //! - Falls back to Tokyo Night defaults when colors are missing
 
 mod item;
+mod list;
 
-pub use item::{ListItem, ListAction, TuiColors};
+pub use item::{ListAction, ListItem, TuiColors};
+pub use list::{print_plain, run, show, ListResult};
 
 /// Default palette colors (Tokyo Night) — used when theme has no [colors] table.
 pub mod defaults {
