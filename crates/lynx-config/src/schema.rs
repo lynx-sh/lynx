@@ -41,6 +41,20 @@ pub struct UserPath {
     pub label: Option<String>,
 }
 
+/// Shell integration settings, stored under `[shell]` in `config.toml`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct ShellConfig {
+    /// When true, `lx init` emits collision-guarded shell function wrappers for a
+    /// curated set of safe lx subcommands (e.g. `theme`, `plugin`, `doctor`) so
+    /// users can omit the `lx` prefix in interactive sessions.
+    ///
+    /// Each wrapper is checked individually: if the name is already taken by a
+    /// function, command, or alias, that wrapper is skipped and a warning is printed.
+    /// Only active in interactive context. Default: false.
+    #[serde(default)]
+    pub bare_subcommands: bool,
+}
+
 /// Top-level user configuration, stored at `~/.config/lynx/config.toml`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LynxConfig {
@@ -60,6 +74,9 @@ pub struct LynxConfig {
     /// TUI display settings.
     #[serde(default)]
     pub tui: TuiConfig,
+    /// Shell integration settings.
+    #[serde(default)]
+    pub shell: ShellConfig,
     /// Set to true after the user completes `lx onboard`.
     /// Prevents `lx setup` from re-launching the wizard on subsequent runs.
     #[serde(default)]
@@ -138,6 +155,36 @@ mod tests {
         assert!(cfg.intro.active.is_none());
         assert!(cfg.tui.enabled);
         assert!(!cfg.onboarding_complete);
+        assert!(!cfg.shell.bare_subcommands);
+    }
+
+    #[test]
+    fn shell_config_default_bare_subcommands_false() {
+        let sc = ShellConfig::default();
+        assert!(!sc.bare_subcommands);
+    }
+
+    #[test]
+    fn shell_bare_subcommands_enabled_deserializes() {
+        let toml = "[shell]\nbare_subcommands = true\n";
+        let cfg: LynxConfig = toml::from_str(toml).unwrap();
+        assert!(cfg.shell.bare_subcommands);
+    }
+
+    #[test]
+    fn shell_bare_subcommands_roundtrip() {
+        let mut cfg = LynxConfig::default();
+        cfg.shell.bare_subcommands = true;
+        let toml_str = toml::to_string_pretty(&cfg).unwrap();
+        let back: LynxConfig = toml::from_str(&toml_str).unwrap();
+        assert!(back.shell.bare_subcommands);
+    }
+
+    #[test]
+    fn existing_config_without_shell_gets_false_default() {
+        let toml = "active_theme = \"nord\"\n";
+        let cfg: LynxConfig = toml::from_str(toml).unwrap();
+        assert!(!cfg.shell.bare_subcommands);
     }
 
     #[test]

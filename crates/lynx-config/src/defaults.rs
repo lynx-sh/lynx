@@ -1,4 +1,4 @@
-use crate::schema::{IntroConfig, LynxConfig, SyncConfig, TuiConfig, CURRENT_SCHEMA_VERSION};
+use crate::schema::{IntroConfig, LynxConfig, ShellConfig, SyncConfig, TuiConfig, CURRENT_SCHEMA_VERSION};
 use lynx_core::types::Context;
 
 impl Default for LynxConfig {
@@ -11,6 +11,7 @@ impl Default for LynxConfig {
             sync: SyncConfig { remote: None },
             intro: IntroConfig::default(),
             tui: TuiConfig::default(),
+            shell: ShellConfig::default(),
             onboarding_complete: false,
             aliases: vec![],
             paths: vec![],

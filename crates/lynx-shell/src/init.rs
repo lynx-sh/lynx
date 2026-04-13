@@ -35,6 +35,10 @@ pub struct InitParams<'a> {
     /// Added to `$fpath` so compinit finds it, plus conditional `compdef` for
     /// shells where compinit has already run (e.g. macOS /etc/zshrc).
     pub completions_zsh: Option<&'a str>,
+    /// When true, emit collision-guarded shell function wrappers for a curated set
+    /// of safe lx subcommands (theme, plugin, doctor, …) so users can omit `lx`.
+    /// Only honored in interactive context. Default: false.
+    pub bare_subcommands: bool,
 }
 
 /// Generate the zsh init script that the shell evals on startup.
@@ -200,6 +204,11 @@ pub fn generate_init_script(params: &InitParams<'_>) -> String {
         ));
     }
 
+    // Bare subcommand wrappers — opt-in, interactive only, per-name collision-guarded.
+    if params.bare_subcommands && *params.context == Context::Interactive {
+        out.push_str(&generate_bare_wrappers());
+    }
+
     // User-defined PATH entries — prepend regardless of context.
     for path in params.user_paths {
         out.push_str(&format!(
@@ -212,6 +221,46 @@ pub fn generate_init_script(params: &InitParams<'_>) -> String {
     out.push_str(&format!("  typeset -g {}=1\n", env_vars::LYNX_INITIALIZED));
     out.push_str("fi\n");
 
+    out
+}
+
+/// Safe lx subcommands exposed as bare shell functions when `bare_subcommands = true`.
+///
+/// Excluded intentionally:
+/// - `init`, `config`, `run`, `install`, `sync`, `update`, `uninstall`, `setup`,
+///   `event`, `migrate`, `path` — collide with common tools or are too generic
+/// - `alias` — zsh builtin
+/// - `jobs` — zsh builtin
+/// - `prompt`, `git-state`, `kubectl-state`, `refresh-state`, `completions` — internal plumbing
+const BARE_SUBCOMMANDS: &[&str] = &[
+    "theme",
+    "plugin",
+    "doctor",
+    "diag",
+    "intro",
+    "cron",
+    "daemon",
+    "rollback",
+    "context",
+    "benchmark",
+    "tap",
+    "browse",
+    "audit",
+    "dashboard",
+    "examples",
+];
+
+/// Generate per-function collision-guarded shell wrappers for the safe subcommand set.
+/// Each wrapper checks functions, commands, and aliases independently — a collision on
+/// one name never prevents others from being registered.
+fn generate_bare_wrappers() -> String {
+    let mut out = String::new();
+    out.push_str("  # bare subcommand wrappers (shell.bare_subcommands = true)\n");
+    for cmd in BARE_SUBCOMMANDS {
+        out.push_str(&format!(
+            "  if (( ! $+functions[{cmd}] )) && (( ! $+commands[{cmd}] )) && (( ! $+aliases[{cmd}] )); then\n    function {cmd} {{ lx {cmd} \"$@\" }}\n  else\n    print -u2 'lynx: bare command \\'{cmd}\\' skipped — name already in use'\n  fi\n",
+        ));
+    }
     out
 }
 
@@ -240,6 +289,7 @@ mod tests {
             user_paths: &[],
             editor: None,
             completions_zsh: None,
+            bare_subcommands: false,
         }
     }
 
@@ -431,6 +481,89 @@ mod tests {
             !script.contains("VISUAL="),
             "VISUAL must not appear when editor is not configured"
         );
+    }
+
+    #[test]
+    fn bare_subcommands_disabled_emits_no_wrappers() {
+        let mut params = base_params(&Context::Interactive, &[]);
+        params.bare_subcommands = false;
+        let script = generate_init_script(&params);
+        assert!(
+            !script.contains("bare subcommand wrappers"),
+            "wrappers must not appear when bare_subcommands = false"
+        );
+        assert!(
+            !script.contains("function theme"),
+            "theme wrapper must not appear when disabled"
+        );
+    }
+
+    #[test]
+    fn bare_subcommands_enabled_emits_wrappers_in_interactive() {
+        let mut params = base_params(&Context::Interactive, &[]);
+        params.bare_subcommands = true;
+        let script = generate_init_script(&params);
+        assert!(
+            script.contains("function theme"),
+            "theme wrapper must appear when enabled in interactive: {script}"
+        );
+        assert!(
+            script.contains("function plugin"),
+            "plugin wrapper must appear: {script}"
+        );
+        assert!(
+            script.contains("function doctor"),
+            "doctor wrapper must appear: {script}"
+        );
+        // Each wrapper must be collision-guarded
+        assert!(
+            script.contains("$+functions[theme]"),
+            "collision guard must check functions: {script}"
+        );
+        assert!(
+            script.contains("$+commands[theme]"),
+            "collision guard must check commands: {script}"
+        );
+        assert!(
+            script.contains("$+aliases[theme]"),
+            "collision guard must check aliases: {script}"
+        );
+    }
+
+    #[test]
+    fn bare_subcommands_not_emitted_in_agent_context() {
+        let mut params = base_params(&Context::Agent, &[]);
+        params.bare_subcommands = true;
+        let script = generate_init_script(&params);
+        assert!(
+            !script.contains("function theme"),
+            "bare wrappers must NOT appear in agent context"
+        );
+    }
+
+    #[test]
+    fn bare_subcommands_not_emitted_in_minimal_context() {
+        let mut params = base_params(&Context::Minimal, &[]);
+        params.bare_subcommands = true;
+        let script = generate_init_script(&params);
+        assert!(
+            !script.contains("function theme"),
+            "bare wrappers must NOT appear in minimal context"
+        );
+    }
+
+    #[test]
+    fn bare_wrappers_exclude_dangerous_subcommands() {
+        let mut params = base_params(&Context::Interactive, &[]);
+        params.bare_subcommands = true;
+        let script = generate_init_script(&params);
+        // These must never be exposed bare
+        for forbidden in &["function init ", "function config ", "function run ", "function install ", "function alias ", "function jobs "] {
+            assert!(
+                !script.contains(forbidden),
+                "forbidden bare command '{forbidden}' must not be emitted"
+            );
+        }
     }
 
     #[test]
