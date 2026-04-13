@@ -121,3 +121,76 @@ pub fn activate(name: &str, manifest: &PluginManifest, bus: Arc<EventBus>) -> Re
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn hook_event_name_known_hooks() {
+        assert_eq!(hook_event_name("chpwd"), "shell:chpwd");
+        assert_eq!(hook_event_name("precmd"), "shell:precmd");
+        assert_eq!(hook_event_name("preexec"), "shell:preexec");
+    }
+
+    #[test]
+    fn hook_event_name_unknown_prefixes_shell() {
+        assert_eq!(hook_event_name("custom_hook"), "shell:custom_hook");
+        assert_eq!(hook_event_name("zshaddhistory"), "shell:zshaddhistory");
+    }
+
+    #[test]
+    fn declare_empty_dir() {
+        let tmp = tempfile::tempdir().unwrap();
+        let reg = declare(tmp.path());
+        assert_eq!(reg.all().count(), 0);
+    }
+
+    #[test]
+    fn declare_nonexistent_dir() {
+        let reg = declare(std::path::Path::new("/nonexistent/plugins"));
+        assert_eq!(reg.all().count(), 0);
+    }
+
+    #[test]
+    fn declare_valid_plugin() {
+        let tmp = tempfile::tempdir().unwrap();
+        let plugin_dir = tmp.path().join("test-plugin");
+        std::fs::create_dir_all(&plugin_dir).unwrap();
+        std::fs::write(plugin_dir.join("plugin.toml"), r#"
+            [plugin]
+            name = "test-plugin"
+            version = "1.0.0"
+            [load]
+            [deps]
+            [exports]
+            [contexts]
+        "#).unwrap();
+
+        let reg = declare(tmp.path());
+        assert_eq!(reg.all().count(), 1);
+        let entry = reg.get("test-plugin").unwrap();
+        assert_eq!(entry.manifest.plugin.name, "test-plugin");
+        assert!(entry.plugin_dir.is_some());
+    }
+
+    #[test]
+    fn declare_skips_invalid_manifest() {
+        let tmp = tempfile::tempdir().unwrap();
+        let plugin_dir = tmp.path().join("bad");
+        std::fs::create_dir_all(&plugin_dir).unwrap();
+        std::fs::write(plugin_dir.join("plugin.toml"), "not valid toml {{{").unwrap();
+
+        let reg = declare(tmp.path());
+        assert_eq!(reg.all().count(), 0);
+    }
+
+    #[test]
+    fn declare_skips_dir_without_manifest() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(tmp.path().join("no-manifest")).unwrap();
+
+        let reg = declare(tmp.path());
+        assert_eq!(reg.all().count(), 0);
+    }
+}

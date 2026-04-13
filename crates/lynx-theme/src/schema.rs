@@ -160,3 +160,75 @@ pub struct SegmentOrder {
     #[serde(default)]
     pub order: Vec<String>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn separator_mode_default_is_static() {
+        let mode = SeparatorMode::default();
+        assert_eq!(mode, SeparatorMode::Static);
+    }
+
+    #[test]
+    fn separator_glyph_default() {
+        let g = SeparatorGlyph::default();
+        assert!(g.char.is_none());
+        assert!(g.color.is_none());
+        assert!(g.bg.is_none());
+    }
+
+    #[test]
+    fn separators_default() {
+        let s = Separators::default();
+        assert_eq!(s.mode, SeparatorMode::Static);
+    }
+
+    #[test]
+    fn segment_layout_default() {
+        let l = SegmentLayout::default();
+        assert!(l.left.order.is_empty());
+        assert!(l.right.order.is_empty());
+        assert!(l.top.order.is_empty());
+        assert!(l.top_right.order.is_empty());
+        assert!(!l.spacing);
+        assert!(l.filler.is_none());
+    }
+
+    #[test]
+    fn theme_meta_deserialize() {
+        let toml = r#"
+            name = "test"
+            description = "A test theme"
+            author = "me"
+        "#;
+        let meta: ThemeMeta = toml::from_str(toml).unwrap();
+        assert_eq!(meta.name, "test");
+        assert_eq!(meta.description, "A test theme");
+        assert_eq!(meta.author, "me");
+    }
+
+    #[test]
+    fn segment_order_default_empty() {
+        let so = SegmentOrder::default();
+        assert!(so.order.is_empty());
+    }
+
+    #[test]
+    fn transient_config_deserialize() {
+        let toml = "template = \"> \"\nfg = \"#fff\"\n";
+        let tc: TransientConfig = toml::from_str(toml).unwrap();
+        assert_eq!(tc.template, "> ");
+        assert_eq!(tc.fg.as_deref(), Some("#fff"));
+        assert!(tc.bg.is_none());
+    }
+
+    #[test]
+    fn filler_config_deserialize() {
+        let toml = "char = \"-\"\ncolor = \"#888\"\n";
+        let fc: FillerConfig = toml::from_str(toml).unwrap();
+        assert_eq!(fc.char, "-");
+        assert_eq!(fc.color.as_deref(), Some("#888"));
+    }
+}

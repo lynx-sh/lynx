@@ -154,3 +154,107 @@ impl AutoSuggestions {
         self.color.as_ref().map(|c| format!("fg={c}"))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn syntax_highlight_empty_returns_none() {
+        let sh = SyntaxHighlight::default();
+        assert!(sh.to_zsh_highlight_styles().is_none());
+    }
+
+    #[test]
+    fn syntax_highlight_single_field() {
+        let sh = SyntaxHighlight {
+            command: Some("#ff0000".into()),
+            ..Default::default()
+        };
+        let result = sh.to_zsh_highlight_styles().unwrap();
+        assert!(result.contains("ZSH_HIGHLIGHT_STYLES[command]='fg=#ff0000'"));
+    }
+
+    #[test]
+    fn syntax_highlight_string_maps_to_three_keys() {
+        let sh = SyntaxHighlight {
+            string: Some("#00ff00".into()),
+            ..Default::default()
+        };
+        let result = sh.to_zsh_highlight_styles().unwrap();
+        assert!(result.contains("single-quoted-argument"));
+        assert!(result.contains("double-quoted-argument"));
+        assert!(result.contains("dollar-quoted-argument"));
+    }
+
+    #[test]
+    fn syntax_highlight_option_maps_to_both_hyphen_types() {
+        let sh = SyntaxHighlight {
+            option: Some("#aabbcc".into()),
+            ..Default::default()
+        };
+        let result = sh.to_zsh_highlight_styles().unwrap();
+        assert!(result.contains("single-hyphen-option"));
+        assert!(result.contains("double-hyphen-option"));
+    }
+
+    #[test]
+    fn syntax_highlight_multiple_fields() {
+        let sh = SyntaxHighlight {
+            command: Some("#111".into()),
+            builtin: Some("#222".into()),
+            path: Some("#333".into()),
+            ..Default::default()
+        };
+        let result = sh.to_zsh_highlight_styles().unwrap();
+        let lines: Vec<&str> = result.lines().collect();
+        assert!(lines.len() >= 3);
+    }
+
+    #[test]
+    fn autosuggest_none_returns_none() {
+        let a = AutoSuggestions::default();
+        assert!(a.to_autosuggest_style().is_none());
+    }
+
+    #[test]
+    fn autosuggest_with_color() {
+        let a = AutoSuggestions {
+            color: Some("#565f89".into()),
+        };
+        assert_eq!(a.to_autosuggest_style().unwrap(), "fg=#565f89");
+    }
+
+    #[test]
+    fn ls_colors_entry_default() {
+        let e = LsColorsEntry::default();
+        assert!(e.fg.is_none());
+        assert!(e.bg.is_none());
+        assert!(!e.bold);
+    }
+
+    #[test]
+    fn eza_columns_default() {
+        let c = EzaColumns::default();
+        assert!(c.date.is_none());
+        assert!(c.size_number.is_none());
+    }
+
+    #[test]
+    fn ls_colors_default_has_empty_extensions() {
+        let lc = LsColors::default();
+        assert!(lc.extensions.is_empty());
+    }
+
+    #[test]
+    fn syntax_highlight_toml_roundtrip() {
+        let sh = SyntaxHighlight {
+            command: Some("#ff0000".into()),
+            unknown: Some("#ff4444".into()),
+            ..Default::default()
+        };
+        let toml_str = toml::to_string(&sh).unwrap();
+        let back: SyntaxHighlight = toml::from_str(&toml_str).unwrap();
+        assert_eq!(sh, back);
+    }
+}

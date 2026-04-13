@@ -45,3 +45,58 @@ impl Event {
         Self::new(name, "")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn event_new_sets_fields() {
+        let e = Event::new("shell:chpwd", "/home");
+        assert_eq!(e.name, "shell:chpwd");
+        assert_eq!(e.data, "/home");
+    }
+
+    #[test]
+    fn event_named_empty_data() {
+        let e = Event::named("plugin:loaded");
+        assert_eq!(e.name, "plugin:loaded");
+        assert!(e.data.is_empty());
+    }
+
+    #[test]
+    fn event_new_from_string() {
+        let e = Event::new(String::from("test"), String::from("payload"));
+        assert_eq!(e.name, "test");
+        assert_eq!(e.data, "payload");
+    }
+
+    #[test]
+    fn well_known_event_names_are_namespaced() {
+        let names = [
+            SHELL_CHPWD, SHELL_PREEXEC, SHELL_PRECMD, SHELL_CONTEXT_CHANGED,
+            CONFIG_CHANGED, THEME_CHANGED,
+            PLUGIN_LOADED, PLUGIN_UNLOADED, PLUGIN_FAILED,
+            GIT_BRANCH_CHANGED, GIT_STATE_UPDATED,
+            TASK_COMPLETED, TASK_FAILED,
+        ];
+        for name in &names {
+            assert!(name.contains(':'), "event name should be namespaced: {name}");
+        }
+    }
+
+    #[test]
+    fn no_duplicate_event_names() {
+        let names = [
+            SHELL_CHPWD, SHELL_PREEXEC, SHELL_PRECMD, SHELL_CONTEXT_CHANGED,
+            CONFIG_CHANGED, THEME_CHANGED,
+            PLUGIN_LOADED, PLUGIN_UNLOADED, PLUGIN_FAILED,
+            GIT_BRANCH_CHANGED, GIT_STATE_UPDATED,
+            TASK_COMPLETED, TASK_FAILED,
+        ];
+        let mut seen = std::collections::HashSet::new();
+        for name in &names {
+            assert!(seen.insert(name), "duplicate event name: {name}");
+        }
+    }
+}

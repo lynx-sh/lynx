@@ -121,3 +121,119 @@ pub struct StateConfig {
     #[serde(default)]
     pub gather: Option<String>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn minimal_manifest_deserialize() {
+        let toml = r#"
+            [plugin]
+            name = "test"
+            version = "1.0.0"
+        "#;
+        let m: PluginManifest = toml::from_str(toml).unwrap();
+        assert_eq!(m.plugin.name, "test");
+        assert_eq!(m.plugin.version, "1.0.0");
+        assert!(!m.load.lazy);
+        assert!(m.load.hooks.is_empty());
+        assert!(m.deps.binaries.is_empty());
+        assert!(m.exports.functions.is_empty());
+        assert!(m.contexts.disabled_in.is_empty());
+        assert!(m.state.gather.is_none());
+        assert!(!m.shell.zle_hook);
+    }
+
+    #[test]
+    fn full_manifest_deserialize() {
+        let toml = r#"
+            schema_version = 1
+            [plugin]
+            name = "git"
+            version = "2.0.0"
+            description = "Git integration"
+            authors = ["Alice", "Bob"]
+
+            [load]
+            lazy = true
+            hooks = ["chpwd", "precmd"]
+
+            [deps]
+            binaries = ["git"]
+            plugins = ["core"]
+
+            [exports]
+            functions = ["git_status", "git_branch"]
+            aliases = ["gs", "gb"]
+
+            [contexts]
+            disabled_in = ["agent", "minimal"]
+
+            [state]
+            gather = "git-state gather"
+
+            [shell]
+            fpath = ["completions"]
+            widgets = ["my-widget"]
+            zle_hook = true
+
+            [[shell.keybindings]]
+            key = "^F"
+            widget = "my-widget"
+        "#;
+        let m: PluginManifest = toml::from_str(toml).unwrap();
+        assert_eq!(m.schema_version, 1);
+        assert_eq!(m.plugin.name, "git");
+        assert_eq!(m.plugin.authors, vec!["Alice", "Bob"]);
+        assert!(m.load.lazy);
+        assert_eq!(m.load.hooks, vec!["chpwd", "precmd"]);
+        assert_eq!(m.deps.binaries, vec!["git"]);
+        assert_eq!(m.deps.plugins, vec!["core"]);
+        assert_eq!(m.exports.functions, vec!["git_status", "git_branch"]);
+        assert_eq!(m.exports.aliases, vec!["gs", "gb"]);
+        assert_eq!(m.contexts.disabled_in, vec!["agent", "minimal"]);
+        assert_eq!(m.state.gather.as_deref(), Some("git-state gather"));
+        assert!(m.shell.zle_hook);
+        assert_eq!(m.shell.fpath, vec!["completions"]);
+        assert_eq!(m.shell.widgets, vec!["my-widget"]);
+        assert_eq!(m.shell.keybindings.len(), 1);
+        assert_eq!(m.shell.keybindings[0].key, "^F");
+    }
+
+    #[test]
+    fn manifest_serialize_roundtrip() {
+        let m = PluginManifest {
+            schema_version: 1,
+            plugin: PluginMeta {
+                name: "test".into(),
+                version: "1.0.0".into(),
+                description: "desc".into(),
+                authors: vec!["a".into()],
+            },
+            load: LoadConfig { lazy: false, hooks: vec![] },
+            deps: DepsConfig::default(),
+            exports: ExportsConfig { functions: vec!["f".into()], aliases: vec![] },
+            contexts: ContextsConfig { disabled_in: vec!["agent".into()] },
+            state: StateConfig::default(),
+            shell: ShellConfig::default(),
+        };
+        let toml_str = toml::to_string_pretty(&m).unwrap();
+        let back: PluginManifest = toml::from_str(&toml_str).unwrap();
+        assert_eq!(m, back);
+    }
+
+    #[test]
+    fn default_schema_version_is_current() {
+        assert_eq!(default_schema_version(), CURRENT_SCHEMA_VERSION);
+    }
+
+    #[test]
+    fn shell_config_default() {
+        let sc = ShellConfig::default();
+        assert!(sc.fpath.is_empty());
+        assert!(sc.widgets.is_empty());
+        assert!(sc.keybindings.is_empty());
+        assert!(!sc.zle_hook);
+    }
+}

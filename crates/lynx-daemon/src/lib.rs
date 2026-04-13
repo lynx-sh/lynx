@@ -42,3 +42,30 @@ pub fn platform_backend() -> Box<dyn ServiceBackend> {
     #[cfg(not(any(target_os = "macos", target_os = "linux")))]
     panic!("Lynx daemon: unsupported platform");
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn service_status_display() {
+        assert_eq!(ServiceStatus::Running.to_string(), "running");
+        assert_eq!(ServiceStatus::Stopped.to_string(), "stopped");
+        assert_eq!(
+            ServiceStatus::Unknown("something".into()).to_string(),
+            "unknown (something)"
+        );
+    }
+
+    #[test]
+    fn service_status_eq() {
+        assert_eq!(ServiceStatus::Running, ServiceStatus::Running);
+        assert_ne!(ServiceStatus::Running, ServiceStatus::Stopped);
+    }
+
+    #[test]
+    fn platform_backend_returns_backend() {
+        // Should not panic on supported platforms
+        let _backend = platform_backend();
+    }
+}
