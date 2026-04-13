@@ -1,4 +1,5 @@
-use anyhow::{anyhow, Result};
+use anyhow::Result;
+use lynx_core::error::LynxError;
 use clap::{Args, Subcommand};
 use lynx_core::brand;
 use lynx_core::runtime::{pid_file, socket_path};
@@ -87,7 +88,7 @@ pub async fn run(args: DaemonArgs) -> Result<()> {
             if !is_running()? {
                 println!("✓ lynx-daemon stopped");
             } else {
-                return Err(anyhow!("failed to stop lynx-daemon"));
+                return Err(LynxError::Daemon("failed to stop lynx-daemon".into()).into());
             }
         }
         DaemonCommand::Restart => {
@@ -111,7 +112,7 @@ pub async fn run(args: DaemonArgs) -> Result<()> {
             println!("✓ lynx-daemon removed");
         }
         DaemonCommand::Other(args) => {
-            return Err(anyhow!("unknown daemon command '{}' — run `lx daemon` for help", args.first().map(|s| s.as_str()).unwrap_or("")));
+            return Err(LynxError::unknown_command(args.first().map(|s| s.as_str()).unwrap_or(""), "daemon").into());
         }
     }
 
@@ -154,7 +155,7 @@ fn start_detached() -> Result<()> {
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()
-        .map_err(|e| anyhow!("failed to spawn lynx-daemon: {e}"))?;
+        .map_err(|e| anyhow::Error::from(LynxError::Daemon(format!("failed to spawn lynx-daemon: {e}"))))?;
 
     Ok(())
 }
@@ -180,7 +181,7 @@ fn stop_detached() -> Result<bool> {
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status()
-        .map_err(|e| anyhow!("failed to signal lynx-daemon: {e}"))?;
+        .map_err(|e| anyhow::Error::from(LynxError::Daemon(format!("failed to signal lynx-daemon: {e}"))))?;
 
     if !status.success() {
         return Ok(false);
@@ -217,7 +218,7 @@ fn daemon_binary_path() -> Result<PathBuf> {
         }
     }
 
-    Err(anyhow!(
-        "lynx-daemon binary not found; install Lynx daemon or set LYNX_DAEMON_BIN"
-    ))
+    Err(LynxError::Daemon(
+        "lynx-daemon binary not found; install Lynx daemon or set LYNX_DAEMON_BIN".into()
+    ).into())
 }

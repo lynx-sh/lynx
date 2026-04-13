@@ -75,7 +75,11 @@ pub(super) async fn cmd_info(name: &str) -> Result<()> {
     let idx = tokio::task::spawn_blocking(|| get_index(false, None)).await??;
     let entry = idx
         .find(name)
-        .ok_or_else(|| anyhow::anyhow!("plugin '{name}' not found in registry"))?;
+        .ok_or_else(|| anyhow::Error::from(lynx_core::error::LynxError::NotFound {
+            item_type: "Plugin".into(),
+            name: name.to_string(),
+            hint: "run `lx browse` to see available packages".into(),
+        }))?;
 
     let lock = load_lock().unwrap_or_default();
     let installed = lock.find(name);
@@ -124,7 +128,7 @@ pub(super) async fn cmd_update(name: Option<&str>, all: bool) -> Result<()> {
         return Ok(());
     }
 
-    let name = name.ok_or_else(|| anyhow::anyhow!("provide a plugin name or use --all"))?;
+    let name = name.ok_or_else(|| anyhow::Error::from(lynx_core::error::LynxError::Plugin("provide a plugin name or use --all".into())))?;
     update_one(name).await
 }
 
@@ -199,7 +203,7 @@ fn verify_installed_plugin_checksum(
         .installed_checksum_sha256
         .as_ref()
         .or(Some(&locked.checksum_sha256))
-        .ok_or_else(|| anyhow::anyhow!("no checksum recorded for '{}'", name))?
+        .ok_or_else(|| anyhow::Error::from(lynx_core::error::LynxError::Plugin(format!("no checksum recorded for '{name}'"))))?
         .to_string();
 
     let plugin_dir = plugins_install_dir().join(name);

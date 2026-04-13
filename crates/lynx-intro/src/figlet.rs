@@ -27,56 +27,56 @@ pub fn render_ascii(font: &str, text: &str) -> anyhow::Result<String> {
     let figure_str = match font {
         "standard" => {
             let f = FIGlet::standard()
-                .map_err(|e| anyhow::anyhow!("figlet: failed to load font '{}': {}", font, e))?;
+                .map_err(|e| anyhow::Error::from(lynx_core::error::LynxError::Theme(format!("figlet: failed to load font '{font}': {e}"))))?;
             convert_figlet(&f, text, font)?
         }
         "slant" => {
             let f = FIGlet::slant()
-                .map_err(|e| anyhow::anyhow!("figlet: failed to load font '{}': {}", font, e))?;
+                .map_err(|e| anyhow::Error::from(lynx_core::error::LynxError::Theme(format!("figlet: failed to load font '{font}': {e}"))))?;
             convert_figlet(&f, text, font)?
         }
         "small" => {
             let f = FIGlet::small()
-                .map_err(|e| anyhow::anyhow!("figlet: failed to load font '{}': {}", font, e))?;
+                .map_err(|e| anyhow::Error::from(lynx_core::error::LynxError::Theme(format!("figlet: failed to load font '{font}': {e}"))))?;
             convert_figlet(&f, text, font)?
         }
         "big" => {
             let f = FIGlet::big()
-                .map_err(|e| anyhow::anyhow!("figlet: failed to load font '{}': {}", font, e))?;
+                .map_err(|e| anyhow::Error::from(lynx_core::error::LynxError::Theme(format!("figlet: failed to load font '{font}': {e}"))))?;
             convert_figlet(&f, text, font)?
         }
         "block" => {
             let f = Toilet::smblock()
-                .map_err(|e| anyhow::anyhow!("figlet: failed to load font '{}': {}", font, e))?;
+                .map_err(|e| anyhow::Error::from(lynx_core::error::LynxError::Theme(format!("figlet: failed to load font '{font}': {e}"))))?;
             convert_toilet(&f, text, font)?
         }
         "future" => {
             let f = Toilet::future()
-                .map_err(|e| anyhow::anyhow!("figlet: failed to load font '{}': {}", font, e))?;
+                .map_err(|e| anyhow::Error::from(lynx_core::error::LynxError::Theme(format!("figlet: failed to load font '{font}': {e}"))))?;
             convert_toilet(&f, text, font)?
         }
         "wideterm" => {
             let f = Toilet::wideterm()
-                .map_err(|e| anyhow::anyhow!("figlet: failed to load font '{}': {}", font, e))?;
+                .map_err(|e| anyhow::Error::from(lynx_core::error::LynxError::Theme(format!("figlet: failed to load font '{font}': {e}"))))?;
             convert_toilet(&f, text, font)?
         }
         "mono12" => {
             let f = Toilet::mono12()
-                .map_err(|e| anyhow::anyhow!("figlet: failed to load font '{}': {}", font, e))?;
+                .map_err(|e| anyhow::Error::from(lynx_core::error::LynxError::Theme(format!("figlet: failed to load font '{font}': {e}"))))?;
             convert_toilet(&f, text, font)?
         }
         "mono9" => {
             let f = Toilet::mono9()
-                .map_err(|e| anyhow::anyhow!("figlet: failed to load font '{}': {}", font, e))?;
+                .map_err(|e| anyhow::Error::from(lynx_core::error::LynxError::Theme(format!("figlet: failed to load font '{font}': {e}"))))?;
             convert_toilet(&f, text, font)?
         }
         unknown => {
             let available = BUNDLED_FONTS.join(", ");
-            anyhow::bail!(
-                "figlet: unknown font '{}'. Available fonts: {}",
-                unknown,
-                available
-            );
+            return Err(lynx_core::error::LynxError::NotFound {
+                item_type: "Font".into(),
+                name: unknown.to_string(),
+                hint: format!("available fonts: {available}"),
+            }.into());
         }
     };
     Ok(figure_str)
@@ -86,11 +86,9 @@ fn convert_figlet(font: &FIGlet, text: &str, font_name: &str) -> anyhow::Result<
     font.convert(text)
         .map(|fig| fig.as_str().to_string())
         .ok_or_else(|| {
-            anyhow::anyhow!(
-                "figlet: font '{}' could not render '{}' (no renderable characters)",
-                font_name,
-                text
-            )
+            anyhow::Error::from(lynx_core::error::LynxError::Theme(format!(
+                "figlet: font '{font_name}' could not render '{text}' (no renderable characters)"
+            )))
         })
 }
 
@@ -98,11 +96,9 @@ fn convert_toilet(font: &Toilet, text: &str, font_name: &str) -> anyhow::Result<
     font.convert(text)
         .map(|fig| fig.as_str().to_string())
         .ok_or_else(|| {
-            anyhow::anyhow!(
-                "figlet: font '{}' could not render '{}' (no renderable characters)",
-                font_name,
-                text
-            )
+            anyhow::Error::from(lynx_core::error::LynxError::Theme(format!(
+                "figlet: font '{font_name}' could not render '{text}' (no renderable characters)"
+            )))
         })
 }
 

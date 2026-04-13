@@ -43,7 +43,7 @@ pub fn user_intro_dir() -> PathBuf {
 pub fn load_user(slug: &str) -> Result<Intro> {
     // Slug must be a plain identifier — no path traversal.
     if slug.contains('/') || slug.contains('\\') || slug.contains("..") {
-        anyhow::bail!("invalid intro slug '{}': must not contain path separators", slug);
+        return Err(lynx_core::error::LynxError::Theme(format!("invalid intro slug '{slug}': must not contain path separators")).into());
     }
     let path = user_intro_dir().join(format!("{slug}.toml"));
     let content = std::fs::read_to_string(&path)
@@ -56,7 +56,7 @@ pub fn load_user(slug: &str) -> Result<Intro> {
 pub fn load(slug: &str) -> Result<Intro> {
     // Slug must be a plain identifier.
     if slug.contains('/') || slug.contains('\\') || slug.contains("..") {
-        anyhow::bail!("invalid intro slug '{}': must not contain path separators", slug);
+        return Err(lynx_core::error::LynxError::Theme(format!("invalid intro slug '{slug}': must not contain path separators")).into());
     }
 
     // User intro overrides built-in.
@@ -66,7 +66,11 @@ pub fn load(slug: &str) -> Result<Intro> {
     }
 
     load_builtin(slug)
-        .ok_or_else(|| anyhow::anyhow!("intro '{}' not found (checked user dir and built-ins)", slug))
+        .ok_or_else(|| anyhow::Error::from(lynx_core::error::LynxError::NotFound {
+            item_type: "Intro".into(),
+            name: slug.to_string(),
+            hint: "run `lx intro list` to see available intros".into(),
+        }))
 }
 
 /// List all available intros: user intros first, then built-ins not shadowed by a user intro.
