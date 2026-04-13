@@ -124,11 +124,12 @@ fn cmd_get(key: &str) -> Result<()> {
         "active_context" => format!("{:?}", cfg.active_context).to_lowercase(),
         "schema_version" => cfg.schema_version.to_string(),
         "sync.remote" => cfg.sync.remote.unwrap_or_default(),
+        "tui.enabled" => cfg.tui.enabled.to_string(),
         other => {
             return Err(LynxError::NotFound {
                 item_type: "Config key".into(),
                 name: other.into(),
-                hint: "known keys: active_theme, active_context, schema_version, sync.remote"
+                hint: "known keys: active_theme, active_context, schema_version, sync.remote, tui.enabled"
                     .into(),
             }
             .into())
@@ -165,6 +166,17 @@ fn cmd_set(key: &str, value: &str) -> Result<()> {
                     None
                 } else {
                     Some(value.to_string())
+                };
+            }
+            "tui.enabled" => {
+                cfg.tui.enabled = match value {
+                    "true" | "1" | "yes" => true,
+                    "false" | "0" | "no" => false,
+                    other => {
+                        return Err(lynx_core::error::LynxError::Config(format!(
+                            "invalid value '{other}' for tui.enabled — use true or false"
+                        )))
+                    }
                 };
             }
             other => {
