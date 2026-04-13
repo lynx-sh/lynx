@@ -81,4 +81,8 @@ pub enum Command {
     Run(crate::commands::run::RunArgs),
     /// Interactive first-run setup wizard — pick theme, plugins, shell integration
     Onboard(crate::commands::onboard::OnboardArgs),
+    /// Manage user-defined aliases
+    Alias(crate::commands::alias::AliasArgs),
+    /// Manage user-defined PATH entries
+    Path(crate::commands::path::PathArgs),
 }

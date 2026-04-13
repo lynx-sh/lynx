@@ -1,3 +1,4 @@
+pub mod alias;
 pub mod audit;
 pub mod benchmark;
 pub mod browse;
@@ -20,6 +21,7 @@ pub mod kubectl_state;
 pub mod migrate;
 pub mod nerd_font;
 pub mod onboard;
+pub mod path;
 pub mod plugin;
 pub mod prompt;
 pub mod refresh_state;
@@ -108,6 +110,8 @@ pub async fn dispatch(cli: Cli) -> Result<()> {
         Command::Jobs(args) => jobs::run(args),
         Command::Run(args) => run::run(args).await,
         Command::Onboard(args) => onboard::run(args),
+        Command::Alias(args) => alias::run(args),
+        Command::Path(args) => path::run(args),
     }
 }
 
