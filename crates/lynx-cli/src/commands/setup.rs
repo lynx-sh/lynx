@@ -22,13 +22,13 @@ pub struct SetupArgs {
 }
 
 pub fn run(args: SetupArgs) -> Result<()> {
-    let home = home_dir()?;
+    let home = lynx_core::paths::home();
 
     let lynx_dir: PathBuf = args
         .dir
         .as_deref()
         .map(PathBuf::from)
-        .unwrap_or_else(|| home.join(brand::CONFIG_DIR));
+        .unwrap_or_else(lynx_core::paths::lynx_dir);
 
     let source_dir = resolve_source_dir(args.source.as_deref())?;
 
@@ -254,11 +254,6 @@ enabled = true
 "#
 }
 
-fn home_dir() -> Result<PathBuf> {
-    std::env::var_os("HOME").map(PathBuf::from).ok_or_else(|| {
-        anyhow::Error::from(lynx_core::error::LynxError::Shell("$HOME not set".into()))
-    })
-}
 
 #[cfg(test)]
 mod tests {

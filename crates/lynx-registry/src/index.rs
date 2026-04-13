@@ -4,8 +4,6 @@ use anyhow::{Context, Result};
 use lynx_core::error::LynxError;
 use tracing::debug;
 
-use lynx_core::brand;
-
 use crate::lock::LockFile;
 use crate::schema::RegistryIndex;
 
@@ -15,24 +13,17 @@ pub const DEFAULT_INDEX_URL: &str =
 
 /// Path to the local cached index: `~/.config/lynx/registry/index.toml`.
 pub fn index_cache_path() -> PathBuf {
-    config_base().join("registry").join("index.toml")
+    lynx_core::paths::registry_cache_dir().join("index.toml")
 }
 
 /// Path to lynx.lock: `~/.config/lynx/lynx.lock`.
 pub fn lock_path() -> PathBuf {
-    config_base().join("lynx.lock")
+    lynx_core::paths::lynx_lock_path()
 }
 
 /// Path to the installed plugins dir: `~/.config/lynx/plugins/`.
 pub fn plugins_install_dir() -> PathBuf {
     lynx_core::paths::installed_plugins_dir()
-}
-
-fn config_base() -> PathBuf {
-    let home = std::env::var_os("HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("."));
-    home.join(brand::CONFIG_DIR)
 }
 
 // ── Index I/O ─────────────────────────────────────────────────────────────────

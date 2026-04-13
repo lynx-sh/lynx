@@ -62,13 +62,12 @@ pub(crate) fn gather_kubectl_state() -> KubectlState {
     }
 
     // Bail if no kubeconfig exists
-    let home = std::env::var("HOME").unwrap_or_default();
     let kubeconfig_env = std::env::var("KUBECONFIG").ok();
-    let default_kube = format!("{home}/.kube/config");
+    let default_kube = lynx_core::paths::home().join(".kube/config");
     let has_config = kubeconfig_env
         .as_deref()
         .map(|p| std::path::Path::new(p).exists())
-        .unwrap_or_else(|| std::path::Path::new(&default_kube).exists());
+        .unwrap_or_else(|| default_kube.exists());
 
     if !has_config {
         return KubectlState {

@@ -91,18 +91,14 @@ fn toml_value_has_nerd_glyphs(value: &toml::Value) -> bool {
 /// On macOS, queries the font system for real PostScript names.
 /// Falls back to filename-based extraction on other platforms.
 pub fn find_installed_nerd_fonts() -> Vec<String> {
-    let home = std::env::var_os("HOME").map(PathBuf::from);
+    let home = lynx_core::paths::home();
     let font_dirs: Vec<PathBuf> = {
         let mut dirs = Vec::new();
-        if let Some(ref h) = home {
-            dirs.push(h.join("Library/Fonts"));
-        }
+        dirs.push(home.join("Library/Fonts"));
         dirs.push("/Library/Fonts".into());
         dirs.push("/System/Library/Fonts".into());
-        if let Some(ref h) = home {
-            dirs.push(h.join(".local/share/fonts"));
-            dirs.push(h.join(".fonts"));
-        }
+        dirs.push(home.join(".local/share/fonts"));
+        dirs.push(home.join(".fonts"));
         dirs.push("/usr/share/fonts".into());
         dirs.push("/usr/local/share/fonts".into());
         dirs
@@ -292,17 +288,15 @@ pub fn configure_iterm2_font(font_family: &str, size: u32) -> Result<()> {
     let font_value = format!("{font_family}-Regular {size}");
 
     // Use PlistBuddy to update the Default profile's font.
-    let plist = format!(
-        "{}/Library/Preferences/com.googlecode.iterm2.plist",
-        std::env::var("HOME").context("HOME not set")?
-    );
+    let plist = lynx_core::paths::home()
+        .join("Library/Preferences/com.googlecode.iterm2.plist");
 
     // Update Normal Font in the first (default) profile.
     let status = Command::new("/usr/libexec/PlistBuddy")
         .args([
             "-c",
             &format!("Set ':New Bookmarks':0:'Normal Font' '{font_value}'"),
-            &plist,
+            plist.to_str().unwrap_or_default(),
         ])
         .status()
         .context("failed to run PlistBuddy")?;
@@ -341,11 +335,9 @@ pub fn install_nerd_font() -> Result<String> {
         .context("failed to read font download")?;
 
     let font_dir = if cfg!(target_os = "macos") {
-        let home = std::env::var("HOME").context("HOME not set")?;
-        PathBuf::from(home).join("Library/Fonts")
+        lynx_core::paths::home().join("Library/Fonts")
     } else {
-        let home = std::env::var("HOME").context("HOME not set")?;
-        PathBuf::from(home).join(".local/share/fonts")
+        lynx_core::paths::home().join(".local/share/fonts")
     };
     std::fs::create_dir_all(&font_dir)?;
 

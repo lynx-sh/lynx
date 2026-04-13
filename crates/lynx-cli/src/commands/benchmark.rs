@@ -4,7 +4,6 @@ use std::time::{Duration, Instant};
 use anyhow::Result;
 use clap::Args;
 
-use lynx_core::brand;
 use lynx_core::env_vars;
 
 #[derive(Args)]
@@ -182,10 +181,7 @@ fn save_benchmark(results: &[BenchResult]) -> Result<()> {
 }
 
 fn benchmark_path() -> PathBuf {
-    let home = std::env::var_os("HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("."));
-    home.join(brand::CONFIG_DIR).join("benchmarks.jsonl")
+    lynx_core::paths::benchmarks_log_file()
 }
 
 #[cfg(test)]
