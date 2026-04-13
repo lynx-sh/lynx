@@ -148,6 +148,24 @@ lx prompt render
 
 ---
 
+## Workflow Execution (`lx run`)
+
+`lx run` uses a single shared execution pipeline in `lynx-workflow`.
+Streaming is optional and only enabled for live consumers (for example TUI/event viewers).
+
+```
+execute_workflow(...)                // non-streaming path
+  └── execute_workflow_impl(..., None)
+
+execute_workflow_streaming(..., tx)  // streaming path
+  └── execute_workflow_impl(..., Some(tx))
+```
+
+Both paths share the same step scheduling, retry/timeout handling, abort rules,
+and result assembly. The only difference is whether `StreamEvent` messages are emitted.
+
+---
+
 ## Config Mutation Protocol
 
 Every command that mutates config must follow this sequence. Skipping any step
