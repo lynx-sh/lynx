@@ -140,12 +140,11 @@ async fn cmd_set(name: &str) -> Result<()> {
     let theme = load_theme(name).with_context(|| format!("theme '{name}' not found"))?;
 
     // Check if theme uses powerline/nerd font glyphs.
-    if super::nerd_font::theme_needs_nerd_font(&theme) {
-        if !ensure_nerd_font_ready()? {
+    if super::nerd_font::theme_needs_nerd_font(&theme)
+        && !ensure_nerd_font_ready()? {
             println!("theme not changed");
             return Ok(());
         }
-    }
 
     mutate_config_transaction(&format!("theme-set-{name}"), |cfg| {
         cfg.active_theme = name.to_string();

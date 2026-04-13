@@ -62,7 +62,7 @@ pub fn theme_needs_nerd_font(theme: &lynx_theme::Theme) -> bool {
     }
 
     // 4. Per-segment config — scan all string values recursively.
-    for (_name, value) in &theme.segment {
+    for value in theme.segment.values() {
         if toml_value_has_nerd_glyphs(value) {
             return true;
         }

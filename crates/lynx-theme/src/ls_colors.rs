@@ -218,13 +218,13 @@ fn bsd_pair(entry: Option<&LsColorsEntry>) -> String {
     let fg = e
         .fg
         .as_deref()
-        .and_then(|c| resolve_color_rgb(c))
+        .and_then(resolve_color_rgb)
         .map(|(r, g, b)| rgb_to_bsd_char(r, g, b, e.bold))
         .unwrap_or('x');
     let bg = e
         .bg
         .as_deref()
-        .and_then(|c| resolve_color_rgb(c))
+        .and_then(resolve_color_rgb)
         .map(|(r, g, b)| rgb_to_bsd_char(r, g, b, false))
         .unwrap_or('x');
     format!("{fg}{bg}")

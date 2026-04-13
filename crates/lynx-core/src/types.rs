@@ -21,7 +21,7 @@ impl Context {
     }
 
     /// Parse from a lowercase string. Returns `None` for unrecognized values.
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s {
             "interactive" => Some(Context::Interactive),
             "agent" => Some(Context::Agent),

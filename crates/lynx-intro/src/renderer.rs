@@ -87,7 +87,7 @@ fn substitute(template: &str, tokens: &HashMap<String, String>) -> String {
 /// Apply ANSI foreground color and optional bold to `text`.
 /// Returns `text` unchanged if color is None/unknown.
 fn apply_style(text: &str, color: Option<&str>, bold: bool) -> String {
-    let color_esc = color.and_then(|c| ansi_fg(c));
+    let color_esc = color.and_then(ansi_fg);
     let bold_esc = if bold { "\x1b[1m" } else { "" };
     let reset = if color_esc.is_some() || bold { "\x1b[0m" } else { "" };
 

@@ -1,5 +1,5 @@
-/// Well-known event names emitted by the Lynx shell hooks.
-/// New events go here — keeps all names in one place (D-008).
+//! Well-known event names emitted by the Lynx shell hooks.
+//! New events go here — keeps all names in one place (D-008).
 
 // ── Shell lifecycle ───────────────────────────────────────────────────────────
 pub const SHELL_CHPWD: &str = "shell:chpwd";

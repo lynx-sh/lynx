@@ -15,6 +15,7 @@ use crate::segment::RenderedSegment;
 /// using `columns` to compute padding (falls back to no padding if unknown).
 ///
 /// When `continuation` is non-empty, PROMPT2 is also emitted.
+#[allow(clippy::too_many_arguments)]
 pub fn render_prompt(
     left: &[RenderedSegment],
     right: &[RenderedSegment],
@@ -31,8 +32,7 @@ pub fn render_prompt(
     // When a top line exists, the bottom (input) line should render plain —
     // no powerline edge glyphs, no adaptive separators.
     let left_str = if !top.is_empty() {
-        let mut plain_sep = Separators::default();
-        plain_sep.mode = SeparatorMode::Static;
+        let plain_sep = Separators { mode: SeparatorMode::Static, ..Separators::default() };
         assemble(left, theme, &plain_sep, true, ctx)
     } else {
         assemble(left, theme, sep, true, ctx)
@@ -53,7 +53,7 @@ pub fn render_prompt(
             let gap = columns
                 .map(|cols| {
                     let used = top_visible + right_visible;
-                    if cols as usize > used { cols as usize - used } else { 0 }
+                    (cols as usize).saturating_sub(used)
                 })
                 .unwrap_or(1);
 
@@ -124,7 +124,7 @@ fn visible_len(s: &str) -> usize {
             while i < b.len() {
                 let byte = b[i];
                 i += 1;
-                if byte >= 0x40 && byte <= 0x7e { break; }
+                if (0x40..=0x7e).contains(&byte) { break; }
             }
         } else {
             // Count only the leading byte of each UTF-8 code point.
