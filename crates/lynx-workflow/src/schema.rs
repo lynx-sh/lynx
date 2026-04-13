@@ -55,7 +55,7 @@ pub struct WorkflowParam {
 }
 
 /// Supported parameter types.
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum ParamType {
     #[default]
@@ -105,7 +105,7 @@ pub struct Step {
 }
 
 /// Built-in runner types and custom runner escape hatch.
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum RunnerType {
     #[default]
@@ -124,7 +124,7 @@ pub enum RunnerType {
 }
 
 /// What to do when a step fails.
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum OnFail {
     /// Abort the entire workflow.

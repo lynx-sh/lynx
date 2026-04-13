@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Install source for a locked plugin.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum PluginSource {
     #[default]

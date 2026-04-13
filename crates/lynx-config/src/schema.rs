@@ -29,14 +29,14 @@ fn default_theme() -> String {
     "default".to_string()
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct SyncConfig {
     pub remote: Option<String>,
 }
 
 /// Intro display configuration, stored under `[intro]` in `config.toml`.
 /// Disabled by default — user must opt in via `lx intro on`.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[derive(Default)]
 pub struct IntroConfig {
     /// Whether the intro is enabled. Default: false.

@@ -66,7 +66,7 @@ pub enum SegmentCondition {
 /// Supports two TOML forms:
 /// - String shorthand: `color = "#7aa2f7"` (sets fg only)
 /// - Full table: `color = { fg = "#7aa2f7", bg = "#1a1b26", bold = true }`
-#[derive(Debug, Clone, PartialEq, Serialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Default)]
 pub struct SegmentColor {
     pub fg: Option<String>,
     #[serde(default)]
@@ -152,7 +152,7 @@ pub struct ConditionalColor {
 /// leading_char = "\ue0b6"    # diamond cap before segment
 /// trailing_char = "\ue0b4"   # diamond cap after segment
 /// ```
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct SegmentSeparators {
     /// Character(s) rendered before this segment's content (e.g. diamond leading edge).
     pub leading_char: Option<String>,
@@ -162,7 +162,7 @@ pub struct SegmentSeparators {
 }
 
 /// Shared status icon type — used by git segment config.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct StatusIcon {
     pub icon: Option<String>,
     pub color: Option<String>,

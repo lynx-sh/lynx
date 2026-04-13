@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 /// The context Lynx is running in — determines what gets loaded.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum Context {
     #[default]
@@ -32,7 +32,7 @@ impl Context {
 }
 
 /// Load strategy for a plugin or module.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum LoadStrategy {
     #[default]

@@ -2,7 +2,7 @@ use lynx_manifest::schema::PluginManifest;
 use std::collections::HashMap;
 
 /// The lifecycle stage a plugin is currently in.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PluginState {
     Pending,
     Declared,

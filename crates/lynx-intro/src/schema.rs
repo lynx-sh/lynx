@@ -11,7 +11,7 @@ pub struct Intro {
     pub blocks: Vec<Block>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct IntroMeta {
     #[serde(default)]
     pub name: String,
@@ -21,7 +21,7 @@ pub struct IntroMeta {
     pub author: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DisplayConfig {
     /// Show on every new interactive shell startup.
     #[serde(default = "default_true")]
@@ -53,7 +53,7 @@ fn default_true() -> bool {
 }
 
 /// A renderable block within an intro.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Block {
     /// A free-form text block. Supports `{{TOKEN}}` substitution.

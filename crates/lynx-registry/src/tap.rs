@@ -18,7 +18,7 @@ use crate::schema::{RegistryEntry, RegistryIndex};
 // ── Trust tiers ─────────────────────────────────────────────────────────────
 
 /// Trust level for a tap — determines the badge shown to users.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum TrustTier {
     /// Curated by Lynx maintainers.

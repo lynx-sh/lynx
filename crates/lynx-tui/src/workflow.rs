@@ -36,7 +36,7 @@ pub enum WorkflowEvent {
 }
 
 /// Step status for the TUI (mirrors executor::StepStatus without coupling).
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum WorkflowStepStatus {
     Pending,
     Running,
@@ -50,7 +50,7 @@ pub enum WorkflowStepStatus {
 pub type StepStepStatus = WorkflowStepStatus;
 
 /// What the user chose to do.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum WorkflowAction {
     /// Workflow finished, user pressed q.
     Completed,

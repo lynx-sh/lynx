@@ -49,7 +49,7 @@ pub struct ShellConfig {
 }
 
 /// A single key → widget binding emitted as `bindkey '<key>' <widget>`.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct KeyBinding {
     /// The key sequence (e.g. `"^F"`, `"\\eOA"`, `"${terminfo[kcuu1]}"`).
     pub key: String,
@@ -61,7 +61,7 @@ fn default_schema_version() -> u32 {
     CURRENT_SCHEMA_VERSION
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PluginMeta {
     pub name: String,
     pub version: String,
@@ -71,7 +71,7 @@ pub struct PluginMeta {
     pub authors: Vec<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct LoadConfig {
     #[serde(default)]
     pub lazy: bool,
@@ -79,7 +79,7 @@ pub struct LoadConfig {
     pub hooks: Vec<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct DepsConfig {
     #[serde(default)]
     pub binaries: Vec<String>,
@@ -87,7 +87,7 @@ pub struct DepsConfig {
     pub plugins: Vec<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct ExportsConfig {
     #[serde(default)]
     pub functions: Vec<String>,
@@ -95,7 +95,7 @@ pub struct ExportsConfig {
     pub aliases: Vec<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct ContextsConfig {
     #[serde(default)]
     pub disabled_in: Vec<String>,
@@ -113,7 +113,7 @@ pub struct ContextsConfig {
 /// - Should set a `_lynx_<name>_state` zsh assoc array for shell helper functions
 /// - Must be silent on failure (no stderr noise in the prompt)
 /// - Must complete in under 200ms or the prompt will feel slow
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct StateConfig {
     /// Shell command to run for state gathering. Evaled each precmd.
     /// May reference `$PLUGIN_DIR` for the plugin's install directory.

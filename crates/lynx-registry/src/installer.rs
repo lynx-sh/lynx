@@ -16,7 +16,7 @@ use crate::schema::{InstallMethods, RegistryEntry};
 // ── Package manager detection ───────────────────────────────────────────────
 
 /// Detected package manager on the system.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PackageManager {
     Brew,
     Apt,

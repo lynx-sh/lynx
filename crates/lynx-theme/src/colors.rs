@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 /// Syntax highlighting colors — maps zsh token types to theme colors.
 /// Used to generate `ZSH_HIGHLIGHT_STYLES` associative array entries.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct SyntaxHighlight {
     /// Valid external commands
     pub command: Option<String>,
@@ -31,14 +31,14 @@ pub struct SyntaxHighlight {
 }
 
 /// Auto-suggestion configuration.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct AutoSuggestions {
     /// Suggestion text color (typically muted). Supports hex or named colors.
     pub color: Option<String>,
 }
 
 /// One entry in the `[ls_colors]` table — colors for a single file-type category.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct LsColorsEntry {
     pub fg: Option<String>,
     pub bg: Option<String>,
@@ -53,7 +53,7 @@ pub struct LsColorsEntry {
 /// Has no effect on plain `/bin/ls` — only eza reads these keys.
 ///
 /// All fields are optional; absent fields fall back to eza's own defaults.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct EzaColumns {
     /// File modification date/time — eza key `da`
     pub date: Option<String>,

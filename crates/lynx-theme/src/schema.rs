@@ -11,7 +11,7 @@ pub use crate::segments::{
 };
 
 /// Separator rendering mode.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum SeparatorMode {
     /// One global separator style for all gaps (default — preserves existing behavior).
@@ -22,7 +22,7 @@ pub enum SeparatorMode {
 }
 
 /// Configuration for a single separator glyph + color.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct SeparatorGlyph {
     /// The character(s) to render between segments (e.g. " " or "").
     pub char: Option<String>,
@@ -84,7 +84,7 @@ pub struct Theme {
     pub colors: HashMap<String, String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ThemeMeta {
     pub name: String,
     #[serde(default)]
@@ -128,7 +128,7 @@ pub struct SegmentLayout {
 /// char = "─"
 /// color = "$muted"
 /// ```
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FillerConfig {
     /// The character to repeat. Default: "─".
     pub char: String,
@@ -145,7 +145,7 @@ pub struct FillerConfig {
 /// template = "❯ "
 /// fg = "#e0f8ff"
 /// ```
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TransientConfig {
     /// The text to display as the transient prompt.
     pub template: String,
@@ -155,7 +155,7 @@ pub struct TransientConfig {
     pub bg: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct SegmentOrder {
     #[serde(default)]
     pub order: Vec<String>,
