@@ -367,6 +367,91 @@ pub fn install_nerd_font() -> Result<String> {
     Ok(family)
 }
 
+/// Ensure a Nerd Font is installed AND the terminal is configured to use it.
+/// Returns true if ready to proceed, false if user chose to cancel.
+pub fn ensure_nerd_font_ready() -> anyhow::Result<bool> {
+    use anyhow::Context as _;
+
+    let fonts = find_installed_nerd_fonts();
+    let terminal_ok = terminal_using_nerd_font();
+
+    if terminal_ok {
+        return Ok(true);
+    }
+
+    if fonts.is_empty() {
+        println!("⚠ This theme uses powerline glyphs that require a Nerd Font.");
+        println!("  Without one, separator characters will render as □ or ?.");
+        println!();
+        print!("  Download and install a Nerd Font? [y]es / [n]o / [s]kip: ");
+        std::io::Write::flush(&mut std::io::stdout())?;
+
+        let choice = read_line_lower()?;
+        match choice.as_str() {
+            "y" | "yes" => {
+                let family = install_nerd_font().context("font installation failed")?;
+                return offer_terminal_config(&family);
+            }
+            "s" | "skip" => return Ok(true),
+            _ => return Ok(false),
+        }
+    }
+
+    let first = &fonts[0];
+    println!("⚠ Nerd Font found ({first}) but your terminal isn't using it.");
+    println!("  Powerline glyphs will render as □ until the terminal font is changed.");
+    println!();
+
+    offer_terminal_config(first)
+}
+
+fn offer_terminal_config(font_family: &str) -> anyhow::Result<bool> {
+    if std::env::var("ITERM_SESSION_ID").is_ok()
+        || std::env::var("TERM_PROGRAM").as_deref() == Ok("iTerm.app")
+    {
+        print!("  Configure iTerm2 to use {font_family}? [y]es / [n]o: ");
+        std::io::Write::flush(&mut std::io::stdout())?;
+
+        let choice = read_line_lower()?;
+        if choice.starts_with('y') {
+            let size = current_iterm2_font_size().unwrap_or(12);
+            configure_iterm2_font(font_family, size)?;
+            return Ok(true);
+        }
+        println!("  → iTerm2: Settings → Profiles → Text → Font → \"{font_family}\"");
+    } else {
+        println!("  → Set your terminal font to \"{font_family}\" in terminal preferences.");
+    }
+
+    print!("  Continue setting theme? [y/n]: ");
+    std::io::Write::flush(&mut std::io::stdout())?;
+    let choice = read_line_lower()?;
+    Ok(choice.starts_with('y'))
+}
+
+fn read_line_lower() -> anyhow::Result<String> {
+    let mut input = String::new();
+    std::io::stdin().read_line(&mut input)?;
+    Ok(input.trim().to_lowercase())
+}
+
+fn current_iterm2_font_size() -> Option<u32> {
+    let output = Command::new("defaults")
+        .args(["read", "com.googlecode.iterm2", "New Bookmarks"])
+        .output()
+        .ok()?;
+    let text = String::from_utf8_lossy(&output.stdout);
+    for line in text.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("\"Normal Font\"") {
+            let val = trimmed.split('=').nth(1)?.trim().trim_matches(';').trim().trim_matches('"');
+            let size_str = val.split_whitespace().last()?;
+            return size_str.parse().ok();
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
