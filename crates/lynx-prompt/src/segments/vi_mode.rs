@@ -19,7 +19,7 @@ impl Segment for ViModeSegment {
 
     fn render(&self, config: &toml::Value, ctx: &RenderContext) -> Option<RenderedSegment> {
         let cfg: ViModeConfig = config.clone().try_into().unwrap_or_default();
-        let mode = ctx.env.get("LYNX_VI_MODE")?;
+        let mode = ctx.env.get(lynx_core::env_vars::LYNX_VI_MODE)?;
         let text = match mode.as_str() {
             "insert" => cfg.insert_label.unwrap_or_else(|| "INSERT".to_string()),
             "normal" => cfg.normal_label.unwrap_or_else(|| "NORMAL".to_string()),
@@ -58,14 +58,14 @@ mod tests {
 
     #[test]
     fn shows_insert_label() {
-        let ctx = ctx_with_env(&[("LYNX_VI_MODE", "insert")]);
+        let ctx = ctx_with_env(&[(lynx_core::env_vars::LYNX_VI_MODE, "insert")]);
         let r = ViModeSegment.render(&empty_config(), &ctx).unwrap();
         assert_eq!(r.text, "INSERT");
     }
 
     #[test]
     fn shows_normal_label() {
-        let ctx = ctx_with_env(&[("LYNX_VI_MODE", "normal")]);
+        let ctx = ctx_with_env(&[(lynx_core::env_vars::LYNX_VI_MODE, "normal")]);
         let r = ViModeSegment.render(&empty_config(), &ctx).unwrap();
         assert_eq!(r.text, "NORMAL");
     }
@@ -79,14 +79,14 @@ normal_label = "N"
 "#,
         )
         .unwrap();
-        let ctx = ctx_with_env(&[("LYNX_VI_MODE", "insert")]);
+        let ctx = ctx_with_env(&[(lynx_core::env_vars::LYNX_VI_MODE, "insert")]);
         let r = ViModeSegment.render(&cfg, &ctx).unwrap();
         assert_eq!(r.text, "I");
     }
 
     #[test]
     fn unknown_mode_uppercased() {
-        let ctx = ctx_with_env(&[("LYNX_VI_MODE", "visual")]);
+        let ctx = ctx_with_env(&[(lynx_core::env_vars::LYNX_VI_MODE, "visual")]);
         let r = ViModeSegment.render(&empty_config(), &ctx).unwrap();
         assert_eq!(r.text, "VISUAL");
     }

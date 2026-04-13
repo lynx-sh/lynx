@@ -237,8 +237,8 @@ mod tests {
     #[test]
     fn defaults_to_interactive_context() {
         let _lock = env_lock().lock().expect("lock");
-        let _guard = EnvGuard::new(&["LYNX_CONTEXT", "PWD"]);
-        std::env::remove_var("LYNX_CONTEXT");
+        let _guard = EnvGuard::new(&[lynx_core::env_vars::LYNX_CONTEXT, "PWD"]);
+        std::env::remove_var(lynx_core::env_vars::LYNX_CONTEXT);
         std::env::set_var("PWD", "/tmp/demo");
 
         let ctx = build_render_context_from_env();
@@ -249,8 +249,8 @@ mod tests {
     #[test]
     fn parses_agent_context() {
         let _lock = env_lock().lock().expect("lock");
-        let _guard = EnvGuard::new(&["LYNX_CONTEXT", "PWD"]);
-        std::env::set_var("LYNX_CONTEXT", "agent");
+        let _guard = EnvGuard::new(&[lynx_core::env_vars::LYNX_CONTEXT, "PWD"]);
+        std::env::set_var(lynx_core::env_vars::LYNX_CONTEXT, "agent");
         std::env::set_var("PWD", "/");
         let ctx = build_render_context_from_env();
         assert!(matches!(ctx.shell_context, Context::Agent));
@@ -330,7 +330,9 @@ mod tests {
         std::env::set_var("PWD", "/");
         let ctx = build_render_context_from_env();
         assert_eq!(
-            ctx.env.get("LYNX_LAST_EXIT_CODE").map(|s| s.as_str()),
+            ctx.env
+                .get(lynx_core::env_vars::LYNX_LAST_EXIT_CODE)
+                .map(|s| s.as_str()),
             Some("1")
         );
     }

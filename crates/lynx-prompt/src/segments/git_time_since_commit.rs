@@ -35,7 +35,7 @@ impl Segment for GitTimeSinceCommitSegment {
         let commit_ts = git_state_u64(ctx, "commit_ts")?;
         let now_secs = ctx
             .env
-            .get("LYNX_NOW_SECS")
+            .get(lynx_core::env_vars::LYNX_NOW_SECS)
             .and_then(|s| s.parse::<u64>().ok())
             .unwrap_or(0);
 
@@ -106,7 +106,10 @@ mod tests {
             serde_json::json!({"branch": "main", "commit_ts": commit_ts}),
         );
         let mut env = HashMap::new();
-        env.insert("LYNX_NOW_SECS".to_string(), now_secs.to_string());
+        env.insert(
+            lynx_core::env_vars::LYNX_NOW_SECS.to_string(),
+            now_secs.to_string(),
+        );
         RenderContext {
             cwd: "/repo".into(),
             shell_context: lynx_core::types::Context::Interactive,

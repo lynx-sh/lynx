@@ -92,7 +92,10 @@ pub(crate) fn gather_kubectl_state() -> KubectlState {
 
 pub(crate) fn render_zsh(state: &KubectlState) -> String {
     match &state.context {
-        None => "_lynx_kubectl_state=()\nexport LYNX_CACHE_KUBECTL_STATE=''\n".to_string(),
+        None => format!(
+            "_lynx_kubectl_state=()\nexport {}=''\n",
+            lynx_core::env_vars::LYNX_CACHE_KUBECTL_STATE
+        ),
         Some(ctx) => {
             let ns = state.namespace.as_deref().unwrap_or("default");
             let ctx_esc = ctx.replace('\'', "'\\''");
@@ -101,7 +104,8 @@ pub(crate) fn render_zsh(state: &KubectlState) -> String {
             let ns_json = ns.replace('\\', "\\\\").replace('"', "\\\"");
             let json = format!(r#"{{"context":"{ctx_json}","namespace":"{ns_json}"}}"#);
             format!(
-                "_lynx_kubectl_state=(context '{ctx_esc}' namespace '{ns_esc}')\nexport LYNX_CACHE_KUBECTL_STATE='{json}'\n"
+                "_lynx_kubectl_state=(context '{ctx_esc}' namespace '{ns_esc}')\nexport {cache_var}='{json}'\n",
+                cache_var = lynx_core::env_vars::LYNX_CACHE_KUBECTL_STATE,
             )
         }
     }
@@ -119,7 +123,10 @@ mod tests {
         };
         let out = render_zsh(&state);
         assert!(out.contains("_lynx_kubectl_state=()"));
-        assert!(out.contains("export LYNX_CACHE_KUBECTL_STATE=''"));
+        assert!(out.contains(&format!(
+            "export {}=''",
+            lynx_core::env_vars::LYNX_CACHE_KUBECTL_STATE
+        )));
     }
 
     #[test]
@@ -153,7 +160,10 @@ mod tests {
             namespace: Some("api".into()),
         };
         let out = render_zsh(&state);
-        assert!(out.contains("export LYNX_CACHE_KUBECTL_STATE='"));
+        assert!(out.contains(&format!(
+            "export {}='",
+            lynx_core::env_vars::LYNX_CACHE_KUBECTL_STATE
+        )));
         assert!(out.contains(r#""context":"my-cluster""#));
     }
 }

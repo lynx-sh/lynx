@@ -198,10 +198,10 @@ mod tests {
     #[test]
     fn write_and_tail_roundtrip() {
         let _lock = env_lock().lock().expect("lock");
-        let _guard = EnvGuard::new(&["HOME", "LYNX_DIR"]);
+        let _guard = EnvGuard::new(&["HOME", lynx_core::env_vars::LYNX_DIR]);
         let tmp = tempfile::tempdir().unwrap();
         std::env::set_var("HOME", tmp.path());
-        std::env::remove_var("LYNX_DIR");
+        std::env::remove_var(lynx_core::env_vars::LYNX_DIR);
 
         let event = Event::new("shell:chpwd", "/tmp/test");
         write_entry(&event, "shell").unwrap();
@@ -220,10 +220,10 @@ mod tests {
     #[test]
     fn tail_log_limits_results() {
         let _lock = env_lock().lock().expect("lock");
-        let _guard = EnvGuard::new(&["HOME", "LYNX_DIR"]);
+        let _guard = EnvGuard::new(&["HOME", lynx_core::env_vars::LYNX_DIR]);
         let tmp = tempfile::tempdir().unwrap();
         std::env::set_var("HOME", tmp.path());
-        std::env::remove_var("LYNX_DIR");
+        std::env::remove_var(lynx_core::env_vars::LYNX_DIR);
 
         for i in 0..5 {
             write_entry(&Event::new("shell:precmd", i.to_string()), "shell").unwrap();

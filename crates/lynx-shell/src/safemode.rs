@@ -14,12 +14,14 @@ pub fn generate_safemode_script(reason: &str) -> String {
 
     format!(
         r#"# Lynx safe mode — config error detected
-export LYNX_SAFE_MODE=1
-export LYNX_CONTEXT=minimal
+export {safe_mode_var}=1
+export {context_var}=minimal
 print -u2 "Lynx: starting in safe mode due to config error:"
 print -u2 "  {safe_reason}"
 print -u2 "  Fix: run 'lx doctor' to diagnose, or 'lx config validate' to check your config."
 "#,
+        safe_mode_var = env_vars::LYNX_SAFE_MODE,
+        context_var = env_vars::LYNX_CONTEXT,
     )
 }
 
@@ -37,11 +39,11 @@ mod tests {
     fn safemode_script_sets_env_var() {
         let script = generate_safemode_script("active_theme must not be empty");
         assert!(
-            script.contains("LYNX_SAFE_MODE=1"),
-            "must set LYNX_SAFE_MODE: {script}"
+            script.contains(&format!("{}=1", env_vars::LYNX_SAFE_MODE)),
+            "must set safe mode env var: {script}"
         );
         assert!(
-            script.contains("LYNX_CONTEXT=minimal"),
+            script.contains(&format!("{}=minimal", env_vars::LYNX_CONTEXT)),
             "must set minimal context: {script}"
         );
     }

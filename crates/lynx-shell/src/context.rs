@@ -119,8 +119,8 @@ mod tests {
 
     #[test]
     fn claude_code_set_returns_agent() {
-        let _g1 = EnvGuard::unset(&["LYNX_CONTEXT"]);
-        let _g2 = EnvGuard::set(&[("CLAUDECODE", "1")]);
+        let _g1 = EnvGuard::unset(&[env_vars::LYNX_CONTEXT]);
+        let _g2 = EnvGuard::set(&[(env_vars::CLAUDECODE, "1")]);
         assert_eq!(detect_context(), Context::Agent);
     }
 
@@ -128,55 +128,70 @@ mod tests {
     fn agent_env_beats_inherited_lynx_context_interactive() {
         // CLAUDECODE=1 must win even when LYNX_CONTEXT=interactive is inherited from
         // a parent interactive shell — agent env is ground truth.
-        let _g = EnvGuard::set(&[("LYNX_CONTEXT", "interactive"), ("CLAUDECODE", "1")]);
+        let _g = EnvGuard::set(&[
+            (env_vars::LYNX_CONTEXT, "interactive"),
+            (env_vars::CLAUDECODE, "1"),
+        ]);
         assert_eq!(detect_context(), Context::Agent);
     }
 
     #[test]
     fn cursor_session_set_returns_agent() {
-        let _g1 = EnvGuard::unset(&["LYNX_CONTEXT"]);
-        let _g2 = EnvGuard::set(&[("CURSOR_CLI", "abc")]);
+        let _g1 = EnvGuard::unset(&[env_vars::LYNX_CONTEXT]);
+        let _g2 = EnvGuard::set(&[(env_vars::CURSOR_CLI, "abc")]);
         assert_eq!(detect_context(), Context::Agent);
     }
 
     #[test]
     fn lynx_context_override_agent() {
         let _g1 = EnvGuard::unset(&["CLAUDECODE", "CURSOR_CLI"]);
-        let _g2 = EnvGuard::set(&[("LYNX_CONTEXT", "agent")]);
+        let _g2 = EnvGuard::set(&[(env_vars::LYNX_CONTEXT, "agent")]);
         assert_eq!(detect_context(), Context::Agent);
     }
 
     #[test]
     fn lynx_context_override_minimal() {
         let _g1 = EnvGuard::unset(&["CLAUDECODE", "CURSOR_CLI"]);
-        let _g2 = EnvGuard::set(&[("LYNX_CONTEXT", "minimal")]);
+        let _g2 = EnvGuard::set(&[(env_vars::LYNX_CONTEXT, "minimal")]);
         assert_eq!(detect_context(), Context::Minimal);
     }
 
     #[test]
     fn lynx_context_override_interactive() {
         let _g1 = EnvGuard::unset(&["CLAUDECODE", "CURSOR_CLI"]);
-        let _g2 = EnvGuard::set(&[("LYNX_CONTEXT", "interactive")]);
+        let _g2 = EnvGuard::set(&[(env_vars::LYNX_CONTEXT, "interactive")]);
         assert_eq!(detect_context(), Context::Interactive);
     }
 
     #[test]
     fn ci_with_no_tty_returns_minimal() {
-        let _g1 = EnvGuard::unset(&["LYNX_CONTEXT", "CLAUDECODE", "CURSOR_CLI"]);
-        let _g2 = EnvGuard::set(&[("CI", "true")]);
+        let _g1 = EnvGuard::unset(&[
+            env_vars::LYNX_CONTEXT,
+            env_vars::CLAUDECODE,
+            env_vars::CURSOR_CLI,
+        ]);
+        let _g2 = EnvGuard::set(&[(env_vars::CI, "true")]);
         assert_eq!(detect_context(), Context::Minimal);
     }
 
     #[test]
     fn unknown_override_falls_back_to_auto_detect() {
-        let _g1 = EnvGuard::set(&[("LYNX_CONTEXT", "unknown"), ("CLAUDECODE", "1")]);
+        let _g1 = EnvGuard::set(&[
+            (env_vars::LYNX_CONTEXT, "unknown"),
+            (env_vars::CLAUDECODE, "1"),
+        ]);
         assert_eq!(detect_context(), Context::Agent);
     }
 
     #[test]
     fn outcome_reports_detecting_env_var() {
-        let _g1 = EnvGuard::unset(&["LYNX_CONTEXT", "CLAUDECODE", "CURSOR_CLI", "CI"]);
-        let _g2 = EnvGuard::set(&[("CURSOR_CLI", "session-123")]);
+        let _g1 = EnvGuard::unset(&[
+            env_vars::LYNX_CONTEXT,
+            env_vars::CLAUDECODE,
+            env_vars::CURSOR_CLI,
+            env_vars::CI,
+        ]);
+        let _g2 = EnvGuard::set(&[(env_vars::CURSOR_CLI, "session-123")]);
         let out = detect_context_outcome();
         assert_eq!(out.context, Context::Agent);
         assert_eq!(out.method, DetectionMethod::AgentEnv("CURSOR_CLI"));

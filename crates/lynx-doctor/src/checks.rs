@@ -373,10 +373,10 @@ mod tests {
     #[test]
     fn config_valid_check_passes_for_clean_config() {
         let _lock = env_lock().lock().expect("lock");
-        let _guard = EnvGuard::new(&["HOME", "LYNX_DIR"]);
+        let _guard = EnvGuard::new(&["HOME", lynx_core::env_vars::LYNX_DIR]);
         let home = temp_home();
         std::env::set_var("HOME", home.path());
-        std::env::remove_var("LYNX_DIR");
+        std::env::remove_var(lynx_core::env_vars::LYNX_DIR);
         write_valid_config(home.path(), &[]);
 
         let check = check_config_valid();
@@ -386,10 +386,10 @@ mod tests {
     #[test]
     fn plugin_binary_deps_warns_when_binary_missing() {
         let _lock = env_lock().lock().expect("lock");
-        let _guard = EnvGuard::new(&["HOME", "LYNX_DIR"]);
+        let _guard = EnvGuard::new(&["HOME", lynx_core::env_vars::LYNX_DIR]);
         let home = temp_home();
         std::env::set_var("HOME", home.path());
-        std::env::remove_var("LYNX_DIR");
+        std::env::remove_var(lynx_core::env_vars::LYNX_DIR);
         write_valid_config(home.path(), &["demo"]);
 
         let plugin_dir = home
@@ -431,10 +431,10 @@ disabled_in = ["agent", "minimal"]
     #[test]
     fn plugin_binary_deps_passes_when_no_plugins_enabled() {
         let _lock = env_lock().lock().expect("lock");
-        let _guard = EnvGuard::new(&["HOME", "LYNX_DIR"]);
+        let _guard = EnvGuard::new(&["HOME", lynx_core::env_vars::LYNX_DIR]);
         let home = temp_home();
         std::env::set_var("HOME", home.path());
-        std::env::remove_var("LYNX_DIR");
+        std::env::remove_var(lynx_core::env_vars::LYNX_DIR);
         write_valid_config(home.path(), &[]);
 
         let check = check_plugin_binary_deps();
@@ -444,10 +444,10 @@ disabled_in = ["agent", "minimal"]
     #[test]
     fn shell_integration_warns_when_zshrc_missing() {
         let _lock = env_lock().lock().expect("lock");
-        let _guard = EnvGuard::new(&["HOME", "LYNX_DIR"]);
+        let _guard = EnvGuard::new(&["HOME", lynx_core::env_vars::LYNX_DIR]);
         let home = temp_home();
         std::env::set_var("HOME", home.path());
-        std::env::remove_var("LYNX_DIR");
+        std::env::remove_var(lynx_core::env_vars::LYNX_DIR);
 
         let check = check_shell_integration();
         assert_eq!(check.status, Status::Warn);

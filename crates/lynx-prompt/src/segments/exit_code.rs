@@ -17,7 +17,7 @@ impl Segment for ExitCodeSegment {
 
     fn render(&self, config: &toml::Value, ctx: &RenderContext) -> Option<RenderedSegment> {
         let cfg: ExitCodeConfig = config.clone().try_into().unwrap_or_default();
-        let code_str = ctx.env.get("LYNX_LAST_EXIT_CODE")?;
+        let code_str = ctx.env.get(lynx_core::env_vars::LYNX_LAST_EXIT_CODE)?;
         let code: i32 = code_str.parse().unwrap_or(0);
         if code == 0 {
             return None;
@@ -49,7 +49,7 @@ mod tests {
 
     #[test]
     fn hidden_when_exit_code_zero() {
-        let ctx = ctx_with_env(&[("LYNX_LAST_EXIT_CODE", "0")]);
+        let ctx = ctx_with_env(&[(lynx_core::env_vars::LYNX_LAST_EXIT_CODE, "0")]);
         let r = ExitCodeSegment.render(&empty_config(), &ctx);
         assert!(r.is_none());
     }
@@ -63,7 +63,7 @@ mod tests {
 
     #[test]
     fn shows_nonzero_exit_code() {
-        let ctx = ctx_with_env(&[("LYNX_LAST_EXIT_CODE", "127")]);
+        let ctx = ctx_with_env(&[(lynx_core::env_vars::LYNX_LAST_EXIT_CODE, "127")]);
         let r = ExitCodeSegment.render(&empty_config(), &ctx).unwrap();
         assert!(
             r.text.contains("127"),
@@ -76,7 +76,7 @@ mod tests {
     #[test]
     fn custom_symbol() {
         let cfg: toml::Value = toml::from_str(r#"symbol = "ERR""#).unwrap();
-        let ctx = ctx_with_env(&[("LYNX_LAST_EXIT_CODE", "1")]);
+        let ctx = ctx_with_env(&[(lynx_core::env_vars::LYNX_LAST_EXIT_CODE, "1")]);
         let r = ExitCodeSegment.render(&cfg, &ctx).unwrap();
         assert!(
             r.text.starts_with("ERR"),

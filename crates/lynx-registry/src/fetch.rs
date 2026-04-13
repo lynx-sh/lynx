@@ -204,9 +204,8 @@ fn extract_tar_gz(archive: &Path, dest: &Path) -> Result<()> {
         }
         let out_path = dest.join(&stripped);
         if entry_type.is_dir() {
-            std::fs::create_dir_all(&out_path).with_context(|| {
-                format!("create extract dir for {}", stripped.display())
-            })?;
+            std::fs::create_dir_all(&out_path)
+                .with_context(|| format!("create extract dir for {}", stripped.display()))?;
             continue;
         }
         let parent = out_path.parent().ok_or_else(|| {
@@ -355,8 +354,8 @@ fn collect_files_sorted(root: &Path, current: &Path, out: &mut Vec<String>) -> R
 #[cfg(test)]
 mod tests {
     use super::*;
-    use flate2::Compression;
     use flate2::write::GzEncoder;
+    use flate2::Compression;
     use std::io::Cursor;
     use tar::{Builder, Header};
 
@@ -535,7 +534,8 @@ disabled_in = []
 
     #[test]
     fn extract_tar_gz_allows_normal_files() {
-        let archive = make_archive(&[("pkg/plugin.toml", b"[plugin]\nname=\"x\"\nversion=\"1\"\n")]);
+        let archive =
+            make_archive(&[("pkg/plugin.toml", b"[plugin]\nname=\"x\"\nversion=\"1\"\n")]);
         let dest = tempfile::tempdir().unwrap();
 
         extract_tar_gz(archive.path(), dest.path()).unwrap();

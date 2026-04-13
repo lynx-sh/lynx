@@ -210,7 +210,7 @@ fn stop_detached() -> Result<bool> {
 }
 
 fn daemon_binary_path() -> Result<PathBuf> {
-    if let Ok(bin) = std::env::var("LYNX_DAEMON_BIN") {
+    if let Ok(bin) = std::env::var(lynx_core::env_vars::LYNX_DAEMON_BIN) {
         let path = PathBuf::from(bin);
         if path.exists() {
             return Ok(path);
@@ -230,9 +230,10 @@ fn daemon_binary_path() -> Result<PathBuf> {
         }
     }
 
-    Err(LynxError::Daemon(
-        "lynx-daemon binary not found; install Lynx daemon or set LYNX_DAEMON_BIN".into(),
-    )
+    Err(LynxError::Daemon(format!(
+        "lynx-daemon binary not found; install Lynx daemon or set {}",
+        lynx_core::env_vars::LYNX_DAEMON_BIN
+    ))
     .into())
 }
 
@@ -245,16 +246,16 @@ mod tests {
 
     impl EnvGuard {
         fn new() -> Self {
-            Self(std::env::var("LYNX_DAEMON_BIN").ok())
+            Self(std::env::var(lynx_core::env_vars::LYNX_DAEMON_BIN).ok())
         }
     }
 
     impl Drop for EnvGuard {
         fn drop(&mut self) {
             if let Some(v) = &self.0 {
-                std::env::set_var("LYNX_DAEMON_BIN", v);
+                std::env::set_var(lynx_core::env_vars::LYNX_DAEMON_BIN, v);
             } else {
-                std::env::remove_var("LYNX_DAEMON_BIN");
+                std::env::remove_var(lynx_core::env_vars::LYNX_DAEMON_BIN);
             }
         }
     }
@@ -279,9 +280,9 @@ mod tests {
         let bin = tmp.path().join("lynx-daemon");
         std::fs::write(&bin, "").unwrap();
 
-        std::env::set_var("LYNX_DAEMON_BIN", bin.to_str().unwrap());
+        std::env::set_var(lynx_core::env_vars::LYNX_DAEMON_BIN, bin.to_str().unwrap());
         let result = daemon_binary_path();
-        std::env::remove_var("LYNX_DAEMON_BIN");
+        std::env::remove_var(lynx_core::env_vars::LYNX_DAEMON_BIN);
 
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), bin);
@@ -291,7 +292,10 @@ mod tests {
     fn daemon_binary_path_env_override_nonexistent_falls_through() {
         let _lock = env_lock().lock().expect("lock");
         let _guard = EnvGuard::new();
-        std::env::set_var("LYNX_DAEMON_BIN", "/nonexistent/lynx-daemon");
+        std::env::set_var(
+            lynx_core::env_vars::LYNX_DAEMON_BIN,
+            "/nonexistent/lynx-daemon",
+        );
         let result = daemon_binary_path();
 
         // Should fall through to which/sibling checks, may or may not find the binary

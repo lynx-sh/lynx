@@ -18,7 +18,7 @@ impl Segment for HistNumberSegment {
     fn render(&self, config: &toml::Value, ctx: &RenderContext) -> Option<RenderedSegment> {
         let cfg: HistNumberConfig = config.clone().try_into().unwrap_or_default();
 
-        let num = ctx.env.get("LYNX_HIST_NUMBER")?;
+        let num = ctx.env.get(lynx_core::env_vars::LYNX_HIST_NUMBER)?;
         if num.is_empty() {
             return None;
         }
@@ -37,7 +37,10 @@ mod tests {
 
     fn ctx_with_hist(num: &str) -> RenderContext {
         let mut env = HashMap::new();
-        env.insert("LYNX_HIST_NUMBER".to_string(), num.to_string());
+        env.insert(
+            lynx_core::env_vars::LYNX_HIST_NUMBER.to_string(),
+            num.to_string(),
+        );
         RenderContext {
             cwd: "/".into(),
             shell_context: lynx_core::types::Context::Interactive,

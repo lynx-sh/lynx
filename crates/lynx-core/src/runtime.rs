@@ -77,20 +77,27 @@ fn libc_getuid() -> u32 {
 mod tests {
     use super::*;
     use std::os::unix::fs::PermissionsExt;
+    use std::sync::{Mutex, OnceLock};
+
+    fn env_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
 
     struct RuntimeDirGuard;
     impl Drop for RuntimeDirGuard {
         fn drop(&mut self) {
-            std::env::remove_var("LYNX_RUNTIME_DIR");
-            std::env::remove_var("XDG_RUNTIME_DIR");
+            std::env::remove_var(env_vars::LYNX_RUNTIME_DIR);
+            std::env::remove_var(env_vars::XDG_RUNTIME_DIR);
         }
     }
 
     #[test]
     fn runtime_dir_creates_with_700() {
+        let _lock = env_lock().lock().expect("lock");
         let tmp = tempfile::tempdir().unwrap();
         let override_path = tmp.path().join("lynx-runtime-test");
-        std::env::set_var("LYNX_RUNTIME_DIR", &override_path);
+        std::env::set_var(env_vars::LYNX_RUNTIME_DIR, &override_path);
         let _g = RuntimeDirGuard;
 
         let dir = runtime_dir().unwrap();
@@ -101,9 +108,10 @@ mod tests {
 
     #[test]
     fn xdg_runtime_dir_respected() {
+        let _lock = env_lock().lock().expect("lock");
         let tmp = tempfile::tempdir().unwrap();
-        std::env::remove_var("LYNX_RUNTIME_DIR");
-        std::env::set_var("XDG_RUNTIME_DIR", tmp.path());
+        std::env::remove_var(env_vars::LYNX_RUNTIME_DIR);
+        std::env::set_var(env_vars::XDG_RUNTIME_DIR, tmp.path());
         let _g = RuntimeDirGuard;
 
         let dir = runtime_dir().unwrap();
@@ -112,8 +120,9 @@ mod tests {
 
     #[test]
     fn all_paths_derive_from_runtime_dir() {
+        let _lock = env_lock().lock().expect("lock");
         let tmp = tempfile::tempdir().unwrap();
-        std::env::set_var("LYNX_RUNTIME_DIR", tmp.path());
+        std::env::set_var(env_vars::LYNX_RUNTIME_DIR, tmp.path());
         let _g = RuntimeDirGuard;
 
         let base = runtime_dir().unwrap();

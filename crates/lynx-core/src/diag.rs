@@ -88,8 +88,8 @@ mod tests {
 
     impl LynxDirGuard {
         fn set(dir: &std::path::Path) -> Self {
-            let prev = std::env::var_os("LYNX_DIR");
-            std::env::set_var("LYNX_DIR", dir);
+            let prev = std::env::var_os(crate::env_vars::LYNX_DIR);
+            std::env::set_var(crate::env_vars::LYNX_DIR, dir);
             Self(prev)
         }
     }
@@ -97,8 +97,8 @@ mod tests {
     impl Drop for LynxDirGuard {
         fn drop(&mut self) {
             match &self.0 {
-                Some(v) => std::env::set_var("LYNX_DIR", v),
-                None => std::env::remove_var("LYNX_DIR"),
+                Some(v) => std::env::set_var(crate::env_vars::LYNX_DIR, v),
+                None => std::env::remove_var(crate::env_vars::LYNX_DIR),
             }
         }
     }

@@ -267,11 +267,11 @@ mod tests {
     #[test]
     fn verify_installed_plugin_checksum_matches_expected() {
         let _lock = env_lock().lock().expect("lock");
-        let _guard = EnvGuard::new(&["HOME", "LYNX_DIR"]);
+        let _guard = EnvGuard::new(&["HOME", lynx_core::env_vars::LYNX_DIR]);
         let home = temp_home();
         std::env::set_var("HOME", home.path());
         let lynx_dir = home.path().join(".config/lynx");
-        std::env::set_var("LYNX_DIR", &lynx_dir);
+        std::env::set_var(lynx_core::env_vars::LYNX_DIR, &lynx_dir);
 
         let install_root = lynx_dir.join("plugins/git");
         std::fs::create_dir_all(install_root.join("shell")).expect("create plugin dir");
@@ -300,11 +300,11 @@ mod tests {
     #[test]
     fn verify_installed_plugin_checksum_detects_mismatch() {
         let _lock = env_lock().lock().expect("lock");
-        let _guard = EnvGuard::new(&["HOME", "LYNX_DIR"]);
+        let _guard = EnvGuard::new(&["HOME", lynx_core::env_vars::LYNX_DIR]);
         let home = temp_home();
         std::env::set_var("HOME", home.path());
         let lynx_dir = home.path().join(".config/lynx");
-        std::env::set_var("LYNX_DIR", &lynx_dir);
+        std::env::set_var(lynx_core::env_vars::LYNX_DIR, &lynx_dir);
 
         let install_root = lynx_dir.join("plugins/git");
         std::fs::create_dir_all(install_root.join("shell")).expect("create plugin dir");

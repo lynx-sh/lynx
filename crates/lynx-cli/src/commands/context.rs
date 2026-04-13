@@ -3,6 +3,7 @@ use clap::{Args, Subcommand};
 use lynx_core::error::LynxError;
 
 use lynx_config::{load, snapshot::mutate_config_transaction};
+use lynx_core::env_vars;
 use lynx_core::types::Context;
 use lynx_events::types::{Event, SHELL_CONTEXT_CHANGED};
 use lynx_shell::context::{detect_context_outcome, DetectionMethod};
@@ -56,7 +57,7 @@ async fn cmd_set(name: &str) -> Result<()> {
     bus.emit(Event::new(SHELL_CONTEXT_CHANGED, data)).await;
 
     // Print the eval-bridge export statement for the shell to evaluate.
-    println!("export LYNX_CONTEXT={name}");
+    println!("export {}={name}", env_vars::LYNX_CONTEXT);
     println!("context switched to '{name}'");
     Ok(())
 }
@@ -66,7 +67,7 @@ fn cmd_status() -> Result<()> {
     let outcome = detect_context_outcome();
     let detected = outcome.context.as_str().to_string();
     let method = match outcome.method {
-        DetectionMethod::Override => "manual override (LYNX_CONTEXT)".to_string(),
+        DetectionMethod::Override => format!("manual override ({})", env_vars::LYNX_CONTEXT),
         DetectionMethod::AgentEnv(var) => format!("auto-detected agent ({var})"),
         DetectionMethod::MinimalEnv(var) => format!("auto-detected minimal ({var})"),
         DetectionMethod::DefaultInteractive => "auto-detected interactive (default)".to_string(),

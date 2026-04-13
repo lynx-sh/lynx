@@ -337,7 +337,7 @@ pub fn should_use_tui() -> bool {
     if !io::stdout().is_tty() {
         return false;
     }
-    if let Ok(ctx) = std::env::var("LYNX_CONTEXT") {
+    if let Ok(ctx) = std::env::var(lynx_core::env_vars::LYNX_CONTEXT) {
         if ctx == "agent" {
             return false;
         }

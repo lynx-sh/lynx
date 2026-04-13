@@ -76,7 +76,10 @@ fn gather_all(enabled: &[String]) -> String {
 
     // Emit LYNX_USER_IS_ROOT — computed in Rust, not in shell (D-001).
     let root_val = if is_root() { "1" } else { "0" };
-    out.push_str(&format!("export LYNX_USER_IS_ROOT={root_val}\n"));
+    out.push_str(&format!(
+        "export {}={root_val}\n",
+        lynx_core::env_vars::LYNX_USER_IS_ROOT
+    ));
 
     for plugin_name in enabled {
         match plugin_name.as_str() {
@@ -180,7 +183,7 @@ mod tests {
     fn empty_plugin_list_emits_root_status_only() {
         let out = gather_all(&[]);
         assert!(
-            out.contains("LYNX_USER_IS_ROOT="),
+            out.contains(&format!("{}=", lynx_core::env_vars::LYNX_USER_IS_ROOT)),
             "expected root status: {out}"
         );
         // Should not contain any plugin state.
@@ -196,7 +199,7 @@ mod tests {
         let out = gather_all(&["nonexistent-plugin".to_string()]);
         // Only root status, no plugin state.
         assert!(
-            out.contains("LYNX_USER_IS_ROOT="),
+            out.contains(&format!("{}=", lynx_core::env_vars::LYNX_USER_IS_ROOT)),
             "expected root status: {out}"
         );
         assert!(
@@ -209,14 +212,14 @@ mod tests {
     fn git_first_party_emits_git_state() {
         let out = gather_all(&["git".to_string()]);
         assert!(out.contains("_lynx_git_state="));
-        assert!(out.contains("LYNX_CACHE_GIT_STATE"));
+        assert!(out.contains(lynx_core::env_vars::LYNX_CACHE_GIT_STATE));
     }
 
     #[test]
     fn kubectl_first_party_emits_kubectl_state() {
         let out = gather_all(&["kubectl".to_string()]);
         assert!(out.contains("_lynx_kubectl_state="));
-        assert!(out.contains("LYNX_CACHE_KUBECTL_STATE"));
+        assert!(out.contains(lynx_core::env_vars::LYNX_CACHE_KUBECTL_STATE));
     }
 
     #[test]
@@ -238,14 +241,17 @@ mod tests {
         fs::create_dir_all(&plugin_dir).expect("create plugin dir");
         fs::write(
             plugin_dir.join("plugin.toml"),
-            r#"
+            format!(
+                r#"
 [plugin]
 name    = "myplugin"
 version = "0.1.0"
 
 [state]
-gather = "echo \"export LYNX_CACHE_MYPLUGIN_STATE='test'\""
+gather = "echo \"export {cache_var}='test'\""
 "#,
+                cache_var = lynx_core::env_vars::cache_state_var("myplugin")
+            ),
         )
         .expect("write plugin.toml");
 
@@ -254,7 +260,10 @@ gather = "echo \"export LYNX_CACHE_MYPLUGIN_STATE='test'\""
         let out = gather_community_plugin("myplugin");
 
         let out = out.expect("should produce output");
-        assert!(out.contains("LYNX_CACHE_MYPLUGIN_STATE"), "got: {out}");
+        assert!(
+            out.contains(&lynx_core::env_vars::cache_state_var("myplugin")),
+            "got: {out}"
+        );
     }
 
     #[test]
@@ -290,14 +299,17 @@ version = "0.1.0"
         fs::create_dir_all(&plugin_dir).expect("create plugin dir");
         fs::write(
             plugin_dir.join("plugin.toml"),
-            r#"
+            format!(
+                r#"
 [plugin]
 name    = "slow"
 version = "0.1.0"
 
 [state]
-gather = "sleep 1; echo \"export LYNX_CACHE_SLOW_STATE='ok'\""
+gather = "sleep 1; echo \"export {cache_var}='ok'\""
 "#,
+                cache_var = lynx_core::env_vars::cache_state_var("slow")
+            ),
         )
         .expect("write plugin.toml");
 
@@ -323,14 +335,17 @@ gather = "sleep 1; echo \"export LYNX_CACHE_SLOW_STATE='ok'\""
         fs::create_dir_all(&plugin_dir).expect("create plugin dir");
         fs::write(
             plugin_dir.join("plugin.toml"),
-            r#"
+            format!(
+                r#"
 [plugin]
 name    = "fast"
 version = "0.1.0"
 
 [state]
-gather = "echo \"export LYNX_CACHE_FAST_STATE='ok'\""
+gather = "echo \"export {cache_var}='ok'\""
 "#,
+                cache_var = lynx_core::env_vars::cache_state_var("fast")
+            ),
         )
         .expect("write plugin.toml");
 
@@ -338,6 +353,9 @@ gather = "echo \"export LYNX_CACHE_FAST_STATE='ok'\""
         let out = gather_community_plugin_with_timeout("fast", Duration::from_millis(300))
             .expect("fast gather should succeed");
 
-        assert!(out.contains("LYNX_CACHE_FAST_STATE"), "got: {out}");
+        assert!(
+            out.contains(&lynx_core::env_vars::cache_state_var("fast")),
+            "got: {out}"
+        );
     }
 }

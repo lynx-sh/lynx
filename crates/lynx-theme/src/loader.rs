@@ -169,13 +169,13 @@ mod tests {
     fn load_default_from_file() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("default.toml"), DEFAULT_THEME_TOML).unwrap();
-        std::env::set_var("LYNX_DIR", dir.path());
+        std::env::set_var(lynx_core::env_vars::LYNX_DIR, dir.path());
         std::fs::create_dir_all(dir.path().join("themes")).unwrap();
         std::fs::write(dir.path().join("themes/default.toml"), DEFAULT_THEME_TOML).unwrap();
         let theme = load_from_path(&dir.path().join("themes/default.toml")).unwrap();
         assert_eq!(theme.meta.name, "default");
         assert!(!theme.segments.left.order.is_empty());
-        std::env::remove_var("LYNX_DIR");
+        std::env::remove_var(lynx_core::env_vars::LYNX_DIR);
     }
 
     #[test]
@@ -235,11 +235,11 @@ order = []
         std::fs::create_dir_all(&themes_dir).unwrap();
         std::fs::write(themes_dir.join("alpha.toml"), "").unwrap();
         std::fs::write(themes_dir.join("beta.toml"), "").unwrap();
-        std::env::set_var("LYNX_DIR", dir.path());
+        std::env::set_var(lynx_core::env_vars::LYNX_DIR, dir.path());
         let names = list();
         assert!(names.contains(&"alpha".to_string()));
         assert!(names.contains(&"beta".to_string()));
-        std::env::remove_var("LYNX_DIR");
+        std::env::remove_var(lynx_core::env_vars::LYNX_DIR);
     }
 
     #[test]

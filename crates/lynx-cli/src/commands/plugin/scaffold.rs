@@ -52,8 +52,9 @@ disabled_in = ["agent", "minimal"]
     let init_zsh = format!(
         "# {name} — init.zsh  (keep this file under 10 lines)\n\
          # Sources functions and aliases; actual logic lives in functions.zsh.\n\
-         source \"${{LYNX_PLUGIN_DIR}}/{name}/shell/functions.zsh\"\n\
-         source \"${{LYNX_PLUGIN_DIR}}/{name}/shell/aliases.zsh\"\n",
+         source \"${{{plugin_dir_var}}}/{name}/shell/functions.zsh\"\n\
+         source \"${{{plugin_dir_var}}}/{name}/shell/aliases.zsh\"\n",
+        plugin_dir_var = lynx_core::env_vars::LYNX_PLUGIN_DIR,
     );
     std::fs::write(dir.join("shell/init.zsh"), init_zsh)?;
 

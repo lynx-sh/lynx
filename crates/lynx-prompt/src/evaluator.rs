@@ -98,7 +98,7 @@ fn eval_condition(cond: &SegmentCondition, ctx: &RenderContext) -> bool {
         SegmentCondition::ExitCodeNonzero { exit_code_nonzero } => {
             let is_nonzero = ctx
                 .env
-                .get("LYNX_LAST_EXIT_CODE")
+                .get(lynx_core::env_vars::LYNX_LAST_EXIT_CODE)
                 .map(|v| v != "0" && !v.is_empty())
                 .unwrap_or(false);
             *exit_code_nonzero == is_nonzero
@@ -483,7 +483,8 @@ mod tests {
     #[test]
     fn show_when_exit_code_nonzero_true() {
         let mut ctx = ctx();
-        ctx.env.insert("LYNX_LAST_EXIT_CODE".into(), "1".into());
+        ctx.env
+            .insert(lynx_core::env_vars::LYNX_LAST_EXIT_CODE.into(), "1".into());
         let cfg = cfg_from_toml(r#"show_when = { exit_code_nonzero = true }"#);
         assert!(is_visible(&cfg, &AlwaysSegment, &ctx));
     }
@@ -491,7 +492,8 @@ mod tests {
     #[test]
     fn show_when_exit_code_nonzero_false_on_zero() {
         let mut ctx = ctx();
-        ctx.env.insert("LYNX_LAST_EXIT_CODE".into(), "0".into());
+        ctx.env
+            .insert(lynx_core::env_vars::LYNX_LAST_EXIT_CODE.into(), "0".into());
         let cfg = cfg_from_toml(r#"show_when = { exit_code_nonzero = true }"#);
         assert!(!is_visible(&cfg, &AlwaysSegment, &ctx));
     }

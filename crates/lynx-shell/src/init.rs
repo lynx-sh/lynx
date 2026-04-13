@@ -141,7 +141,9 @@ pub fn generate_init_script(params: &InitParams<'_>) -> String {
             let guard = env_vars::plugin_guard_var(plugin);
             let full_plugin_dir = shell_quote(&format!("{}/{}", params.plugin_dir, plugin));
             out.push_str(&format!(
-                "  if [[ -z \"${{{guard}}}\" ]]; then\n    LYNX_PLUGIN_DIR={full_plugin_dir}\n    source \"$LYNX_PLUGIN_DIR/shell/init.zsh\" 2>/dev/null\n    typeset -g {guard}=1\n  fi\n",
+                "  if [[ -z \"${{{guard}}}\" ]]; then\n    {plugin_dir_var}={full_plugin_dir}\n    source \"${plugin_dir_ref}/shell/init.zsh\" 2>/dev/null\n    typeset -g {guard}=1\n  fi\n",
+                plugin_dir_var = env_vars::LYNX_PLUGIN_DIR,
+                plugin_dir_ref = env_vars::LYNX_PLUGIN_DIR,
             ));
         } else {
             out.push_str(&format!("  lynx_eval_plugin {}\n", shell_quote(plugin)));
@@ -183,9 +185,9 @@ mod tests {
     fn output_contains_required_exports() {
         let plugins = vec!["git".to_string()];
         let script = generate_init_script(&base_params(&Context::Interactive, &plugins));
-        assert!(script.contains("LYNX_DIR="));
-        assert!(script.contains("LYNX_CONTEXT=interactive"));
-        assert!(script.contains("LYNX_PLUGIN_DIR="));
+        assert!(script.contains(&format!("{}=", env_vars::LYNX_DIR)));
+        assert!(script.contains(&format!("{}=interactive", env_vars::LYNX_CONTEXT)));
+        assert!(script.contains(&format!("{}=", env_vars::LYNX_PLUGIN_DIR)));
     }
 
     #[test]
@@ -217,7 +219,7 @@ mod tests {
     #[test]
     fn agent_context_sets_correct_value() {
         let script = generate_init_script(&base_params(&Context::Agent, &[]));
-        assert!(script.contains("LYNX_CONTEXT=agent"));
+        assert!(script.contains(&format!("{}=agent", env_vars::LYNX_CONTEXT)));
     }
 
     #[test]
@@ -231,7 +233,7 @@ mod tests {
     #[test]
     fn idempotency_guard_present() {
         let script = generate_init_script(&base_params(&Context::Interactive, &[]));
-        assert!(script.contains("LYNX_INITIALIZED"));
+        assert!(script.contains(env_vars::LYNX_INITIALIZED));
     }
 
     #[test]
@@ -242,7 +244,10 @@ mod tests {
         let script = generate_init_script(&params);
         // ZLE plugin must use direct source, not lynx_eval_plugin
         assert!(!script.contains("lynx_eval_plugin 'syntax-highlight'"));
-        assert!(script.contains("source \"$LYNX_PLUGIN_DIR/shell/init.zsh\""));
+        assert!(script.contains(&format!(
+            "source \"${}/shell/init.zsh\"",
+            env_vars::LYNX_PLUGIN_DIR
+        )));
         // Non-ZLE plugin still uses eval bridge
         assert!(script.contains("lynx_eval_plugin 'git'"));
     }
@@ -250,7 +255,7 @@ mod tests {
     #[test]
     fn no_plugins_produces_valid_structure() {
         let script = generate_init_script(&base_params(&Context::Minimal, &[]));
-        assert!(script.contains("LYNX_CONTEXT=minimal"));
+        assert!(script.contains(&format!("{}=minimal", env_vars::LYNX_CONTEXT)));
         assert!(!script.contains("lynx_eval_plugin"));
     }
 

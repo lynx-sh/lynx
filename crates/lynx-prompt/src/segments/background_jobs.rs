@@ -17,7 +17,7 @@ impl Segment for BackgroundJobsSegment {
 
     fn render(&self, config: &toml::Value, ctx: &RenderContext) -> Option<RenderedSegment> {
         let cfg: BackgroundJobsConfig = config.clone().try_into().unwrap_or_default();
-        let jobs_str = ctx.env.get("LYNX_BG_JOBS")?;
+        let jobs_str = ctx.env.get(lynx_core::env_vars::LYNX_BG_JOBS)?;
         let jobs: u32 = jobs_str.parse().unwrap_or(0);
         if jobs == 0 {
             return None;
@@ -49,7 +49,7 @@ mod tests {
 
     #[test]
     fn hidden_when_zero_jobs() {
-        let ctx = ctx_with_env(&[("LYNX_BG_JOBS", "0")]);
+        let ctx = ctx_with_env(&[(lynx_core::env_vars::LYNX_BG_JOBS, "0")]);
         let r = BackgroundJobsSegment.render(&empty_config(), &ctx);
         assert!(r.is_none());
     }
@@ -63,7 +63,7 @@ mod tests {
 
     #[test]
     fn shows_job_count() {
-        let ctx = ctx_with_env(&[("LYNX_BG_JOBS", "3")]);
+        let ctx = ctx_with_env(&[(lynx_core::env_vars::LYNX_BG_JOBS, "3")]);
         let r = BackgroundJobsSegment.render(&empty_config(), &ctx).unwrap();
         assert!(r.text.contains('3'), "expected count: {}", r.text);
         assert!(r.text.contains('⚙'), "expected default symbol: {}", r.text);
@@ -72,7 +72,7 @@ mod tests {
     #[test]
     fn custom_symbol() {
         let cfg: toml::Value = toml::from_str(r#"symbol = "&""#).unwrap();
-        let ctx = ctx_with_env(&[("LYNX_BG_JOBS", "2")]);
+        let ctx = ctx_with_env(&[(lynx_core::env_vars::LYNX_BG_JOBS, "2")]);
         let r = BackgroundJobsSegment.render(&cfg, &ctx).unwrap();
         assert!(
             r.text.starts_with('&'),

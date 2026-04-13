@@ -141,13 +141,19 @@ mod tests {
         assert!(script.contains("unalias gst 2>/dev/null"));
         // git plugin no longer self-registers hooks — lx refresh-state handles precmd
         assert!(!script.contains("add-zsh-hook"));
-        assert!(script.contains("unset LYNX_PLUGIN_GIT_LOADED"));
+        assert!(script.contains(&format!(
+            "unset {}",
+            lynx_core::env_vars::plugin_guard_var("git")
+        )));
     }
 
     #[test]
     fn build_unload_script_without_manifest_only_unsets_guard() {
         let script = build_unload_script("missing-plugin", None);
-        assert!(script.contains("unset LYNX_PLUGIN_MISSING_PLUGIN_LOADED"));
+        assert!(script.contains(&format!(
+            "unset {}",
+            lynx_core::env_vars::plugin_guard_var("missing-plugin")
+        )));
         assert!(!script.contains("unfunction"));
         assert!(!script.contains("unalias"));
     }
@@ -184,7 +190,7 @@ mod tests {
         let script = generate_exec_script_for_plugin("git").expect("exec script");
         // git plugin no longer self-registers hooks — lx refresh-state handles precmd
         assert!(!script.contains("add-zsh-hook"));
-        assert!(script.contains("LYNX_PLUGIN_GIT_LOADED"));
+        assert!(script.contains(&lynx_core::env_vars::plugin_guard_var("git")));
     }
 
     #[test]

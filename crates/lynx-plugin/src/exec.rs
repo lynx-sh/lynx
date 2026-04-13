@@ -46,17 +46,22 @@ pub fn generate_exec_script(manifest: &PluginManifest, plugin_dir: &Path) -> Res
     out.push_str(&format!("if [[ -z \"${{{guard_var}}}\" ]]; then\n"));
     // Not exported — LYNX_PLUGIN_DIR is shell-local state used only during plugin sourcing
     out.push_str(&format!(
-        "  LYNX_PLUGIN_DIR='{}'\n",
+        "  {}='{}'\n",
+        lynx_core::env_vars::LYNX_PLUGIN_DIR,
         dir_str.replace('\'', "'\\''")
     ));
     // fpath prepends — must come before init.zsh so completions are available to compinit
     for fpath_dir in &manifest.shell.fpath {
         let escaped = fpath_dir.replace('\'', "'\\''");
         out.push_str(&format!(
-            "  fpath=(\"$LYNX_PLUGIN_DIR/{escaped}\" $fpath)\n"
+            "  fpath=(\"${plugin_dir_var}/{escaped}\" $fpath)\n",
+            plugin_dir_var = lynx_core::env_vars::LYNX_PLUGIN_DIR,
         ));
     }
-    out.push_str("  source \"$LYNX_PLUGIN_DIR/shell/init.zsh\" 2>/dev/null\n");
+    out.push_str(&format!(
+        "  source \"${}/shell/init.zsh\" 2>/dev/null\n",
+        lynx_core::env_vars::LYNX_PLUGIN_DIR
+    ));
     for hook in &manifest.load.hooks {
         let hook_token = hook.replace('-', "_");
         let fn_name = format!(
@@ -147,13 +152,16 @@ fn is_plugin_name(value: &str) -> bool {
 
 fn is_command_name(value: &str) -> bool {
     !value.is_empty()
-        && value
-            .chars()
-            .all(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '-' || ch == '.' || ch == '+')
+        && value.chars().all(|ch| {
+            ch.is_ascii_alphanumeric() || ch == '_' || ch == '-' || ch == '.' || ch == '+'
+        })
 }
 
 fn is_hook_name(value: &str) -> bool {
-    !value.is_empty() && value.chars().all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
+    !value.is_empty()
+        && value
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
 }
 
 fn is_widget_name(value: &str) -> bool {
@@ -199,9 +207,12 @@ mod tests {
         let m = simple_manifest("git");
         let script = generate_exec_script(&m, tmp.path()).unwrap();
 
-        assert!(script.contains("LYNX_PLUGIN_DIR="));
-        assert!(script.contains("source \"$LYNX_PLUGIN_DIR/shell/init.zsh\""));
-        assert!(script.contains("LYNX_PLUGIN_GIT_LOADED"));
+        assert!(script.contains(&format!("{}=", lynx_core::env_vars::LYNX_PLUGIN_DIR)));
+        assert!(script.contains(&format!(
+            "source \"${}/shell/init.zsh\"",
+            lynx_core::env_vars::LYNX_PLUGIN_DIR
+        )));
+        assert!(script.contains(&lynx_core::env_vars::plugin_guard_var("git")));
     }
 
     #[test]
@@ -212,7 +223,7 @@ mod tests {
 
         let m = simple_manifest("git");
         let script = generate_exec_script(&m, tmp.path()).unwrap();
-        assert!(script.contains("LYNX_PLUGIN_GIT_LOADED"));
+        assert!(script.contains(&lynx_core::env_vars::plugin_guard_var("git")));
     }
 
     #[test]
@@ -273,11 +284,17 @@ mod tests {
         m.shell.fpath = vec!["completions".into()];
         let script = generate_exec_script(&m, tmp.path()).unwrap();
 
-        assert!(script.contains("fpath=(\"$LYNX_PLUGIN_DIR/completions\" $fpath)"));
+        assert!(script.contains(&format!(
+            "fpath=(\"${}/completions\" $fpath)",
+            lynx_core::env_vars::LYNX_PLUGIN_DIR
+        )));
         // fpath must appear before source in the output
         let fpath_pos = script.find("fpath=(").unwrap();
         let source_pos = script
-            .find("source \"$LYNX_PLUGIN_DIR/shell/init.zsh\"")
+            .find(&format!(
+                "source \"${}/shell/init.zsh\"",
+                lynx_core::env_vars::LYNX_PLUGIN_DIR
+            ))
             .unwrap();
         assert!(fpath_pos < source_pos, "fpath must come before source");
     }

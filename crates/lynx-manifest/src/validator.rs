@@ -112,13 +112,16 @@ fn is_plugin_name(value: &str) -> bool {
 
 fn is_command_name(value: &str) -> bool {
     !value.is_empty()
-        && value
-            .chars()
-            .all(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '-' || ch == '.' || ch == '+')
+        && value.chars().all(|ch| {
+            ch.is_ascii_alphanumeric() || ch == '_' || ch == '-' || ch == '.' || ch == '+'
+        })
 }
 
 fn is_hook_name(value: &str) -> bool {
-    !value.is_empty() && value.chars().all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
+    !value.is_empty()
+        && value
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
 }
 
 fn is_widget_name(value: &str) -> bool {

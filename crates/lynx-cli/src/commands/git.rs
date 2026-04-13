@@ -198,7 +198,10 @@ fn zsh_escape(s: &str) -> String {
 
 pub(crate) fn render_zsh(state: &GitState) -> String {
     if state.root.is_none() {
-        return "_lynx_git_state=()\nexport LYNX_CACHE_GIT_STATE=''\n".to_string();
+        return format!(
+            "_lynx_git_state=()\nexport {}=''\n",
+            lynx_core::env_vars::LYNX_CACHE_GIT_STATE
+        );
     }
 
     let root = zsh_escape(state.root.as_deref().unwrap_or(""));
@@ -208,7 +211,7 @@ pub(crate) fn render_zsh(state: &GitState) -> String {
     let modified = if state.modified { "1" } else { "0" };
     let untracked = if state.untracked { "1" } else { "0" };
 
-    // JSON for LYNX_CACHE_GIT_STATE — read by lx prompt render into the segment cache.
+    // JSON for the git cache env var — read by lx prompt render into the segment cache.
     // branch is JSON-escaped to handle unusual names safely.
     let branch_raw = state.branch.as_deref().unwrap_or("");
     let branch_json = branch_raw.replace('\\', "\\\\").replace('"', "\\\"");
@@ -243,7 +246,8 @@ pub(crate) fn render_zsh(state: &GitState) -> String {
     );
 
     format!(
-        "_lynx_git_state=(root '{root}' branch '{branch}' dirty '{dirty}' staged '{staged}' modified '{modified}' untracked '{untracked}' stash '{stash}' ahead '{ahead}' behind '{behind}' action '{action_zsh}' sha '{sha_zsh}' commit_ts '{commit_ts_zsh}')\nexport LYNX_CACHE_GIT_STATE='{json}'\n",
+        "_lynx_git_state=(root '{root}' branch '{branch}' dirty '{dirty}' staged '{staged}' modified '{modified}' untracked '{untracked}' stash '{stash}' ahead '{ahead}' behind '{behind}' action '{action_zsh}' sha '{sha_zsh}' commit_ts '{commit_ts_zsh}')\nexport {cache_var}='{json}'\n",
+        cache_var = lynx_core::env_vars::LYNX_CACHE_GIT_STATE,
         stash = state.stash_count,
         ahead = state.ahead,
         behind = state.behind,
@@ -272,7 +276,10 @@ mod tests {
         };
         let out = render_zsh(&state);
         assert!(out.contains("_lynx_git_state=()"));
-        assert!(out.contains("export LYNX_CACHE_GIT_STATE=''"));
+        assert!(out.contains(&format!(
+            "export {}=''",
+            lynx_core::env_vars::LYNX_CACHE_GIT_STATE
+        )));
     }
 
     #[test]
@@ -320,7 +327,10 @@ mod tests {
             commit_ts: None,
         };
         let out = render_zsh(&state);
-        assert!(out.contains("export LYNX_CACHE_GIT_STATE='"));
+        assert!(out.contains(&format!(
+            "export {}='",
+            lynx_core::env_vars::LYNX_CACHE_GIT_STATE
+        )));
         assert!(out.contains(r#""branch":"feat/x""#));
         assert!(out.contains(r#""staged":true"#));
         assert!(out.contains(r#""modified":true"#));

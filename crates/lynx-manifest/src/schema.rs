@@ -31,7 +31,7 @@ pub struct PluginManifest {
 pub struct ShellConfig {
     /// Directories to prepend to `$fpath` (relative to plugin dir).
     /// Convention: `completions/` for zsh completion files.
-    /// Emitted as `fpath=("$LYNX_PLUGIN_DIR/<dir>" $fpath)` before init.zsh is sourced.
+    /// Emitted as `fpath=("${plugin_dir_var}/<dir>" $fpath)` before init.zsh is sourced.
     #[serde(default)]
     pub fpath: Vec<String>,
     /// ZLE widgets to register with `zle -N`.

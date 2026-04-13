@@ -156,9 +156,9 @@ mod tests {
     #[test]
     fn compute_summary_returns_none_when_no_tasks_toml() {
         let tmp = TempDir::new().unwrap();
-        std::env::set_var("LYNX_DIR", tmp.path());
+        std::env::set_var(lynx_core::env_vars::LYNX_DIR, tmp.path());
         let result = compute_task_summary();
-        std::env::remove_var("LYNX_DIR");
+        std::env::remove_var(lynx_core::env_vars::LYNX_DIR);
         assert!(result.is_none());
     }
 
@@ -170,9 +170,9 @@ mod tests {
             "[[task]]\nname=\"a\"\nrun=\"echo a\"\ncron=\"* * * * *\"\n\n[[task]]\nname=\"b\"\nrun=\"echo b\"\ncron=\"* * * * *\"\n",
         ).unwrap();
 
-        std::env::set_var("LYNX_DIR", tmp.path());
+        std::env::set_var(lynx_core::env_vars::LYNX_DIR, tmp.path());
         let result = compute_task_summary();
-        std::env::remove_var("LYNX_DIR");
+        std::env::remove_var(lynx_core::env_vars::LYNX_DIR);
 
         let summary = result.unwrap();
         assert!(summary.contains("2"), "expected count 2, got: {summary}");

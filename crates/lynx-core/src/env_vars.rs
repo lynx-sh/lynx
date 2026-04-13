@@ -66,6 +66,15 @@ pub const LYNX_BG_JOBS: &str = "LYNX_BG_JOBS";
 /// Current vi-mode indicator (e.g. `"insert"`, `"normal"`). Set by the vi-mode plugin.
 pub const LYNX_VI_MODE: &str = "LYNX_VI_MODE";
 
+/// Root user marker exported by `lx refresh-state` for prompt symbol logic.
+pub const LYNX_USER_IS_ROOT: &str = "LYNX_USER_IS_ROOT";
+
+/// Shell history line number exported by shell hooks.
+pub const LYNX_HIST_NUMBER: &str = "LYNX_HIST_NUMBER";
+
+/// Current UNIX timestamp in seconds for time-based prompt segments.
+pub const LYNX_NOW_SECS: &str = "LYNX_NOW_SECS";
+
 // ── Agent detection env vars ─────────────────────────────────────────────────
 
 /// Set to `"1"` by Claude Code in every shell it spawns.
@@ -99,6 +108,18 @@ pub fn plugin_guard_var(plugin_name: &str) -> String {
     )
 }
 
+/// Returns the canonical plugin state-cache variable name for a plugin.
+///
+/// Pattern: `LYNX_CACHE_{NAME_UPPERCASE_UNDERSCORED}_STATE`
+///
+/// Used by community plugin `state.gather` output checks and refresh-state tests.
+pub fn cache_state_var(plugin_name: &str) -> String {
+    format!(
+        "LYNX_CACHE_{}_STATE",
+        plugin_name.to_uppercase().replace('-', "_")
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -114,5 +135,15 @@ mod tests {
     #[test]
     fn plugin_guard_var_uppercase() {
         assert_eq!(plugin_guard_var("git"), "LYNX_PLUGIN_GIT_LOADED");
+    }
+
+    #[test]
+    fn cache_state_var_normalizes_hyphens() {
+        assert_eq!(cache_state_var("my-plugin"), "LYNX_CACHE_MY_PLUGIN_STATE");
+    }
+
+    #[test]
+    fn cache_state_var_uppercase() {
+        assert_eq!(cache_state_var("git"), "LYNX_CACHE_GIT_STATE");
     }
 }

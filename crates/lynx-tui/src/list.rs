@@ -467,7 +467,7 @@ fn is_interactive() -> bool {
         return false;
     }
     // Agent context should get plain text — interactive TUI would block automation.
-    if let Ok(ctx) = std::env::var("LYNX_CONTEXT") {
+    if let Ok(ctx) = std::env::var(lynx_core::env_vars::LYNX_CONTEXT) {
         if ctx == "agent" {
             return false;
         }
