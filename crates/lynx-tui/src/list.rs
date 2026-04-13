@@ -440,6 +440,230 @@ pub fn print_plain<T: ListItem>(items: &[T], title: &str) {
     }
 }
 
+/// Print all items as plain text for multi-select (non-interactive fallback).
+pub fn print_plain_multi<T: ListItem>(items: &[T], title: &str, preselected: &[usize]) {
+    println!("{title} ({} items)", items.len());
+    for (i, item) in items.iter().enumerate() {
+        let marker = if preselected.contains(&i) { "[x]" } else { "[ ]" };
+        let subtitle = item.subtitle();
+        if subtitle.is_empty() {
+            println!("  {marker} {}", item.title());
+        } else {
+            println!("  {marker} {} — {}", item.title(), subtitle);
+        }
+    }
+}
+
+// ── Multi-select state ───────────────────────────────────────────────────────
+
+struct MultiState {
+    nav: AppState,
+    /// Original indices of items currently checked.
+    checked: std::collections::HashSet<usize>,
+}
+
+impl MultiState {
+    fn new(total: usize, preselected: &[usize]) -> Self {
+        Self {
+            nav: AppState::new(total),
+            checked: preselected.iter().copied().collect(),
+        }
+    }
+
+    fn toggle_current(&mut self) {
+        if let Some(orig) = self.nav.selected_original_index() {
+            if self.checked.contains(&orig) {
+                self.checked.remove(&orig);
+            } else {
+                self.checked.insert(orig);
+            }
+        }
+    }
+
+    fn checked_sorted(&self) -> Vec<usize> {
+        let mut v: Vec<usize> = self.checked.iter().copied().collect();
+        v.sort_unstable();
+        v
+    }
+}
+
+/// Run an interactive multi-select list in the terminal.
+/// Returns the selected original indices (sorted), or empty vec if cancelled.
+pub fn run_multi<T: ListItem>(
+    items: &[T],
+    title: &str,
+    colors: &TuiColors,
+    preselected: &[usize],
+) -> io::Result<Vec<usize>> {
+    if items.is_empty() {
+        return Ok(vec![]);
+    }
+
+    terminal::enable_raw_mode()?;
+    let mut stdout = io::stdout();
+    stdout.execute(EnterAlternateScreen)?;
+    stdout.execute(EnableMouseCapture)?;
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
+
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        multi_event_loop(&mut terminal, items, title, colors, preselected)
+    }));
+
+    terminal::disable_raw_mode()?;
+    terminal.backend_mut().execute(DisableMouseCapture)?;
+    terminal.backend_mut().execute(LeaveAlternateScreen)?;
+    terminal.show_cursor()?;
+
+    match result {
+        Ok(inner) => inner,
+        Err(panic) => std::panic::resume_unwind(panic),
+    }
+}
+
+fn multi_event_loop<T: ListItem>(
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+    items: &[T],
+    title: &str,
+    colors: &TuiColors,
+    preselected: &[usize],
+) -> io::Result<Vec<usize>> {
+    let mut state = MultiState::new(items.len(), preselected);
+
+    loop {
+        terminal.draw(|f| render_multi(f, items, title, colors, &state))?;
+
+        let ev = event::read()?;
+        if let Event::Key(key) = ev {
+            if key.kind != KeyEventKind::Press {
+                continue;
+            }
+
+            match key.code {
+                // Navigation
+                KeyCode::Char('j') | KeyCode::Down => state.nav.move_down(),
+                KeyCode::Char('k') | KeyCode::Up => state.nav.move_up(),
+
+                // Search
+                KeyCode::Char('/') if state.nav.mode == Mode::Normal => {
+                    state.nav.mode = Mode::Search;
+                }
+                KeyCode::Esc if state.nav.mode == Mode::Search => {
+                    state.nav.mode = Mode::Normal;
+                    state.nav.query.clear();
+                    state.nav.refilter(items);
+                }
+                KeyCode::Backspace if state.nav.mode == Mode::Search => {
+                    state.nav.query.pop();
+                    state.nav.refilter(items);
+                }
+                KeyCode::Char(c) if state.nav.mode == Mode::Search => {
+                    state.nav.query.push(c);
+                    state.nav.refilter(items);
+                }
+
+                // Toggle selection
+                KeyCode::Char(' ') => state.toggle_current(),
+
+                // Confirm
+                KeyCode::Enter => return Ok(state.checked_sorted()),
+
+                // Quit / cancel
+                KeyCode::Char('q') | KeyCode::Esc => return Ok(vec![]),
+
+                // Ctrl-c
+                KeyCode::Char('c')
+                    if key.modifiers.contains(KeyModifiers::CONTROL) =>
+                {
+                    return Ok(vec![]);
+                }
+
+                _ => {}
+            }
+        }
+    }
+}
+
+fn render_multi<T: ListItem>(
+    f: &mut Frame,
+    items: &[T],
+    title: &str,
+    colors: &TuiColors,
+    state: &MultiState,
+) {
+    let accent = colors.accent;
+    let muted = colors.muted;
+    let success = colors.success;
+
+    let hint = if state.nav.mode == Mode::Search {
+        format!("search: {}  esc=cancel", state.nav.query)
+    } else {
+        format!(
+            "j/k=nav  space=toggle  /=search  enter=confirm ({} selected)  q=cancel",
+            state.checked.len()
+        )
+    };
+
+    let area = f.area();
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(3), Constraint::Length(1)])
+        .split(area);
+
+    // Build list items with checkbox prefix.
+    let list_items: Vec<RatatuiListItem> = state
+        .nav
+        .filtered
+        .iter()
+        .map(|&orig| {
+            let item = &items[orig];
+            let checked = state.checked.contains(&orig);
+            let checkbox = if checked { "[x] " } else { "[ ] " };
+            let checkbox_style = if checked {
+                Style::default().fg(success)
+            } else {
+                Style::default().fg(muted)
+            };
+            let text_style = if item.is_active() {
+                Style::default().fg(accent)
+            } else {
+                Style::default()
+            };
+            let subtitle = item.subtitle();
+            let line = if subtitle.is_empty() {
+                Line::from(vec![
+                    Span::styled(checkbox, checkbox_style),
+                    Span::styled(item.title().to_string(), text_style),
+                ])
+            } else {
+                Line::from(vec![
+                    Span::styled(checkbox, checkbox_style),
+                    Span::styled(item.title().to_string(), text_style),
+                    Span::styled(format!(" — {subtitle}"), Style::default().fg(muted)),
+                ])
+            };
+            RatatuiListItem::new(line)
+        })
+        .collect();
+
+    let block = Block::default()
+        .title(format!(" {title} "))
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(accent));
+
+    let list = RatatuiList::new(list_items)
+        .block(block)
+        .highlight_style(Style::default().bg(Color::DarkGray));
+
+    let mut list_state = state.nav.list_state.clone();
+    f.render_stateful_widget(list, chunks[0], &mut list_state);
+
+    // Status bar
+    let status = ratatui::widgets::Paragraph::new(hint)
+        .style(Style::default().fg(muted));
+    f.render_widget(status, chunks[1]);
+}
+
 /// Show items interactively if TTY, or as plain text if piped/agent.
 ///
 /// This is the single entry point all CLI commands should use.
@@ -458,5 +682,82 @@ pub fn show<T: ListItem>(
         ListResult::Selected(idx) => Ok(Some(idx)),
         ListResult::Cancelled => Ok(None),
     }
+}
+
+#[cfg(test)]
+mod multi_tests {
+    use super::*;
+    use crate::item::TuiColors;
+
+    struct Item(String, bool);
+    impl ListItem for Item {
+        fn title(&self) -> &str { &self.0 }
+        fn is_active(&self) -> bool { self.1 }
+    }
+
+    #[test]
+    fn multi_state_preselected() {
+        let state = MultiState::new(3, &[0, 2]);
+        assert!(state.checked.contains(&0));
+        assert!(!state.checked.contains(&1));
+        assert!(state.checked.contains(&2));
+    }
+
+    #[test]
+    fn multi_state_toggle() {
+        let mut state = MultiState::new(3, &[0]);
+        // Simulate cursor on item 0 (filtered[0] = orig 0).
+        assert!(state.nav.selected_original_index() == Some(0));
+        state.toggle_current(); // uncheck 0
+        assert!(!state.checked.contains(&0));
+        state.toggle_current(); // re-check 0
+        assert!(state.checked.contains(&0));
+    }
+
+    #[test]
+    fn multi_state_checked_sorted() {
+        let state = MultiState::new(5, &[4, 1, 2]);
+        let sorted = state.checked_sorted();
+        assert_eq!(sorted, vec![1, 2, 4]);
+    }
+
+    #[test]
+    fn show_multi_non_tty_returns_preselected() {
+        // In non-TTY test environment, show_multi falls back to plain and returns preselected.
+        let items = vec![Item("a".into(), false), Item("b".into(), false)];
+        let colors = TuiColors::default();
+        let result = show_multi(&items, "Test", &colors, &[0]).unwrap();
+        // Non-interactive: preselected returned unchanged.
+        assert_eq!(result, vec![0]);
+    }
+
+    #[test]
+    fn show_multi_non_tty_empty_preselected() {
+        let items = vec![Item("a".into(), false)];
+        let colors = TuiColors::default();
+        let result = show_multi(&items, "Test", &colors, &[]).unwrap();
+        assert_eq!(result, vec![]);
+    }
+}
+
+/// Show a multi-select list interactively if TTY, or as plain text if piped/agent.
+///
+/// `preselected` — original indices of items that should start checked.
+///
+/// Returns the sorted list of selected original indices, or an empty vec if
+/// the user cancels. In non-interactive mode, all items are printed and all
+/// preselected indices are returned (non-destructive fallback).
+pub fn show_multi<T: ListItem>(
+    items: &[T],
+    title: &str,
+    colors: &TuiColors,
+    preselected: &[usize],
+) -> io::Result<Vec<usize>> {
+    let config_tui = lynx_config::load().ok().map(|c| c.tui.enabled);
+    if !crate::gate::tui_enabled(config_tui) {
+        print_plain_multi(items, title, preselected);
+        return Ok(preselected.to_vec());
+    }
+    run_multi(items, title, colors, preselected)
 }
 

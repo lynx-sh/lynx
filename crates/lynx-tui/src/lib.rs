@@ -20,7 +20,7 @@ mod preview;
 pub mod workflow;
 
 pub use item::{ListAction, ListItem, TuiColors};
-pub use list::{print_plain, run, show, ListResult};
+pub use list::{print_plain, print_plain_multi, run, run_multi, show, show_multi, ListResult};
 
 /// Default palette colors (Tokyo Night) — used when theme has no [colors] table.
 pub mod defaults {
