@@ -7,16 +7,43 @@ pub mod validate;
 use lynx_core::error::{LynxError, Result};
 use schema::LynxConfig;
 use std::path::{Path, PathBuf};
+use std::sync::{OnceLock, RwLock};
+
+/// Process-level config cache. Populated on first `load()` call; cleared by `invalidate_cache()`.
+/// `load_from()` bypasses this cache and always reads from disk (used in tests and mutations).
+static CONFIG_CACHE: OnceLock<RwLock<Option<LynxConfig>>> = OnceLock::new();
+
+fn cache() -> &'static RwLock<Option<LynxConfig>> {
+    CONFIG_CACHE.get_or_init(|| RwLock::new(None))
+}
+
+/// Invalidate the in-process config cache. Must be called after any mutation to config on disk.
+pub fn invalidate_cache() {
+    if let Ok(mut guard) = cache().write() {
+        *guard = None;
+    }
+}
 
 /// Resolve config file path: `$HOME/.config/lynx/config.toml`.
 pub fn config_path() -> PathBuf {
     lynx_core::paths::config_file()
 }
 
-/// Load config from disk. Returns `LynxConfig::default()` if the file is missing.
-/// Applies migration if schema_version is stale.
+/// Load config, returning a cached clone if available. Falls back to disk on first call.
+/// Returns `LynxConfig::default()` if the file is missing. Applies migration if schema_version is stale.
 pub fn load() -> Result<LynxConfig> {
-    load_from(&config_path())
+    // Fast path: return cached value if present.
+    if let Ok(guard) = cache().read() {
+        if let Some(cfg) = guard.as_ref() {
+            return Ok(cfg.clone());
+        }
+    }
+    // Slow path: read from disk, populate cache.
+    let cfg = load_from(&config_path())?;
+    if let Ok(mut guard) = cache().write() {
+        *guard = Some(cfg.clone());
+    }
+    Ok(cfg)
 }
 
 pub fn load_from(path: &Path) -> Result<LynxConfig> {
@@ -38,10 +65,14 @@ pub fn enable_plugin(name: &str) -> Result<()> {
     if config.enabled_plugins.iter().any(|p| p == name) {
         return Ok(());
     }
-    snapshot::mutate_config_transaction(&format!("plugin-enable-{name}"), |cfg| {
+    let result = snapshot::mutate_config_transaction(&format!("plugin-enable-{name}"), |cfg| {
         cfg.enabled_plugins.push(name.to_string());
         Ok(())
-    })
+    });
+    if result.is_ok() {
+        invalidate_cache();
+    }
+    result
 }
 
 /// Disable a plugin by removing it from enabled_plugins (D-007: snapshot → validate → apply).
@@ -50,15 +81,23 @@ pub fn disable_plugin(name: &str) -> Result<()> {
     if !config.enabled_plugins.iter().any(|p| p == name) {
         return Err(LynxError::Config(format!("plugin '{name}' is not enabled")));
     }
-    snapshot::mutate_config_transaction(&format!("plugin-disable-{name}"), |cfg| {
+    let result = snapshot::mutate_config_transaction(&format!("plugin-disable-{name}"), |cfg| {
         cfg.enabled_plugins.retain(|p| p != name);
         Ok(())
-    })
+    });
+    if result.is_ok() {
+        invalidate_cache();
+    }
+    result
 }
 
 /// Validate then write config to disk (D-007: validate before writing).
 pub fn save(config: &LynxConfig) -> Result<()> {
-    save_to(config, &config_path())
+    let result = save_to(config, &config_path());
+    if result.is_ok() {
+        invalidate_cache();
+    }
+    result
 }
 
 pub fn save_to(config: &LynxConfig, path: &Path) -> Result<()> {
@@ -116,6 +155,22 @@ enabled_plugins = []
         .unwrap();
         let cfg = load_from(&path).unwrap();
         assert_eq!(cfg.schema_version, CURRENT_SCHEMA_VERSION);
+    }
+
+    #[test]
+    fn invalidate_cache_clears_cached_value() {
+        // Warm the cache with a known value via load_from, then manually prime.
+        if let Ok(mut guard) = cache().write() {
+            *guard = Some(LynxConfig {
+                active_theme: "cached".into(),
+                ..Default::default()
+            });
+        }
+        // Cache is warm.
+        assert!(cache().read().unwrap().is_some());
+        // Invalidating clears it.
+        invalidate_cache();
+        assert!(cache().read().unwrap().is_none());
     }
 
     #[test]
