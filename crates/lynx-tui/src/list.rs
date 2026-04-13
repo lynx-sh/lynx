@@ -448,7 +448,8 @@ pub fn show<T: ListItem>(
     title: &str,
     colors: &TuiColors,
 ) -> io::Result<Option<usize>> {
-    if !crate::gate::tui_enabled(None) {
+    let config_tui = lynx_config::load().ok().map(|c| c.tui.enabled);
+    if !crate::gate::tui_enabled(config_tui) {
         print_plain(items, title);
         return Ok(None);
     }

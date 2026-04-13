@@ -334,8 +334,10 @@ pub fn run_workflow_tui(
 /// Check if we should use the workflow TUI.
 ///
 /// Delegates to the shared gate — see `crate::gate::tui_enabled` for full check list.
+/// Loads `[tui] enabled` from config (best-effort) to honour the user's opt-out flag.
 pub fn should_use_tui() -> bool {
-    crate::gate::tui_enabled(None)
+    let config_tui = lynx_config::load().ok().map(|c| c.tui.enabled);
+    crate::gate::tui_enabled(config_tui)
 }
 
 // ── Event loop ─────────────────────────────────────────────────────────────

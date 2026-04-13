@@ -19,6 +19,13 @@ pub struct LynxConfig {
     /// Intro display settings. Disabled by default.
     #[serde(default)]
     pub intro: IntroConfig,
+    /// TUI display settings.
+    #[serde(default)]
+    pub tui: TuiConfig,
+    /// Set to true after the user completes `lx onboard`.
+    /// Prevents `lx setup` from re-launching the wizard on subsequent runs.
+    #[serde(default)]
+    pub onboarding_complete: bool,
 }
 
 fn default_schema_version() -> u32 {
@@ -27,6 +34,26 @@ fn default_schema_version() -> u32 {
 
 fn default_theme() -> String {
     "default".to_string()
+}
+
+/// TUI display configuration, stored under `[tui]` in `config.toml`.
+/// Enabled by default — set `enabled = false` to always use plain terminal output.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TuiConfig {
+    /// Whether to use interactive TUI mode. Default: true.
+    /// When false, all commands fall back to plain text output.
+    #[serde(default = "default_tui_enabled")]
+    pub enabled: bool,
+}
+
+impl Default for TuiConfig {
+    fn default() -> Self {
+        Self { enabled: true }
+    }
+}
+
+fn default_tui_enabled() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -60,6 +87,8 @@ mod tests {
         assert!(cfg.sync.remote.is_none());
         assert!(!cfg.intro.enabled);
         assert!(cfg.intro.active.is_none());
+        assert!(cfg.tui.enabled);
+        assert!(!cfg.onboarding_complete);
     }
 
     #[test]
@@ -116,5 +145,34 @@ mod tests {
     fn sync_config_default() {
         let sc = SyncConfig::default();
         assert!(sc.remote.is_none());
+    }
+
+    #[test]
+    fn tui_config_default_enabled() {
+        let tc = TuiConfig::default();
+        assert!(tc.enabled);
+    }
+
+    #[test]
+    fn tui_config_disabled_deserializes() {
+        let toml = "[tui]\nenabled = false\n";
+        let cfg: LynxConfig = toml::from_str(toml).unwrap();
+        assert!(!cfg.tui.enabled);
+    }
+
+    #[test]
+    fn existing_config_without_tui_gets_enabled_default() {
+        // Backward compat: configs written before [tui] existed must default to enabled.
+        let toml = "active_theme = \"nord\"\n";
+        let cfg: LynxConfig = toml::from_str(toml).unwrap();
+        assert!(cfg.tui.enabled);
+        assert!(!cfg.onboarding_complete);
+    }
+
+    #[test]
+    fn onboarding_complete_roundtrip() {
+        let toml = "onboarding_complete = true\n";
+        let cfg: LynxConfig = toml::from_str(toml).unwrap();
+        assert!(cfg.onboarding_complete);
     }
 }
