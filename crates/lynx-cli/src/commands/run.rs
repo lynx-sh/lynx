@@ -35,9 +35,17 @@ pub async fn run(args: RunArgs) -> Result<()> {
         }
     };
 
-    // Handle 'lx run list'
+    // Handle 'lx run list' and 'lx run examples'
     if workflow_name == "list" {
         return cmd_list();
+    }
+    if workflow_name == "examples" {
+        crate::commands::examples::print_workflow_examples();
+        return Ok(());
+    }
+    if workflow_name == "help" {
+        print_run_help();
+        return Ok(());
     }
 
     // Load workflow
@@ -187,7 +195,7 @@ fn print_run_help() {
     lx run <name>          run a workflow
     lx run <name> --help   see workflow-specific params
     lx run list            browse available workflows
-    lx examples run        full examples with TOML snippets
+    lx run examples        full examples with TOML snippets
 
   Workflow files live in: ~/.config/lynx/workflows/
 "#

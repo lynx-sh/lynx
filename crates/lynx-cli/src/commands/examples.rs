@@ -288,7 +288,7 @@ fn print_daemon_examples() {
     );
 }
 
-fn print_workflow_examples() {
+pub fn print_workflow_examples() {
     println!(
         r#"
   lx run — workflow examples
