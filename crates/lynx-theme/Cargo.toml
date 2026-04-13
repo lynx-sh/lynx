@@ -1,4 +1,5 @@
 [package]
+description = "Theme loader, color system, LS_COLORS generator, and TOML patch engine"
 name = "lynx-theme"
 version.workspace = true
 edition.workspace = true

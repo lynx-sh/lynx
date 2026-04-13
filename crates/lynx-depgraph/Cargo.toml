@@ -1,4 +1,5 @@
 [package]
+description = "Plugin dependency graph resolver — topological sort with cycle detection"
 name = "lynx-depgraph"
 version.workspace = true
 edition.workspace = true

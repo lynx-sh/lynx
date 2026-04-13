@@ -1,4 +1,5 @@
 [package]
+description = "Shared test utilities — temp dirs, zsh runner, workspace path resolution"
 name = "lynx-test-utils"
 version.workspace = true
 edition.workspace = true
