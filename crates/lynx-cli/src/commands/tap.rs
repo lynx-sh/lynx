@@ -45,21 +45,32 @@ pub async fn run(args: TapArgs) -> Result<()> {
     }
 }
 
+struct TapListEntry {
+    name: String,
+    url: String,
+    trust: String,
+}
+
+impl lynx_tui::ListItem for TapListEntry {
+    fn title(&self) -> &str { &self.name }
+    fn subtitle(&self) -> String { self.trust.clone() }
+    fn detail(&self) -> String {
+        format!("URL: {}\nTrust: {}", self.url, self.trust)
+    }
+    fn category(&self) -> Option<&str> { Some("tap") }
+}
+
 fn cmd_list() -> Result<()> {
     let path = taps_config_path();
     let list = load_taps(&path)?;
 
-    println!("{:<20} {:<10} URL", "NAME", "TRUST");
-    println!("{}", "-".repeat(70));
-    for tap in &list.taps {
-        println!(
-            "{} {:<18} {:<10} {}",
-            tap.trust.badge(),
-            tap.name,
-            tap.trust.label(),
-            tap.url
-        );
-    }
+    let entries: Vec<TapListEntry> = list.taps.iter().map(|tap| TapListEntry {
+        name: tap.name.clone(),
+        url: tap.url.clone(),
+        trust: tap.trust.label().to_string(),
+    }).collect();
+
+    lynx_tui::show(&entries, "Taps", &super::tui_colors())?;
     Ok(())
 }
 

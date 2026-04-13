@@ -194,6 +194,28 @@ async fn cmd_add(
     Ok(())
 }
 
+struct CronListEntry {
+    name: String,
+    cron: String,
+    enabled: bool,
+    last_run: String,
+    exit_code: String,
+}
+
+impl lynx_tui::ListItem for CronListEntry {
+    fn title(&self) -> &str { &self.name }
+    fn subtitle(&self) -> String {
+        format!("{} {}", self.cron, if self.enabled { "" } else { "(disabled)" })
+    }
+    fn detail(&self) -> String {
+        format!(
+            "Schedule: {}\nEnabled: {}\nLast run: {}\nExit code: {}",
+            self.cron, self.enabled, self.last_run, self.exit_code
+        )
+    }
+    fn is_active(&self) -> bool { self.enabled }
+}
+
 async fn cmd_list() -> Result<()> {
     let path = tasks_toml_path();
     let content = read_tasks_file(&path)?;
@@ -205,25 +227,18 @@ async fn cmd_list() -> Result<()> {
     }
 
     let log_dir = task_logs_dir();
-
-    println!(
-        "{:<20} {:<18} {:<8} {:<12} {:<10}",
-        "NAME", "LAST RUN", "EXIT", "ENABLED", "CRON"
-    );
-    println!("{}", "-".repeat(72));
-
-    for task in &file.tasks {
+    let entries: Vec<CronListEntry> = file.tasks.iter().map(|task| {
         let (last_run, exit_code) = read_last_run(&log_dir, &task.name);
-        println!(
-            "{:<20} {:<18} {:<8} {:<12} {}",
-            task.name,
+        CronListEntry {
+            name: task.name.clone(),
+            cron: task.cron.clone(),
+            enabled: task.enabled,
             last_run,
             exit_code,
-            if task.enabled { "yes" } else { "no" },
-            task.cron,
-        );
-    }
+        }
+    }).collect();
 
+    lynx_tui::show(&entries, "Cron Tasks", &super::tui_colors())?;
     Ok(())
 }
 

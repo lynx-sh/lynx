@@ -51,6 +51,30 @@ pub async fn run(args: JobsArgs) -> Result<()> {
     }
 }
 
+struct JobListEntry {
+    job_id: String,
+    workflow: String,
+    success: bool,
+    duration_ms: u64,
+}
+
+impl lynx_tui::ListItem for JobListEntry {
+    fn title(&self) -> &str { &self.job_id }
+    fn subtitle(&self) -> String {
+        let status = if self.success { "pass" } else { "fail" };
+        format!("{} — {status}", self.workflow)
+    }
+    fn detail(&self) -> String {
+        format!(
+            "Workflow: {}\nStatus: {}\nDuration: {}ms",
+            self.workflow,
+            if self.success { "pass" } else { "fail" },
+            self.duration_ms
+        )
+    }
+    fn is_active(&self) -> bool { self.success }
+}
+
 fn cmd_list() -> Result<()> {
     let entries = lynx_workflow::jobs::list_jobs()?;
     if entries.is_empty() {
@@ -58,16 +82,14 @@ fn cmd_list() -> Result<()> {
         return Ok(());
     }
 
-    println!(
-        "{:<30} {:<15} {:<10} {:<12}",
-        "JOB ID", "WORKFLOW", "STATUS", "DURATION"
-    );
-    println!("{}", "-".repeat(70));
-    for e in &entries {
-        let status = if e.success { "pass" } else { "fail" };
-        let dur = format!("{}ms", e.duration_ms);
-        println!("{:<30} {:<15} {:<10} {:<12}", e.job_id, e.workflow, status, dur);
-    }
+    let items: Vec<JobListEntry> = entries.iter().map(|e| JobListEntry {
+        job_id: e.job_id.clone(),
+        workflow: e.workflow.clone(),
+        success: e.success,
+        duration_ms: e.duration_ms,
+    }).collect();
+
+    lynx_tui::show(&items, "Jobs", &super::tui_colors())?;
     Ok(())
 }
 

@@ -35,6 +35,17 @@ pub mod update;
 use crate::cli::{Cli, Command};
 use anyhow::{bail, Result};
 
+/// Load TUI colors from the active theme. Falls back to defaults.
+pub(crate) fn tui_colors() -> lynx_tui::TuiColors {
+    let Ok(cfg) = lynx_config::load() else {
+        return lynx_tui::TuiColors::default();
+    };
+    match lynx_theme::loader::load(&cfg.active_theme) {
+        Ok(theme) => lynx_tui::TuiColors::from_palette(&theme.colors),
+        Err(_) => lynx_tui::TuiColors::default(),
+    }
+}
+
 /// Open a file in VS Code (blocking until the window/tab is closed).
 /// Errors with a clear install message if `code` is not in PATH.
 pub(crate) fn open_in_vscode(path: &std::path::Path) -> Result<()> {

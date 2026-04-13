@@ -114,6 +114,20 @@ pub async fn run(args: RunArgs) -> Result<()> {
     Ok(())
 }
 
+struct WorkflowListEntry {
+    name: String,
+    description: String,
+}
+
+impl lynx_tui::ListItem for WorkflowListEntry {
+    fn title(&self) -> &str { &self.name }
+    fn subtitle(&self) -> String { self.description.clone() }
+    fn detail(&self) -> String {
+        format!("{}\n\nRun: lx run {}", self.description, self.name)
+    }
+    fn category(&self) -> Option<&str> { Some("workflow") }
+}
+
 fn cmd_list() -> Result<()> {
     let entries = lynx_workflow::store::list_workflows()?;
     if entries.is_empty() {
@@ -122,10 +136,13 @@ fn cmd_list() -> Result<()> {
         return Ok(());
     }
 
-    println!("{:<20} DESCRIPTION", "NAME");
-    println!("{}", "-".repeat(50));
-    for e in &entries {
-        println!("{:<20} {}", e.name, e.description);
+    let items: Vec<WorkflowListEntry> = entries.iter().map(|e| WorkflowListEntry {
+        name: e.name.clone(),
+        description: e.description.clone(),
+    }).collect();
+
+    if let Some(idx) = lynx_tui::show(&items, "Workflows", &super::tui_colors())? {
+        println!("  Run: lx run {}", items[idx].name);
     }
     Ok(())
 }
