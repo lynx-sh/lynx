@@ -16,6 +16,7 @@
 pub(crate) mod gate;
 mod item;
 mod list;
+pub mod onboard;
 mod preview;
 pub mod workflow;
 
