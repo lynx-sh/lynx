@@ -66,8 +66,7 @@ fn cmd_show() -> Result<()> {
 
 fn cmd_edit() -> Result<()> {
     let path = config_path();
-    let snapshot_dir = snapshot(path.parent().unwrap_or(&path), "config-edit")?;
-    let _ = snapshot_dir;
+    snapshot(path.parent().unwrap_or(&path), "config-edit")?;
 
     let file_existed = path.exists();
     let snapshot_content = std::fs::read_to_string(&path).unwrap_or_default();

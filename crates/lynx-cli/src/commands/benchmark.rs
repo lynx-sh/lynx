@@ -69,7 +69,17 @@ fn measure_startup() -> Result<Vec<(String, Duration)>> {
 
     // In a real implementation each component would report its own timing.
     // For now we report the total startup time as a single measurement.
-    let _ = status;
+    match status {
+        Ok(output) if !output.status.success() => {
+            tracing::warn!("benchmark: zsh exited with status {}", output.status);
+        }
+        Err(e) => {
+            return Err(anyhow::anyhow!(
+                "failed to spawn zsh for benchmark: {e}\n  Fix: ensure zsh is installed and in your PATH"
+            ));
+        }
+        _ => {}
+    }
 
     Ok(vec![("shell startup".to_string(), total)])
 }
