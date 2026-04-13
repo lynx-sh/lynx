@@ -3,6 +3,15 @@
 //! Always reference these constants instead of spelling variable names inline.
 //! This prevents typos, makes grep-based audits reliable, and gives AI agents
 //! one authoritative place to look up any env var name.
+//!
+//! # Allowlist ownership
+//!
+//! `scripts/check-env-vars.sh` (run in CI via `scripts/verify-guardrails.sh`) denies
+//! any quoted `"LYNX_*"` string literals or direct `env::var("LYNX_*")` calls outside
+//! **this file**. This file is the sole allowlisted source.
+//!
+//! To add a new env var: add a `pub const` here with a doc comment, then reference it
+//! everywhere else via the constant. Never spell the string inline in other crates.
 
 // ── Lynx runtime env vars ────────────────────────────────────────────────────
 
