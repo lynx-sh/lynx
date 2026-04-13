@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 
+use lynx_config::schema::{AliasContext, UserAlias};
 use lynx_core::env_vars;
 use lynx_core::types::Context;
 
@@ -22,6 +23,11 @@ pub struct InitParams<'a> {
     /// Plugins that hook into ZLE (zle -N) and must be sourced directly.
     /// These cannot go through eval "$()" — zle widget binding fails inside eval.
     pub zle_hook_plugins: HashSet<String>,
+    /// User-defined aliases to emit in the init script (context-gated).
+    /// Only emitted when context is Interactive.
+    pub user_aliases: &'a [UserAlias],
+    /// User-defined PATH entries to prepend. Always emitted regardless of context.
+    pub user_paths: &'a [String],
 }
 
 /// Generate the zsh init script that the shell evals on startup.
@@ -150,6 +156,28 @@ pub fn generate_init_script(params: &InitParams<'_>) -> String {
         }
     }
 
+    // User-defined aliases — only emit in interactive context (D-010/D-004).
+    if *params.context == Context::Interactive {
+        for alias in params.user_aliases {
+            // Only emit aliases tagged Interactive or All.
+            if matches!(alias.context, AliasContext::Interactive | AliasContext::All) {
+                out.push_str(&format!(
+                    "  alias {}={}\n",
+                    alias.name,
+                    shell_quote(&alias.command)
+                ));
+            }
+        }
+    }
+
+    // User-defined PATH entries — prepend regardless of context.
+    for path in params.user_paths {
+        out.push_str(&format!(
+            "  export PATH={path_q}:\"$PATH\"\n",
+            path_q = shell_quote(path)
+        ));
+    }
+
     // Not exported — must not leak into child shells or lx init would skip there too
     out.push_str(&format!("  typeset -g {}=1\n", env_vars::LYNX_INITIALIZED));
     out.push_str("fi\n");
@@ -178,6 +206,8 @@ mod tests {
             syntax_highlight_styles: None,
             autosuggest_style: None,
             zle_hook_plugins: HashSet::new(),
+            user_aliases: &[],
+            user_paths: &[],
         }
     }
 
@@ -297,6 +327,70 @@ mod tests {
         assert!(
             hostname_pos > guard_pos,
             "HOSTNAME must be inside the init guard"
+        );
+    }
+
+    #[test]
+    fn user_aliases_emitted_in_interactive_context() {
+        use lynx_config::schema::{AliasContext, UserAlias};
+        let plugins = vec![];
+        let aliases = vec![UserAlias {
+            name: "gs".into(),
+            command: "git status".into(),
+            description: None,
+            context: AliasContext::Interactive,
+        }];
+        let mut params = base_params(&Context::Interactive, &plugins);
+        params.user_aliases = &aliases;
+        let script = generate_init_script(&params);
+        assert!(
+            script.contains("alias gs="),
+            "interactive alias must be emitted: {script}"
+        );
+    }
+
+    #[test]
+    fn user_aliases_not_emitted_in_agent_context() {
+        use lynx_config::schema::{AliasContext, UserAlias};
+        let plugins = vec![];
+        let aliases = vec![UserAlias {
+            name: "gs".into(),
+            command: "git status".into(),
+            description: None,
+            context: AliasContext::Interactive,
+        }];
+        let mut params = base_params(&Context::Agent, &plugins);
+        params.user_aliases = &aliases;
+        let script = generate_init_script(&params);
+        assert!(
+            !script.contains("alias gs="),
+            "aliases must NOT be emitted in agent context"
+        );
+    }
+
+    #[test]
+    fn user_paths_always_emitted() {
+        let plugins = vec![];
+        let paths = vec!["/usr/local/sbin".to_string()];
+        let mut params = base_params(&Context::Agent, &plugins);
+        params.user_paths = &paths;
+        let script = generate_init_script(&params);
+        assert!(
+            script.contains("/usr/local/sbin"),
+            "user paths must be emitted even in agent context"
+        );
+    }
+
+    #[test]
+    fn user_paths_prepend_to_path() {
+        let plugins = vec![];
+        let paths = vec!["/opt/custom/bin".to_string()];
+        let mut params = base_params(&Context::Interactive, &plugins);
+        params.user_paths = &paths;
+        let script = generate_init_script(&params);
+        assert!(
+            script.contains("PATH='/opt/custom/bin':\"$PATH\""),
+            "path must be prepended: {script}"
         );
     }
 }

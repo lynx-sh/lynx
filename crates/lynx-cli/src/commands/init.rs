@@ -97,6 +97,8 @@ pub fn run(args: InitArgs) -> Result<()> {
         .map(|m| m.plugin.name.clone())
         .collect();
 
+    let user_paths: Vec<String> = config.paths.iter().map(|p| p.path.clone()).collect();
+
     let script = generate_init_script(&InitParams {
         context: &context,
         lynx_dir: &lynx_dir,
@@ -108,6 +110,8 @@ pub fn run(args: InitArgs) -> Result<()> {
         syntax_highlight_styles: syntax_styles_str.as_deref(),
         autosuggest_style: autosuggest_str.as_deref(),
         zle_hook_plugins,
+        user_aliases: &config.aliases,
+        user_paths: &user_paths,
     });
 
     print!("{script}");

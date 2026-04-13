@@ -5,6 +5,10 @@
 lx() {
   case "$1 $2" in
     "context set") eval "$(command lx "$@")" ;;
+    # alias add: binary emits "alias name='cmd'" + feedback line; eval sets alias live.
+    "alias add")   eval "$(command lx "$@")" ;;
+    # alias remove: binary removes from config; unalias clears the current session.
+    "alias remove") command lx "$@" && unalias "$3" 2>/dev/null ;;
     *) command lx "$@" ;;
   esac
 }
