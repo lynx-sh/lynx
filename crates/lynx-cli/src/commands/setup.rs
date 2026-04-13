@@ -175,6 +175,7 @@ fn snapshot_if_exists(lynx_dir: &Path) {
         // Best-effort: copy config.toml if it exists
         let cfg = lynx_dir.join("config.toml");
         if cfg.exists() {
+            // Best-effort backup — failure is non-critical
             let _ = std::fs::copy(&cfg, snap_dir.join("config.toml"));
         }
         println!("  ✓ snapshot → {}", snap_dir.display());

@@ -135,6 +135,7 @@ fn signal_daemon_reload() {
 
 #[cfg(unix)]
 fn send_signal(pid: i32, sig: i32) {
+    // Best-effort: SIGHUP to daemon may fail if not running
     let _ = std::process::Command::new("kill")
         .args([&format!("-{sig}"), &pid.to_string()])
         .status();
@@ -341,7 +342,7 @@ async fn cmd_run(name: String) -> Result<()> {
         match tokio::time::timeout(timeout, child.wait()).await {
             Ok(s) => s.context("wait failed")?,
             Err(_) => {
-                let _ = child.kill().await;
+                let _ = child.kill().await; // best-effort: child may have exited
                 println!("Task '{name}' timed out.");
                 return Ok(());
             }
