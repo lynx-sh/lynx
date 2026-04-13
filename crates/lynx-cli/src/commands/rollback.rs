@@ -1,6 +1,6 @@
 use anyhow::Result;
-use lynx_core::error::LynxError;
 use clap::Args;
+use lynx_core::error::LynxError;
 
 use lynx_config::snapshot::{list, restore};
 

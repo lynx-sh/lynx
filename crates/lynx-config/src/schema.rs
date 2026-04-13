@@ -36,8 +36,7 @@ pub struct SyncConfig {
 
 /// Intro display configuration, stored under `[intro]` in `config.toml`.
 /// Disabled by default — user must opt in via `lx intro on`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct IntroConfig {
     /// Whether the intro is enabled. Default: false.
     #[serde(default)]
@@ -90,7 +89,10 @@ mod tests {
         assert_eq!(cfg.active_theme, "nord");
         assert_eq!(cfg.active_context, Context::Agent);
         assert_eq!(cfg.enabled_plugins, vec!["git", "fzf"]);
-        assert_eq!(cfg.sync.remote.as_deref(), Some("git@github.com:user/dotfiles.git"));
+        assert_eq!(
+            cfg.sync.remote.as_deref(),
+            Some("git@github.com:user/dotfiles.git")
+        );
         assert!(cfg.intro.enabled);
         assert_eq!(cfg.intro.active.as_deref(), Some("default"));
     }
@@ -116,4 +118,3 @@ mod tests {
         assert!(sc.remote.is_none());
     }
 }
-

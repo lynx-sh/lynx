@@ -74,9 +74,10 @@ fn measure_startup() -> Result<Vec<(String, Duration)>> {
             tracing::warn!("benchmark: zsh exited with status {}", output.status);
         }
         Err(e) => {
-            return Err(lynx_core::error::LynxError::Shell(
-                format!("failed to spawn zsh for benchmark: {e}")
-            ).into());
+            return Err(lynx_core::error::LynxError::Shell(format!(
+                "failed to spawn zsh for benchmark: {e}"
+            ))
+            .into());
         }
         _ => {}
     }
@@ -200,9 +201,10 @@ mod tests {
 
     #[test]
     fn average_runs_single_run() {
-        let runs = vec![
-            vec![("component_a".to_string(), Duration::from_millis(100))],
-        ];
+        let runs = vec![vec![(
+            "component_a".to_string(),
+            Duration::from_millis(100),
+        )]];
         let result = average_runs(&runs);
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].component, "component_a");
@@ -253,18 +255,20 @@ mod tests {
 
     #[test]
     fn print_table_no_previous() {
-        let results = vec![
-            BenchResult { component: "startup".to_string(), avg_ms: 150 },
-        ];
+        let results = [BenchResult {
+            component: "startup".to_string(),
+            avg_ms: 150,
+        }];
         // Should print "(new)" for no previous data and not panic.
         print_table(&results, &[]);
     }
 
     #[test]
     fn print_table_with_regression() {
-        let results = vec![
-            BenchResult { component: "startup".to_string(), avg_ms: 200 },
-        ];
+        let results = vec![BenchResult {
+            component: "startup".to_string(),
+            avg_ms: 200,
+        }];
         let previous = vec![("startup".to_string(), 100u64)];
         // Should show regression warning
         print_table(&results, &previous);
@@ -272,18 +276,20 @@ mod tests {
 
     #[test]
     fn print_table_with_improvement() {
-        let results = vec![
-            BenchResult { component: "startup".to_string(), avg_ms: 50 },
-        ];
+        let results = vec![BenchResult {
+            component: "startup".to_string(),
+            avg_ms: 50,
+        }];
         let previous = vec![("startup".to_string(), 100u64)];
         print_table(&results, &previous);
     }
 
     #[test]
     fn print_table_previous_zero_shows_dash() {
-        let results = vec![
-            BenchResult { component: "startup".to_string(), avg_ms: 100 },
-        ];
+        let results = vec![BenchResult {
+            component: "startup".to_string(),
+            avg_ms: 100,
+        }];
         let previous = vec![("startup".to_string(), 0u64)];
         print_table(&results, &previous);
     }
@@ -293,9 +299,10 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let path = tmp.path().join("bench.jsonl");
 
-        let results = vec![
-            BenchResult { component: "startup".to_string(), avg_ms: 150 },
-        ];
+        let results = [BenchResult {
+            component: "startup".to_string(),
+            avg_ms: 150,
+        }];
 
         // Write to a temp path by temporarily overriding
         // We can't easily override benchmark_path(), so test the JSONL format directly.

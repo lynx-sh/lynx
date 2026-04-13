@@ -14,11 +14,7 @@ impl Segment for RubyVersionSegment {
     }
 
     fn render(&self, _config: &toml::Value, ctx: &RenderContext) -> Option<RenderedSegment> {
-        let state = ctx.cache.get(crate::cache_keys::RUBY_STATE)?;
-        let version = state.get("version")?.as_str()?;
-        if version.is_empty() {
-            return None;
-        }
+        let version = super::cached_version(ctx, crate::cache_keys::RUBY_STATE)?;
         Some(
             RenderedSegment::new(format!("💎 {version}"))
                 .with_cache_key(crate::cache_keys::RUBY_STATE),
@@ -59,17 +55,23 @@ mod tests {
 
     #[test]
     fn hidden_without_cache() {
-        assert!(RubyVersionSegment.render(&empty_config(), &empty_ctx()).is_none());
+        assert!(RubyVersionSegment
+            .render(&empty_config(), &empty_ctx())
+            .is_none());
     }
 
     #[test]
     fn shows_version() {
-        let r = RubyVersionSegment.render(&empty_config(), &ctx_with("3.3.0")).unwrap();
+        let r = RubyVersionSegment
+            .render(&empty_config(), &ctx_with("3.3.0"))
+            .unwrap();
         assert!(r.text.contains("3.3.0"), "text: {}", r.text);
     }
 
     #[test]
     fn hidden_on_empty_version() {
-        assert!(RubyVersionSegment.render(&empty_config(), &ctx_with("")).is_none());
+        assert!(RubyVersionSegment
+            .render(&empty_config(), &ctx_with(""))
+            .is_none());
     }
 }

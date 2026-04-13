@@ -7,15 +7,14 @@ use lynx_prompt::{
     evaluator::evaluate_theme,
     renderer::{render_prompt, render_transient_prompt},
     segment::RenderContext,
-    AwsProfileSegment, BackgroundJobsSegment, BatterySegment, CmdDurationSegment,
-    CondaEnvSegment, ContextBadgeSegment, DirSegment, DockerSegment,
-    ExitCodeSegment, GcpSegment, GitActionSegment, GitAheadBehindSegment, GitBranchSegment,
-    GitShaSegment, GitStashSegment, GitStatusSegment, GitTimeSinceCommitSegment,
-    GolangVersionSegment, HistNumberSegment, HostnameSegment, KubectlContextSegment,
-    LangVersionSegment, NewlineSegment, NodeVersionSegment, OsSegment, PromptCharSegment,
-    RubyVersionSegment, RustVersionSegment, ShellSegment, SshIndicatorSegment,
-    TaskStatusSegment, TerraformSegment, TextSegment, TimeSegment, UsernameSegment,
-    VenvSegment, ViModeSegment, CustomSegment,
+    AwsProfileSegment, BackgroundJobsSegment, BatterySegment, CmdDurationSegment, CondaEnvSegment,
+    ContextBadgeSegment, CustomSegment, DirSegment, DockerSegment, ExitCodeSegment, GcpSegment,
+    GitActionSegment, GitAheadBehindSegment, GitBranchSegment, GitShaSegment, GitStashSegment,
+    GitStatusSegment, GitTimeSinceCommitSegment, GolangVersionSegment, HistNumberSegment,
+    HostnameSegment, KubectlContextSegment, LangVersionSegment, NewlineSegment, NodeVersionSegment,
+    OsSegment, PromptCharSegment, RubyVersionSegment, RustVersionSegment, ShellSegment,
+    SshIndicatorSegment, TaskStatusSegment, TerraformSegment, TextSegment, TimeSegment,
+    UsernameSegment, VenvSegment, ViModeSegment,
 };
 use lynx_theme::loader::load as load_theme;
 use std::collections::HashMap;
@@ -125,8 +124,18 @@ async fn cmd_render(transient: bool) -> Result<()> {
     }
 
     let columns = ctx.env.get("COLUMNS").and_then(|v| v.parse::<u32>().ok());
-    let (left, right, top, top_right, continuation) = evaluate_theme(&segments, theme_ref, &ctx).await;
-    let output = render_prompt(&left, &right, &top, &top_right, &continuation, theme_ref, columns, Some(&ctx));
+    let (left, right, top, top_right, continuation) =
+        evaluate_theme(&segments, theme_ref, &ctx).await;
+    let output = render_prompt(
+        &left,
+        &right,
+        &top,
+        &top_right,
+        &continuation,
+        theme_ref,
+        columns,
+        Some(&ctx),
+    );
     print!("{output}");
     Ok(())
 }
@@ -142,40 +151,22 @@ fn build_render_context_from_env() -> RenderContext {
         .and_then(|v| v.parse::<u64>().ok());
 
     let mut cache: HashMap<String, serde_json::Value> = HashMap::new();
-
-    if let Ok(git_json) = std::env::var(env_vars::LYNX_CACHE_GIT_STATE) {
-        if let Ok(v) = serde_json::from_str::<serde_json::Value>(&git_json) {
-            cache.insert(cache_keys::GIT_STATE.into(), v);
-        }
-    }
-
-    if let Ok(kubectl_json) = std::env::var(env_vars::LYNX_CACHE_KUBECTL_STATE) {
-        if let Ok(v) = serde_json::from_str::<serde_json::Value>(&kubectl_json) {
-            cache.insert(cache_keys::KUBECTL_STATE.into(), v);
-        }
-    }
-
-    if let Ok(json) = std::env::var(env_vars::LYNX_CACHE_NODE_STATE) {
-        if let Ok(v) = serde_json::from_str::<serde_json::Value>(&json) {
-            cache.insert(cache_keys::NODE_STATE.into(), v);
-        }
-    }
-
-    if let Ok(json) = std::env::var(env_vars::LYNX_CACHE_RUBY_STATE) {
-        if let Ok(v) = serde_json::from_str::<serde_json::Value>(&json) {
-            cache.insert(cache_keys::RUBY_STATE.into(), v);
-        }
-    }
-
-    if let Ok(json) = std::env::var(env_vars::LYNX_CACHE_GOLANG_STATE) {
-        if let Ok(v) = serde_json::from_str::<serde_json::Value>(&json) {
-            cache.insert(cache_keys::GOLANG_STATE.into(), v);
-        }
-    }
-
-    if let Ok(json) = std::env::var(env_vars::LYNX_CACHE_RUST_STATE) {
-        if let Ok(v) = serde_json::from_str::<serde_json::Value>(&json) {
-            cache.insert(cache_keys::RUST_STATE.into(), v);
+    let cache_env_map = [
+        (env_vars::LYNX_CACHE_GIT_STATE, cache_keys::GIT_STATE),
+        (
+            env_vars::LYNX_CACHE_KUBECTL_STATE,
+            cache_keys::KUBECTL_STATE,
+        ),
+        (env_vars::LYNX_CACHE_NODE_STATE, cache_keys::NODE_STATE),
+        (env_vars::LYNX_CACHE_RUBY_STATE, cache_keys::RUBY_STATE),
+        (env_vars::LYNX_CACHE_GOLANG_STATE, cache_keys::GOLANG_STATE),
+        (env_vars::LYNX_CACHE_RUST_STATE, cache_keys::RUST_STATE),
+    ];
+    for (env_key, cache_key) in cache_env_map {
+        if let Ok(json) = std::env::var(env_key) {
+            if let Ok(value) = serde_json::from_str::<serde_json::Value>(&json) {
+                cache.insert(cache_key.into(), value);
+            }
         }
     }
 
@@ -211,12 +202,7 @@ fn build_render_context_from_env() -> RenderContext {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::{Mutex, OnceLock};
-
-    fn env_lock() -> &'static Mutex<()> {
-        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-        LOCK.get_or_init(|| Mutex::new(()))
-    }
+    use lynx_test_utils::env_lock;
 
     fn set_env_or_remove(key: &str, value: Option<&str>) {
         if let Some(v) = value {
@@ -294,11 +280,20 @@ mod tests {
     fn valid_git_cache_json_is_loaded() {
         let _lock = env_lock().lock().expect("lock");
         let _guard = EnvGuard::new(&[lynx_core::env_vars::LYNX_CACHE_GIT_STATE, "PWD"]);
-        std::env::set_var(lynx_core::env_vars::LYNX_CACHE_GIT_STATE, r#"{"branch":"main","dirty":false,"staged":false,"modified":false,"untracked":false,"stash":0,"ahead":0,"behind":0}"#);
+        std::env::set_var(
+            lynx_core::env_vars::LYNX_CACHE_GIT_STATE,
+            r#"{"branch":"main","dirty":false,"staged":false,"modified":false,"untracked":false,"stash":0,"ahead":0,"behind":0}"#,
+        );
         std::env::set_var("PWD", "/");
         let ctx = build_render_context_from_env();
-        assert_eq!(ctx.cache[lynx_prompt::cache_keys::GIT_STATE]["branch"], "main");
-        assert_eq!(ctx.cache[lynx_prompt::cache_keys::GIT_STATE]["staged"], false);
+        assert_eq!(
+            ctx.cache[lynx_prompt::cache_keys::GIT_STATE]["branch"],
+            "main"
+        );
+        assert_eq!(
+            ctx.cache[lynx_prompt::cache_keys::GIT_STATE]["staged"],
+            false
+        );
     }
 
     #[test]
@@ -321,7 +316,10 @@ mod tests {
         );
         std::env::set_var("PWD", "/");
         let ctx = build_render_context_from_env();
-        assert_eq!(ctx.cache[lynx_prompt::cache_keys::KUBECTL_STATE]["context"], "dev");
+        assert_eq!(
+            ctx.cache[lynx_prompt::cache_keys::KUBECTL_STATE]["context"],
+            "dev"
+        );
     }
 
     #[test]
@@ -331,7 +329,10 @@ mod tests {
         std::env::set_var(lynx_core::env_vars::LYNX_LAST_EXIT_CODE, "1");
         std::env::set_var("PWD", "/");
         let ctx = build_render_context_from_env();
-        assert_eq!(ctx.env.get("LYNX_LAST_EXIT_CODE").map(|s| s.as_str()), Some("1"));
+        assert_eq!(
+            ctx.env.get("LYNX_LAST_EXIT_CODE").map(|s| s.as_str()),
+            Some("1")
+        );
     }
 
     #[test]

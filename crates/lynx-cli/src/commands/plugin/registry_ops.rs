@@ -3,8 +3,8 @@
 // All network/IO work is offloaded via spawn_blocking so the async runtime stays unblocked.
 
 use anyhow::{Context, Result};
-use lynx_core::error::LynxError;
 use lynx_config::snapshot::mutate_config_transaction;
+use lynx_core::error::LynxError;
 use lynx_registry::fetch::{
     check_for_update, checksum_file, checksum_plugin_dir, fetch_plugin, update_plugin, FetchOptions,
 };
@@ -73,13 +73,13 @@ pub(super) async fn cmd_search(query: &str, refresh: bool) -> Result<()> {
 
 pub(super) async fn cmd_info(name: &str) -> Result<()> {
     let idx = tokio::task::spawn_blocking(|| get_index(false, None)).await??;
-    let entry = idx
-        .find(name)
-        .ok_or_else(|| anyhow::Error::from(lynx_core::error::LynxError::NotFound {
+    let entry = idx.find(name).ok_or_else(|| {
+        anyhow::Error::from(lynx_core::error::LynxError::NotFound {
             item_type: "Plugin".into(),
             name: name.to_string(),
             hint: "run `lx browse` to see available packages".into(),
-        }))?;
+        })
+    })?;
 
     let lock = load_lock().unwrap_or_default();
     let installed = lock.find(name);
@@ -128,7 +128,11 @@ pub(super) async fn cmd_update(name: Option<&str>, all: bool) -> Result<()> {
         return Ok(());
     }
 
-    let name = name.ok_or_else(|| anyhow::Error::from(lynx_core::error::LynxError::Plugin("provide a plugin name or use --all".into())))?;
+    let name = name.ok_or_else(|| {
+        anyhow::Error::from(lynx_core::error::LynxError::Plugin(
+            "provide a plugin name or use --all".into(),
+        ))
+    })?;
     update_one(name).await
 }
 
@@ -177,9 +181,13 @@ pub(super) fn cmd_checksum(target: &str) -> Result<()> {
         Ok(())
     } else {
         Err(LynxError::Registry(format!(
-                "checksum mismatch for '{}'\nexpected: {}\nactual:   {}\npath:     {}",
-                name, expected, actual, plugin_dir.display()
-            )).into())
+            "checksum mismatch for '{}'\nexpected: {}\nactual:   {}\npath:     {}",
+            name,
+            expected,
+            actual,
+            plugin_dir.display()
+        ))
+        .into())
     }
 }
 
@@ -194,15 +202,17 @@ fn verify_installed_plugin_checksum(
     lock: &LockFile,
 ) -> Result<(String, String, PathBuf)> {
     let locked = lock.find(name).with_context(|| {
-        format!(
-            "plugin '{name}' not found in lynx.lock (install it from registry first)"
-        )
+        format!("plugin '{name}' not found in lynx.lock (install it from registry first)")
     })?;
     let expected = locked
         .installed_checksum_sha256
         .as_ref()
         .or(Some(&locked.checksum_sha256))
-        .ok_or_else(|| anyhow::Error::from(lynx_core::error::LynxError::Plugin(format!("no checksum recorded for '{name}'"))))?
+        .ok_or_else(|| {
+            anyhow::Error::from(lynx_core::error::LynxError::Plugin(format!(
+                "no checksum recorded for '{name}'"
+            )))
+        })?
         .to_string();
 
     let plugin_dir = plugins_install_dir().join(name);
@@ -211,7 +221,8 @@ fn verify_installed_plugin_checksum(
             item_type: "Plugin directory".into(),
             name: name.to_string(),
             hint: format!("expected at {}", plugin_dir.display()),
-        }.into());
+        }
+        .into());
     }
     let actual = checksum_plugin_dir(&plugin_dir)?;
     Ok((expected, actual, plugin_dir))
@@ -226,13 +237,7 @@ fn validate_registry_index_path(path: &Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lynx_test_utils::temp_home;
-    use std::sync::{Mutex, OnceLock};
-
-    fn env_lock() -> &'static Mutex<()> {
-        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-        LOCK.get_or_init(|| Mutex::new(()))
-    }
+    use lynx_test_utils::{env_lock, temp_home};
 
     struct EnvGuard {
         vars: Vec<(String, Option<std::ffi::OsString>)>,
@@ -265,11 +270,13 @@ mod tests {
         let _guard = EnvGuard::new(&["HOME", "LYNX_DIR"]);
         let home = temp_home();
         std::env::set_var("HOME", home.path());
-        std::env::remove_var("LYNX_DIR");
+        let lynx_dir = home.path().join(".config/lynx");
+        std::env::set_var("LYNX_DIR", &lynx_dir);
 
-        let install_root = home.path().join(".local/share/lynx/plugins/git");
+        let install_root = lynx_dir.join("plugins/git");
         std::fs::create_dir_all(install_root.join("shell")).expect("create plugin dir");
-        std::fs::write(install_root.join(lynx_core::brand::PLUGIN_MANIFEST), "x").expect("write plugin.toml");
+        std::fs::write(install_root.join(lynx_core::brand::PLUGIN_MANIFEST), "x")
+            .expect("write plugin.toml");
         std::fs::write(install_root.join("shell/init.zsh"), "y").expect("write init");
         let checksum = checksum_plugin_dir(&install_root).expect("checksum");
 
@@ -296,11 +303,13 @@ mod tests {
         let _guard = EnvGuard::new(&["HOME", "LYNX_DIR"]);
         let home = temp_home();
         std::env::set_var("HOME", home.path());
-        std::env::remove_var("LYNX_DIR");
+        let lynx_dir = home.path().join(".config/lynx");
+        std::env::set_var("LYNX_DIR", &lynx_dir);
 
-        let install_root = home.path().join(".local/share/lynx/plugins/git");
+        let install_root = lynx_dir.join("plugins/git");
         std::fs::create_dir_all(install_root.join("shell")).expect("create plugin dir");
-        std::fs::write(install_root.join(lynx_core::brand::PLUGIN_MANIFEST), "x").expect("write plugin.toml");
+        std::fs::write(install_root.join(lynx_core::brand::PLUGIN_MANIFEST), "x")
+            .expect("write plugin.toml");
         std::fs::write(install_root.join("shell/init.zsh"), "y").expect("write init");
 
         let lock = LockFile {

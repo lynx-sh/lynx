@@ -181,4 +181,27 @@ mod tests {
         assert_eq!(out.context, Context::Agent);
         assert_eq!(out.method, DetectionMethod::AgentEnv("CURSOR_CLI"));
     }
+
+    #[test]
+    fn docs_use_canonical_agent_env_vars() {
+        let workspace_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .and_then(|p| p.parent())
+            .expect("workspace root")
+            .to_path_buf();
+
+        let readme =
+            std::fs::read_to_string(workspace_root.join("README.md")).expect("read README");
+        assert!(readme.contains(env_vars::CLAUDECODE));
+        assert!(readme.contains(env_vars::CURSOR_CLI));
+        assert!(!readme.contains("CLAUDE_CODE"));
+        assert!(!readme.contains("CURSOR_SESSION"));
+
+        let architecture = std::fs::read_to_string(workspace_root.join("docs/architecture.md"))
+            .expect("read architecture doc");
+        assert!(architecture.contains(env_vars::CLAUDECODE));
+        assert!(architecture.contains(env_vars::CURSOR_CLI));
+        assert!(!architecture.contains("CLAUDE_CODE"));
+        assert!(!architecture.contains("CURSOR_SESSION"));
+    }
 }

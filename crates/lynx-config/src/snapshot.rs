@@ -189,7 +189,11 @@ mod tests {
             let saved_lynx_dir = std::env::var("LYNX_DIR").ok();
             std::env::set_var("HOME", tmp.path());
             std::env::remove_var("LYNX_DIR"); // force lynx_dir() to derive from HOME
-            Self { _lock: lock, saved_home, saved_lynx_dir }
+            Self {
+                _lock: lock,
+                saved_home,
+                saved_lynx_dir,
+            }
         }
     }
 

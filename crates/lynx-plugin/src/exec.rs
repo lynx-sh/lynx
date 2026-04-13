@@ -32,9 +32,7 @@ pub fn generate_exec_script(manifest: &PluginManifest, plugin_dir: &Path) -> Res
     // This is the authoritative location for binary checks; plugin shell/init.zsh must not
     // duplicate this logic (D-001: no logic in static shell files).
     for binary in &manifest.deps.binaries {
-        out.push_str(&format!(
-            "if ! command -v {binary} &>/dev/null; then\n"
-        ));
+        out.push_str(&format!("if ! command -v {binary} &>/dev/null; then\n"));
         out.push_str(&format!(
             "  echo \"lynx: plugin '{}' requires '{binary}' — install it first\" >&2\n",
             manifest.plugin.name
@@ -193,7 +191,9 @@ mod tests {
         assert!(script.contains("fpath=(\"$LYNX_PLUGIN_DIR/completions\" $fpath)"));
         // fpath must appear before source in the output
         let fpath_pos = script.find("fpath=(").unwrap();
-        let source_pos = script.find("source \"$LYNX_PLUGIN_DIR/shell/init.zsh\"").unwrap();
+        let source_pos = script
+            .find("source \"$LYNX_PLUGIN_DIR/shell/init.zsh\"")
+            .unwrap();
         assert!(fpath_pos < source_pos, "fpath must come before source");
     }
 

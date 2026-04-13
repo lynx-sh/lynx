@@ -14,11 +14,7 @@ impl Segment for GolangVersionSegment {
     }
 
     fn render(&self, _config: &toml::Value, ctx: &RenderContext) -> Option<RenderedSegment> {
-        let state = ctx.cache.get(crate::cache_keys::GOLANG_STATE)?;
-        let version = state.get("version")?.as_str()?;
-        if version.is_empty() {
-            return None;
-        }
+        let version = super::cached_version(ctx, crate::cache_keys::GOLANG_STATE)?;
         Some(
             RenderedSegment::new(format!("🐹 {version}"))
                 .with_cache_key(crate::cache_keys::GOLANG_STATE),
@@ -59,17 +55,23 @@ mod tests {
 
     #[test]
     fn hidden_without_cache() {
-        assert!(GolangVersionSegment.render(&empty_config(), &empty_ctx()).is_none());
+        assert!(GolangVersionSegment
+            .render(&empty_config(), &empty_ctx())
+            .is_none());
     }
 
     #[test]
     fn shows_version() {
-        let r = GolangVersionSegment.render(&empty_config(), &ctx_with("1.22.3")).unwrap();
+        let r = GolangVersionSegment
+            .render(&empty_config(), &ctx_with("1.22.3"))
+            .unwrap();
         assert!(r.text.contains("1.22.3"), "text: {}", r.text);
     }
 
     #[test]
     fn hidden_on_empty_version() {
-        assert!(GolangVersionSegment.render(&empty_config(), &ctx_with("")).is_none());
+        assert!(GolangVersionSegment
+            .render(&empty_config(), &ctx_with(""))
+            .is_none());
     }
 }

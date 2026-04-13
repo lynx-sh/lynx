@@ -6,7 +6,9 @@
 use std::io;
 
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind, KeyModifiers},
+    event::{
+        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind, KeyModifiers,
+    },
     terminal::{self, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
@@ -74,7 +76,10 @@ impl AppState {
                     item.title().to_lowercase().contains(&q)
                         || item.subtitle().to_lowercase().contains(&q)
                         || item.tags().iter().any(|t| t.to_lowercase().contains(&q))
-                        || item.category().map(|c| c.to_lowercase().contains(&q)).unwrap_or(false)
+                        || item
+                            .category()
+                            .map(|c| c.to_lowercase().contains(&q))
+                            .unwrap_or(false)
                 })
                 .map(|(i, _)| i)
                 .collect();
@@ -92,7 +97,11 @@ impl AppState {
             return;
         }
         let i = self.list_state.selected().unwrap_or(0);
-        let next = if i >= self.filtered.len() - 1 { 0 } else { i + 1 };
+        let next = if i >= self.filtered.len() - 1 {
+            0
+        } else {
+            i + 1
+        };
         self.list_state.select(Some(next));
     }
 
@@ -101,7 +110,11 @@ impl AppState {
             return;
         }
         let i = self.list_state.selected().unwrap_or(0);
-        let prev = if i == 0 { self.filtered.len() - 1 } else { i - 1 };
+        let prev = if i == 0 {
+            self.filtered.len() - 1
+        } else {
+            i - 1
+        };
         self.list_state.select(Some(prev));
     }
 
@@ -117,11 +130,7 @@ impl AppState {
 const PREVIEW_MIN_WIDTH: u16 = 80;
 
 /// Run an interactive list in the terminal.
-pub fn run<T: ListItem>(
-    items: &[T],
-    title: &str,
-    colors: &TuiColors,
-) -> io::Result<ListResult> {
+pub fn run<T: ListItem>(items: &[T], title: &str, colors: &TuiColors) -> io::Result<ListResult> {
     if items.is_empty() {
         return Ok(ListResult::Cancelled);
     }
@@ -294,7 +303,15 @@ fn render_list<T: ListItem>(
                 let style = item_style(is_selected, item.is_active(), colors);
                 Line::from(Span::styled(text, style))
             } else {
-                build_highlighted_line(marker, title_text, &subtitle, &state.query, is_selected, item.is_active(), colors)
+                build_highlighted_line(
+                    marker,
+                    title_text,
+                    &subtitle,
+                    &state.query,
+                    is_selected,
+                    item.is_active(),
+                    colors,
+                )
             };
 
             RatatuiListItem::new(line)
@@ -372,12 +389,7 @@ fn build_highlighted_line(
 }
 
 /// Split text into spans, highlighting case-insensitive matches of `query`.
-fn highlight_spans(
-    text: &str,
-    query: &str,
-    base: Style,
-    highlight: Style,
-) -> Vec<Span<'static>> {
+fn highlight_spans(text: &str, query: &str, base: Style, highlight: Style) -> Vec<Span<'static>> {
     let mut spans = Vec::new();
     let lower = text.to_lowercase();
     let q = query.to_lowercase();
@@ -389,7 +401,10 @@ fn highlight_spans(
             spans.push(Span::styled(text[pos..abs_start].to_string(), base));
         }
         let abs_end = abs_start + query.len();
-        spans.push(Span::styled(text[abs_start..abs_end].to_string(), highlight));
+        spans.push(Span::styled(
+            text[abs_start..abs_end].to_string(),
+            highlight,
+        ));
         pos = abs_end;
     }
 

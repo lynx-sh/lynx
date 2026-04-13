@@ -2,13 +2,13 @@ use anyhow::Result;
 use clap::Args;
 use lynx_config::load as load_config;
 use lynx_core::{brand, diag, env_vars, types::Context};
-use lynx_theme::loader::load as load_theme;
 use lynx_manifest::schema::PluginManifest;
 use lynx_shell::{
     context::detect_context,
     init::{generate_init_script, InitParams},
     safemode::generate_safemode_script,
 };
+use lynx_theme::loader::load as load_theme;
 
 /// Cooldown timestamp filename in the runtime dir.
 const INTRO_LAST_SHOWN_FILE: &str = "intro_last_shown";
@@ -67,22 +67,23 @@ pub fn run(args: InitArgs) -> Result<()> {
     };
 
     // Load theme colors to embed inside the init script (inside the LYNX_INITIALIZED guard).
-    let theme_name = std::env::var(env_vars::LYNX_THEME)
-        .unwrap_or_else(|_| config.active_theme.clone());
+    let theme_name =
+        std::env::var(env_vars::LYNX_THEME).unwrap_or_else(|_| config.active_theme.clone());
     let theme_result = load_theme(&theme_name).or_else(|_| load_theme(brand::DEFAULT_THEME));
-    let (ls_colors_str, eza_colors_str, bsd_lscolors_str, syntax_styles_str, autosuggest_str) = match &theme_result {
-        Ok(theme) => (
-            theme.ls_colors.to_ls_colors_string(),
-            theme.ls_colors.to_eza_colors_string(),
-            Some(theme.ls_colors.to_bsd_lscolors()),
-            theme.syntax_highlight.to_zsh_highlight_styles(),
-            theme.autosuggestions.to_autosuggest_style(),
-        ),
-        Err(e) => {
-            diag::warn("init", &format!("theme '{theme_name}' failed to load: {e}"));
-            (None, None, None, None, None)
-        }
-    };
+    let (ls_colors_str, eza_colors_str, bsd_lscolors_str, syntax_styles_str, autosuggest_str) =
+        match &theme_result {
+            Ok(theme) => (
+                theme.ls_colors.to_ls_colors_string(),
+                theme.ls_colors.to_eza_colors_string(),
+                Some(theme.ls_colors.to_bsd_lscolors()),
+                theme.syntax_highlight.to_zsh_highlight_styles(),
+                theme.autosuggestions.to_autosuggest_style(),
+            ),
+            Err(e) => {
+                diag::warn("init", &format!("theme '{theme_name}' failed to load: {e}"));
+                (None, None, None, None, None)
+            }
+        };
 
     // Display intro if enabled and in interactive context.
     // Must print BEFORE the eval script so it appears above the first prompt.
@@ -166,7 +167,10 @@ fn load_plugin_manifests(plugin_dir: &str, enabled: &[String]) -> Vec<PluginMani
         if let Ok(content) = std::fs::read_to_string(&toml_path) {
             match lynx_manifest::parse_and_validate(&content) {
                 Ok(m) => manifests.push(m),
-                Err(e) => diag::warn("init", &format!("skipping plugin '{name}': invalid manifest: {e}")),
+                Err(e) => diag::warn(
+                    "init",
+                    &format!("skipping plugin '{name}': invalid manifest: {e}"),
+                ),
             }
         } // plugin dir missing or no manifest — silently skip (expected for optional plugins)
     }
@@ -196,10 +200,8 @@ mod tests {
         std::fs::create_dir_all(&plugin_dir).unwrap();
         std::fs::write(plugin_dir.join("plugin.toml"), "not valid toml {{{{").unwrap();
 
-        let manifests = load_plugin_manifests(
-            tmp.path().to_str().unwrap(),
-            &["test-plugin".to_string()],
-        );
+        let manifests =
+            load_plugin_manifests(tmp.path().to_str().unwrap(), &["test-plugin".to_string()]);
         assert!(manifests.is_empty());
     }
 
@@ -232,10 +234,7 @@ disabled_in = ["agent"]
 "#;
         std::fs::write(plugin_dir.join("plugin.toml"), manifest).unwrap();
 
-        let manifests = load_plugin_manifests(
-            tmp.path().to_str().unwrap(),
-            &["git".to_string()],
-        );
+        let manifests = load_plugin_manifests(tmp.path().to_str().unwrap(), &["git".to_string()]);
         assert_eq!(manifests.len(), 1);
         assert_eq!(manifests[0].plugin.name, "git");
     }

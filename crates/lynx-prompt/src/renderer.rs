@@ -33,7 +33,10 @@ pub fn render_prompt(
     // When a top line exists, the bottom (input) line should render plain —
     // no powerline edge glyphs, no adaptive separators.
     let left_str = if !top.is_empty() {
-        let plain_sep = Separators { mode: SeparatorMode::Static, ..Separators::default() };
+        let plain_sep = Separators {
+            mode: SeparatorMode::Static,
+            ..Separators::default()
+        };
         assemble(left, theme, &plain_sep, true, ctx)
     } else {
         assemble(left, theme, sep, true, ctx)
@@ -125,7 +128,9 @@ fn visible_len(s: &str) -> usize {
             while i < b.len() {
                 let byte = b[i];
                 i += 1;
-                if (0x40..=0x7e).contains(&byte) { break; }
+                if (0x40..=0x7e).contains(&byte) {
+                    break;
+                }
             }
         } else {
             // Count only the leading byte of each UTF-8 code point.
@@ -145,16 +150,17 @@ fn visible_len(s: &str) -> usize {
 pub fn render_transient_prompt(theme: &Theme) -> String {
     if let Some(ref transient) = theme.transient {
         let cap = capability();
-        let text = if cap != TermCapability::None && (transient.fg.is_some() || transient.bg.is_some()) {
-            let color = SegmentColor {
-                fg: transient.fg.clone(),
-                bg: transient.bg.clone(),
-                bold: false,
+        let text =
+            if cap != TermCapability::None && (transient.fg.is_some() || transient.bg.is_some()) {
+                let color = SegmentColor {
+                    fg: transient.fg.clone(),
+                    bg: transient.bg.clone(),
+                    bold: false,
+                };
+                apply_color_zsh(&transient.template, &color, cap)
+            } else {
+                transient.template.clone()
             };
-            apply_color_zsh(&transient.template, &color, cap)
-        } else {
-            transient.template.clone()
-        };
         format!("PROMPT=\"{text}\"\nRPROMPT=\"\"\n")
     } else {
         // Legacy fallback: prompt_char symbol.
@@ -200,7 +206,10 @@ mod tests {
         let top = vec![RenderedSegment::new("info").with_cache_key("dir")];
         let left = vec![RenderedSegment::new("~/code").with_cache_key("dir")];
         let out = render_prompt(&left, &[], &top, &[], &[], &theme, None, None);
-        assert!(out.contains("$'\\n'"), "expected ANSI-C newline ($'\\n') in two-line prompt");
+        assert!(
+            out.contains("$'\\n'"),
+            "expected ANSI-C newline ($'\\n') in two-line prompt"
+        );
     }
 
     #[test]
@@ -211,9 +220,15 @@ mod tests {
         let top_right = vec![RenderedSegment::new("[main]").with_cache_key("git_branch")];
         let out = render_prompt(&[], &[], &top, &top_right, &[], &theme, Some(80), None);
         // top_right content must appear in the top line
-        assert!(out.contains("[main]"), "expected top_right content in output: {out:?}");
+        assert!(
+            out.contains("[main]"),
+            "expected top_right content in output: {out:?}"
+        );
         // padding spaces must appear between top and top_right
-        assert!(out.contains("  "), "expected padding spaces in output: {out:?}");
+        assert!(
+            out.contains("  "),
+            "expected padding spaces in output: {out:?}"
+        );
     }
 
     #[test]
@@ -246,7 +261,7 @@ mod tests {
         assert_eq!(visible_len("~/dev"), 5);
         // Combined: zsh-wrapped ANSI + text after it
         assert_eq!(visible_len("%{\x1b[1m%}┌─[%{\x1b[0m%}foo"), 6); // ┌─[ = 3, foo = 3
-        // Trailing space counted
+                                                                    // Trailing space counted
         assert_eq!(visible_len("abc "), 4);
     }
 
@@ -261,8 +276,14 @@ mod tests {
         let top = vec![RenderedSegment::new("left").with_cache_key("dir")];
         let top_right = vec![RenderedSegment::new("right").with_cache_key("git_branch")];
         let out = render_prompt(&[], &[], &top, &top_right, &[], &theme, Some(40), None);
-        assert!(out.contains("─"), "expected filler char in top line: {out:?}");
-        assert!(!out.contains("     "), "should not have long space runs: {out:?}");
+        assert!(
+            out.contains("─"),
+            "expected filler char in top line: {out:?}"
+        );
+        assert!(
+            !out.contains("     "),
+            "should not have long space runs: {out:?}"
+        );
     }
 
     #[test]
@@ -275,8 +296,14 @@ mod tests {
             bg: None,
         });
         let out = render_transient_prompt(&theme);
-        assert!(out.contains("→"), "expected custom transient template: {out:?}");
-        assert!(!out.contains("❯"), "should not contain default symbol: {out:?}");
+        assert!(
+            out.contains("→"),
+            "expected custom transient template: {out:?}"
+        );
+        assert!(
+            !out.contains("❯"),
+            "should not contain default symbol: {out:?}"
+        );
     }
 
     #[test]
@@ -284,6 +311,9 @@ mod tests {
         let theme = load_default();
         // No [transient] config — should use prompt_char symbol.
         let out = render_transient_prompt(&theme);
-        assert!(out.contains("PROMPT="), "expected PROMPT assignment: {out:?}");
+        assert!(
+            out.contains("PROMPT="),
+            "expected PROMPT assignment: {out:?}"
+        );
     }
 }

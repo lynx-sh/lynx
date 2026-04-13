@@ -130,7 +130,7 @@ environment and adjusts what loads:
 - **Minimal** — only `dir` segment; no plugins
 
 Detection is automatic with canonical env vars:
-- `CLAUDE_CODE=1` or `CURSOR_SESSION=<id>` -> `agent`
+- `CLAUDECODE=1` or `CURSOR_CLI=<id>` -> `agent`
 - `CI=true` -> `minimal`
 - otherwise -> `interactive`
 

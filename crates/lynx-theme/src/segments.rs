@@ -169,131 +169,6 @@ pub struct StatusIcon {
 }
 
 /// The set of segment names that Lynx recognises. Used for validation.
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn segment_color_deserialize_string_shorthand() {
-        let input = "color = \"#7aa2f7\"";
-        #[derive(serde::Deserialize)]
-        struct W { color: SegmentColor }
-        let w: W = toml::from_str(input).unwrap();
-        assert_eq!(w.color.fg, Some("#7aa2f7".to_string()));
-        assert!(!w.color.bold);
-        assert!(w.color.bg.is_none());
-    }
-
-    #[test]
-    fn segment_color_deserialize_table() {
-        let input = "[color]\nfg = \"#ff0000\"\nbg = \"#000000\"\nbold = true\n";
-        #[derive(serde::Deserialize)]
-        struct W { color: SegmentColor }
-        let w: W = toml::from_str(input).unwrap();
-        assert_eq!(w.color.fg, Some("#ff0000".to_string()));
-        assert_eq!(w.color.bg, Some("#000000".to_string()));
-        assert!(w.color.bold);
-    }
-
-    #[test]
-    fn segment_color_default() {
-        let c = SegmentColor::default();
-        assert!(c.fg.is_none());
-        assert!(c.bg.is_none());
-        assert!(!c.bold);
-    }
-
-    #[test]
-    fn segment_visibility_default() {
-        let v = SegmentVisibility::default();
-        assert!(v.show_in.is_none());
-        assert!(v.hide_in.is_none());
-        assert!(v.show_when.is_none());
-        assert!(v.hide_when.is_none());
-    }
-
-    #[test]
-    fn segment_condition_env_set() {
-        let input = r#"show_when = { env_set = "SSH_CONNECTION" }"#;
-        #[derive(serde::Deserialize)]
-        struct W { show_when: SegmentCondition }
-        let w: W = toml::from_str(input).unwrap();
-        assert!(matches!(w.show_when, SegmentCondition::EnvSet { env_set } if env_set == "SSH_CONNECTION"));
-    }
-
-    #[test]
-    fn segment_condition_in_git_repo() {
-        let input = r#"show_when = { in_git_repo = true }"#;
-        #[derive(serde::Deserialize)]
-        struct W { show_when: SegmentCondition }
-        let w: W = toml::from_str(input).unwrap();
-        assert!(matches!(w.show_when, SegmentCondition::InGitRepo { in_git_repo: true }));
-    }
-
-    #[test]
-    fn segment_condition_cwd_matches() {
-        let input = r#"show_when = { cwd_matches = "~/work/**" }"#;
-        #[derive(serde::Deserialize)]
-        struct W { show_when: SegmentCondition }
-        let w: W = toml::from_str(input).unwrap();
-        assert!(matches!(w.show_when, SegmentCondition::CwdMatches { cwd_matches } if cwd_matches == "~/work/**"));
-    }
-
-    #[test]
-    fn segment_condition_exit_code_nonzero() {
-        let input = r#"show_when = { exit_code_nonzero = true }"#;
-        #[derive(serde::Deserialize)]
-        struct W { show_when: SegmentCondition }
-        let w: W = toml::from_str(input).unwrap();
-        assert!(matches!(w.show_when, SegmentCondition::ExitCodeNonzero { exit_code_nonzero: true }));
-    }
-
-    #[test]
-    fn segment_separators_default() {
-        let s = SegmentSeparators::default();
-        assert!(s.leading_char.is_none());
-        assert!(s.trailing_char.is_none());
-    }
-
-    #[test]
-    fn status_icon_default() {
-        let s = StatusIcon::default();
-        assert!(s.icon.is_none());
-        assert!(s.color.is_none());
-    }
-
-    #[test]
-    fn known_segments_is_not_empty() {
-        assert!(!KNOWN_SEGMENTS.is_empty());
-    }
-
-    #[test]
-    fn known_segments_no_duplicates() {
-        let mut seen = std::collections::HashSet::new();
-        for seg in KNOWN_SEGMENTS {
-            assert!(seen.insert(seg), "duplicate known segment: {seg}");
-        }
-    }
-
-    #[test]
-    fn known_segments_include_common_ones() {
-        assert!(KNOWN_SEGMENTS.contains(&"dir"));
-        assert!(KNOWN_SEGMENTS.contains(&"git_branch"));
-        assert!(KNOWN_SEGMENTS.contains(&"prompt_char"));
-        assert!(KNOWN_SEGMENTS.contains(&"time"));
-    }
-
-    #[test]
-    fn conditional_color_deserialize() {
-        let input = "[[color_when]]\ncondition = { cache_is_true = \"staged\" }\nbg = \"#00ff00\"\n";
-        #[derive(serde::Deserialize)]
-        struct W { color_when: Vec<ConditionalColor> }
-        let w: W = toml::from_str(input).unwrap();
-        assert_eq!(w.color_when.len(), 1);
-        assert_eq!(w.color_when[0].bg.as_deref(), Some("#00ff00"));
-    }
-}
-
 pub const KNOWN_SEGMENTS: &[&str] = &[
     "aws_profile",
     "battery",
@@ -333,3 +208,155 @@ pub const KNOWN_SEGMENTS: &[&str] = &[
     "newline",
     "prompt_char",
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn segment_color_deserialize_string_shorthand() {
+        let input = "color = \"#7aa2f7\"";
+        #[derive(serde::Deserialize)]
+        struct W {
+            color: SegmentColor,
+        }
+        let w: W = toml::from_str(input).unwrap();
+        assert_eq!(w.color.fg, Some("#7aa2f7".to_string()));
+        assert!(!w.color.bold);
+        assert!(w.color.bg.is_none());
+    }
+
+    #[test]
+    fn segment_color_deserialize_table() {
+        let input = "[color]\nfg = \"#ff0000\"\nbg = \"#000000\"\nbold = true\n";
+        #[derive(serde::Deserialize)]
+        struct W {
+            color: SegmentColor,
+        }
+        let w: W = toml::from_str(input).unwrap();
+        assert_eq!(w.color.fg, Some("#ff0000".to_string()));
+        assert_eq!(w.color.bg, Some("#000000".to_string()));
+        assert!(w.color.bold);
+    }
+
+    #[test]
+    fn segment_color_default() {
+        let c = SegmentColor::default();
+        assert!(c.fg.is_none());
+        assert!(c.bg.is_none());
+        assert!(!c.bold);
+    }
+
+    #[test]
+    fn segment_visibility_default() {
+        let v = SegmentVisibility::default();
+        assert!(v.show_in.is_none());
+        assert!(v.hide_in.is_none());
+        assert!(v.show_when.is_none());
+        assert!(v.hide_when.is_none());
+    }
+
+    #[test]
+    fn segment_condition_env_set() {
+        let input = r#"show_when = { env_set = "SSH_CONNECTION" }"#;
+        #[derive(serde::Deserialize)]
+        struct W {
+            show_when: SegmentCondition,
+        }
+        let w: W = toml::from_str(input).unwrap();
+        assert!(
+            matches!(w.show_when, SegmentCondition::EnvSet { env_set } if env_set == "SSH_CONNECTION")
+        );
+    }
+
+    #[test]
+    fn segment_condition_in_git_repo() {
+        let input = r#"show_when = { in_git_repo = true }"#;
+        #[derive(serde::Deserialize)]
+        struct W {
+            show_when: SegmentCondition,
+        }
+        let w: W = toml::from_str(input).unwrap();
+        assert!(matches!(
+            w.show_when,
+            SegmentCondition::InGitRepo { in_git_repo: true }
+        ));
+    }
+
+    #[test]
+    fn segment_condition_cwd_matches() {
+        let input = r#"show_when = { cwd_matches = "~/work/**" }"#;
+        #[derive(serde::Deserialize)]
+        struct W {
+            show_when: SegmentCondition,
+        }
+        let w: W = toml::from_str(input).unwrap();
+        assert!(
+            matches!(w.show_when, SegmentCondition::CwdMatches { cwd_matches } if cwd_matches == "~/work/**")
+        );
+    }
+
+    #[test]
+    fn segment_condition_exit_code_nonzero() {
+        let input = r#"show_when = { exit_code_nonzero = true }"#;
+        #[derive(serde::Deserialize)]
+        struct W {
+            show_when: SegmentCondition,
+        }
+        let w: W = toml::from_str(input).unwrap();
+        assert!(matches!(
+            w.show_when,
+            SegmentCondition::ExitCodeNonzero {
+                exit_code_nonzero: true
+            }
+        ));
+    }
+
+    #[test]
+    fn segment_separators_default() {
+        let s = SegmentSeparators::default();
+        assert!(s.leading_char.is_none());
+        assert!(s.trailing_char.is_none());
+    }
+
+    #[test]
+    fn status_icon_default() {
+        let s = StatusIcon::default();
+        assert!(s.icon.is_none());
+        assert!(s.color.is_none());
+    }
+
+    #[test]
+    fn known_segments_is_not_empty() {
+        assert!(!KNOWN_SEGMENTS.is_empty());
+    }
+
+    #[test]
+    fn known_segments_no_duplicates() {
+        let mut seen = std::collections::HashSet::new();
+        for seg in KNOWN_SEGMENTS {
+            assert!(seen.insert(seg), "duplicate known segment: {seg}");
+        }
+    }
+
+    #[test]
+    fn known_segments_include_common_ones() {
+        assert!(KNOWN_SEGMENTS.contains(&"dir"));
+        assert!(KNOWN_SEGMENTS.contains(&"git_branch"));
+        assert!(KNOWN_SEGMENTS.contains(&"prompt_char"));
+        assert!(KNOWN_SEGMENTS.contains(&"time"));
+    }
+
+    #[test]
+    fn conditional_color_deserialize() {
+        let input =
+            "[[color_when]]\ncondition = { cache_is_true = \"staged\" }\nbg = \"#00ff00\"\n";
+        #[derive(serde::Deserialize)]
+        struct W {
+            color_when: Vec<ConditionalColor>,
+        }
+        let w: W = toml::from_str(input).unwrap();
+        assert_eq!(w.color_when.len(), 1);
+        assert_eq!(w.color_when[0].bg.as_deref(), Some("#00ff00"));
+    }
+}

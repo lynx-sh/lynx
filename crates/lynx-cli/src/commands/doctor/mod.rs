@@ -78,27 +78,23 @@ mod tests {
 
     #[test]
     fn print_human_with_fail_mentions_issues() {
-        let checks = vec![
-            Check {
-                name: "test-check",
-                status: Status::Fail,
-                detail: "something is wrong".to_string(),
-                fix: Some("fix it".to_string()),
-            },
-        ];
+        let checks = vec![Check {
+            name: "test-check",
+            status: Status::Fail,
+            detail: "something is wrong".to_string(),
+            fix: Some("fix it".to_string()),
+        }];
         print_human(&checks);
     }
 
     #[test]
     fn print_human_with_pass_no_fix() {
-        let checks = vec![
-            Check {
-                name: "ok-check",
-                status: Status::Pass,
-                detail: "all good".to_string(),
-                fix: None,
-            },
-        ];
+        let checks = vec![Check {
+            name: "ok-check",
+            status: Status::Pass,
+            detail: "all good".to_string(),
+            fix: None,
+        }];
         print_human(&checks);
     }
 
@@ -109,27 +105,23 @@ mod tests {
 
     #[test]
     fn print_json_includes_fix_when_present() {
-        let checks = vec![
-            Check {
-                name: "broken",
-                status: Status::Fail,
-                detail: "bad".to_string(),
-                fix: Some("run this".to_string()),
-            },
-        ];
+        let checks = vec![Check {
+            name: "broken",
+            status: Status::Fail,
+            detail: "bad".to_string(),
+            fix: Some("run this".to_string()),
+        }];
         print_json(&checks);
     }
 
     #[test]
     fn print_json_omits_fix_when_none() {
-        let checks = vec![
-            Check {
-                name: "ok",
-                status: Status::Pass,
-                detail: "good".to_string(),
-                fix: None,
-            },
-        ];
+        let checks = vec![Check {
+            name: "ok",
+            status: Status::Pass,
+            detail: "good".to_string(),
+            fix: None,
+        }];
         print_json(&checks);
     }
 }

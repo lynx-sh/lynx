@@ -95,9 +95,12 @@ mod tests {
 
     #[test]
     fn custom_label_overrides_default() {
-        let cfg: toml::Value = toml::from_str(r#"[label]
+        let cfg: toml::Value = toml::from_str(
+            r#"[label]
 merge = "⚡MERGING"
-"#).unwrap();
+"#,
+        )
+        .unwrap();
         let ctx = ctx_with_action(Some("merge"));
         let r = GitActionSegment.render(&cfg, &ctx).unwrap();
         assert_eq!(r.text, "⚡MERGING");

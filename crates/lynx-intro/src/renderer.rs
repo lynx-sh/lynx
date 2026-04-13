@@ -24,12 +24,20 @@ pub fn render_intro(intro: &Intro, tokens: &HashMap<String, String>) -> String {
 
 fn render_block(block: &Block, tokens: &HashMap<String, String>) -> anyhow::Result<String> {
     match block {
-        Block::Text { content, color, bold } => {
+        Block::Text {
+            content,
+            color,
+            bold,
+        } => {
             let text = substitute(content, tokens);
             Ok(apply_style(&text, color.as_deref(), *bold))
         }
 
-        Block::KeyVal { items, color_key, color_val } => {
+        Block::KeyVal {
+            items,
+            color_key,
+            color_val,
+        } => {
             if items.is_empty() {
                 return Ok(String::new());
             }
@@ -89,7 +97,11 @@ fn substitute(template: &str, tokens: &HashMap<String, String>) -> String {
 fn apply_style(text: &str, color: Option<&str>, bold: bool) -> String {
     let color_esc = color.and_then(ansi_fg);
     let bold_esc = if bold { "\x1b[1m" } else { "" };
-    let reset = if color_esc.is_some() || bold { "\x1b[0m" } else { "" };
+    let reset = if color_esc.is_some() || bold {
+        "\x1b[0m"
+    } else {
+        ""
+    };
 
     match color_esc {
         Some(fg) => format!("{bold_esc}{fg}{text}{reset}"),
@@ -107,21 +119,21 @@ fn ansi_fg(color: &str) -> Option<String> {
     }
     // Named colors — curated palette matching lynx-theme's names
     let (r, g, b) = match color.to_lowercase().as_str() {
-        "black"        => (0,   0,   0),
-        "red"          => (247, 118, 142),
-        "green"        => (158, 206, 106),
-        "yellow"       => (224, 175, 104),
-        "blue"         => (122, 162, 247),
-        "magenta"      => (187, 154, 247),
-        "cyan"         => (125, 207, 255),
-        "white"        => (192, 202, 245),
-        "bright-red"   => (255, 85,  85),
-        "bright-green" => (80,  250, 123),
-        "bright-yellow"=> (241, 250, 140),
-        "light-blue"   => (130, 170, 255),
-        "orange"       => (255, 158, 100),
+        "black" => (0, 0, 0),
+        "red" => (247, 118, 142),
+        "green" => (158, 206, 106),
+        "yellow" => (224, 175, 104),
+        "blue" => (122, 162, 247),
+        "magenta" => (187, 154, 247),
+        "cyan" => (125, 207, 255),
+        "white" => (192, 202, 245),
+        "bright-red" => (255, 85, 85),
+        "bright-green" => (80, 250, 123),
+        "bright-yellow" => (241, 250, 140),
+        "light-blue" => (130, 170, 255),
+        "orange" => (255, 158, 100),
         "muted" | "gray" | "grey" => (128, 128, 128),
-        "accent"       => (122, 162, 247),  // default accent = blue
+        "accent" => (122, 162, 247), // default accent = blue
         _ => return None,
     };
     Some(format!("\x1b[38;2;{r};{g};{b}m"))
@@ -146,7 +158,11 @@ mod tests {
 
     fn fixture_intro() -> Intro {
         Intro {
-            meta: IntroMeta { name: "test".into(), description: "".into(), author: "".into() },
+            meta: IntroMeta {
+                name: "test".into(),
+                description: "".into(),
+                author: "".into(),
+            },
             display: DisplayConfig::default(),
             blocks: vec![
                 Block::Text {
@@ -154,7 +170,11 @@ mod tests {
                     color: Some("green".into()),
                     bold: true,
                 },
-                Block::Separator { char: "─".into(), width: 20, color: None },
+                Block::Separator {
+                    char: "─".into(),
+                    width: 20,
+                    color: None,
+                },
                 Block::KeyVal {
                     items: vec![
                         ["OS".into(), "{{os}}".into()],

@@ -1,10 +1,8 @@
-use lynx_core::error::LynxError;
 use anyhow::Result;
 use clap::{Args, Subcommand};
+use lynx_core::error::LynxError;
 use lynx_core::paths::taps_config_path;
-use lynx_registry::tap::{
-    add_tap, load_taps, remove_tap, resolve_tap_url, save_taps,
-};
+use lynx_registry::tap::{add_tap, load_taps, remove_tap, resolve_tap_url, save_taps};
 
 #[derive(Args)]
 #[command(arg_required_else_help = true)]
@@ -40,9 +38,11 @@ pub fn run(args: TapArgs) -> Result<()> {
         TapCommand::Add { source } => cmd_add(&source),
         TapCommand::Remove { name } => cmd_remove(&name),
         TapCommand::Update => cmd_update(),
-        TapCommand::Other(args) => {
-            Err(LynxError::unknown_command(args.first().map(|s| s.as_str()).unwrap_or(""), "tap").into())
-        }
+        TapCommand::Other(args) => Err(LynxError::unknown_command(
+            args.first().map(|s| s.as_str()).unwrap_or(""),
+            "tap",
+        )
+        .into()),
     }
 }
 
@@ -53,23 +53,33 @@ struct TapListEntry {
 }
 
 impl lynx_tui::ListItem for TapListEntry {
-    fn title(&self) -> &str { &self.name }
-    fn subtitle(&self) -> String { self.trust.clone() }
+    fn title(&self) -> &str {
+        &self.name
+    }
+    fn subtitle(&self) -> String {
+        self.trust.clone()
+    }
     fn detail(&self) -> String {
         format!("URL: {}\nTrust: {}", self.url, self.trust)
     }
-    fn category(&self) -> Option<&str> { Some("tap") }
+    fn category(&self) -> Option<&str> {
+        Some("tap")
+    }
 }
 
 fn cmd_list() -> Result<()> {
     let path = taps_config_path();
     let list = load_taps(&path)?;
 
-    let entries: Vec<TapListEntry> = list.taps.iter().map(|tap| TapListEntry {
-        name: tap.name.clone(),
-        url: tap.url.clone(),
-        trust: tap.trust.label().to_string(),
-    }).collect();
+    let entries: Vec<TapListEntry> = list
+        .taps
+        .iter()
+        .map(|tap| TapListEntry {
+            name: tap.name.clone(),
+            url: tap.url.clone(),
+            trust: tap.trust.label().to_string(),
+        })
+        .collect();
 
     lynx_tui::show(&entries, "Taps", &super::tui_colors())?;
     Ok(())

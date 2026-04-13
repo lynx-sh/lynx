@@ -20,7 +20,9 @@ pub fn resolve_source(input: &str) -> Result<Source> {
     if input.starts_with("https://") || input.starts_with("http://") {
         let url = normalize_github_url(input);
         if !url.starts_with("https://") {
-            return Err(LynxError::Theme("only HTTPS URLs are supported for security".into()).into());
+            return Err(
+                LynxError::Theme("only HTTPS URLs are supported for security".into()).into(),
+            );
         }
         return Ok(Source::Remote(url));
     }

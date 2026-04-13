@@ -14,11 +14,7 @@ impl Segment for RustVersionSegment {
     }
 
     fn render(&self, _config: &toml::Value, ctx: &RenderContext) -> Option<RenderedSegment> {
-        let state = ctx.cache.get(crate::cache_keys::RUST_STATE)?;
-        let version = state.get("version")?.as_str()?;
-        if version.is_empty() {
-            return None;
-        }
+        let version = super::cached_version(ctx, crate::cache_keys::RUST_STATE)?;
         Some(
             RenderedSegment::new(format!("🦀 {version}"))
                 .with_cache_key(crate::cache_keys::RUST_STATE),
@@ -59,23 +55,31 @@ mod tests {
 
     #[test]
     fn hidden_without_cache() {
-        assert!(RustVersionSegment.render(&empty_config(), &empty_ctx()).is_none());
+        assert!(RustVersionSegment
+            .render(&empty_config(), &empty_ctx())
+            .is_none());
     }
 
     #[test]
     fn shows_channel() {
-        let r = RustVersionSegment.render(&empty_config(), &ctx_with("stable")).unwrap();
+        let r = RustVersionSegment
+            .render(&empty_config(), &ctx_with("stable"))
+            .unwrap();
         assert!(r.text.contains("stable"), "text: {}", r.text);
     }
 
     #[test]
     fn shows_pinned_version() {
-        let r = RustVersionSegment.render(&empty_config(), &ctx_with("1.78.0")).unwrap();
+        let r = RustVersionSegment
+            .render(&empty_config(), &ctx_with("1.78.0"))
+            .unwrap();
         assert!(r.text.contains("1.78.0"));
     }
 
     #[test]
     fn hidden_on_empty_version() {
-        assert!(RustVersionSegment.render(&empty_config(), &ctx_with("")).is_none());
+        assert!(RustVersionSegment
+            .render(&empty_config(), &ctx_with(""))
+            .is_none());
     }
 }

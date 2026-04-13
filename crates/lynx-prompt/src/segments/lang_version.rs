@@ -61,91 +61,94 @@ fn detect(cwd: &Path) -> Option<Detection> {
     // Priority order: most specific first.
     if cwd.join("Cargo.toml").exists() {
         return Some(Detection {
-            icon: " \u{f013} ",  // Font Awesome gear (fa-cog) — full-size
+            icon: " \u{f013} ", // Font Awesome gear (fa-cog) — full-size
             name: "rust",
             version: rust_version(cwd).unwrap_or_default(),
         });
     }
     if cwd.join("go.mod").exists() {
         return Some(Detection {
-            icon: " \u{e627} ",  // Nerd Fonts Go
+            icon: " \u{e627} ", // Nerd Fonts Go
             name: "go",
             version: go_version(cwd).unwrap_or_default(),
         });
     }
     if cwd.join("package.json").exists() {
         return Some(Detection {
-            icon: " \u{e718} ",  // Nerd Fonts Node
+            icon: " \u{e718} ", // Nerd Fonts Node
             name: "node",
             version: node_version(cwd).unwrap_or_default(),
         });
     }
     if cwd.join("pyproject.toml").exists() || cwd.join("requirements.txt").exists() {
         return Some(Detection {
-            icon: " \u{e73c} ",  // Nerd Fonts Python
+            icon: " \u{e73c} ", // Nerd Fonts Python
             name: "python",
             version: python_version(cwd).unwrap_or_default(),
         });
     }
     if cwd.join("Gemfile").exists() {
         return Some(Detection {
-            icon: " \u{e791} ",  // Nerd Fonts Ruby
+            icon: " \u{e791} ", // Nerd Fonts Ruby
             name: "ruby",
             version: ruby_version(cwd).unwrap_or_default(),
         });
     }
     if cwd.join("composer.json").exists() {
         return Some(Detection {
-            icon: " \u{e73d} ",  // Nerd Fonts PHP
+            icon: " \u{e73d} ", // Nerd Fonts PHP
             name: "php",
             version: php_version(cwd).unwrap_or_default(),
         });
     }
     if cwd.join("pom.xml").exists() || cwd.join("build.gradle").exists() {
         return Some(Detection {
-            icon: " \u{e738} ",  // Nerd Fonts Java
+            icon: " \u{e738} ", // Nerd Fonts Java
             name: "java",
             version: String::new(),
         });
     }
     if cwd.join("build.gradle.kts").exists() {
         return Some(Detection {
-            icon: " \u{e634} ",  // Nerd Fonts Kotlin
+            icon: " \u{e634} ", // Nerd Fonts Kotlin
             name: "kotlin",
             version: String::new(),
         });
     }
     if cwd.join("pubspec.yaml").exists() {
         return Some(Detection {
-            icon: " \u{e798} ",  // Nerd Fonts Dart
+            icon: " \u{e798} ", // Nerd Fonts Dart
             name: "dart",
             version: dart_version(cwd).unwrap_or_default(),
         });
     }
     if cwd.join("Package.swift").exists() {
         return Some(Detection {
-            icon: " \u{e755} ",  // Nerd Fonts Swift
+            icon: " \u{e755} ", // Nerd Fonts Swift
             name: "swift",
             version: swift_version(cwd).unwrap_or_default(),
         });
     }
     if cwd.join("mix.exs").exists() {
         return Some(Detection {
-            icon: " \u{e62d} ",  // Nerd Fonts Elixir
+            icon: " \u{e62d} ", // Nerd Fonts Elixir
             name: "elixir",
             version: elixir_version(cwd).unwrap_or_default(),
         });
     }
     if cwd.join("build.zig").exists() {
         return Some(Detection {
-            icon: " \u{e6a9} ",  // Nerd Fonts Zig
+            icon: " \u{e6a9} ", // Nerd Fonts Zig
             name: "zig",
             version: String::new(),
         });
     }
-    if cwd.join("init.lua").exists() || cwd.join(".luarocks").exists() || cwd.join(".luacheckrc").exists() {
+    if cwd.join("init.lua").exists()
+        || cwd.join(".luarocks").exists()
+        || cwd.join(".luacheckrc").exists()
+    {
         return Some(Detection {
-            icon: " \u{e620} ",  // Nerd Fonts Lua
+            icon: " \u{e620} ", // Nerd Fonts Lua
             name: "lua",
             version: String::new(),
         });
@@ -153,7 +156,7 @@ fn detect(cwd: &Path) -> Option<Detection> {
     // .NET — check for *.csproj or *.fsproj
     if has_extension(cwd, "csproj") || has_extension(cwd, "fsproj") {
         return Some(Detection {
-            icon: " \u{e77f} ",  // Nerd Fonts .NET
+            icon: " \u{e77f} ", // Nerd Fonts .NET
             name: "dotnet",
             version: dotnet_version(cwd).unwrap_or_default(),
         });
@@ -270,7 +273,9 @@ fn ruby_version(cwd: &Path) -> Option<String> {
     for line in content.lines() {
         let line = line.trim();
         if line.starts_with("ruby '") || line.starts_with("ruby \"") {
-            return line.split('\'').nth(1)
+            return line
+                .split('\'')
+                .nth(1)
                 .or_else(|| line.split('"').nth(1))
                 .map(str::to_string);
         }
@@ -284,7 +289,10 @@ fn dart_version(cwd: &Path) -> Option<String> {
     for line in content.lines() {
         let line = line.trim();
         if line.starts_with("sdk:") {
-            return line.split(':').nth(1).map(|s| s.trim().trim_matches('"').trim_matches('\'').to_string());
+            return line
+                .split(':')
+                .nth(1)
+                .map(|s| s.trim().trim_matches('"').trim_matches('\'').to_string());
         }
     }
     None
@@ -315,10 +323,16 @@ fn elixir_version(cwd: &Path) -> Option<String> {
 
 /// Read .NET target framework from *.csproj TargetFramework element.
 fn dotnet_version(cwd: &Path) -> Option<String> {
-    let entry = std::fs::read_dir(cwd).ok()?
+    let entry = std::fs::read_dir(cwd)
+        .ok()?
         .filter_map(|e| e.ok())
         .find(|e| {
-            let ext = e.path().extension().and_then(|x| x.to_str()).unwrap_or("").to_string();
+            let ext = e
+                .path()
+                .extension()
+                .and_then(|x| x.to_str())
+                .unwrap_or("")
+                .to_string();
             ext == "csproj" || ext == "fsproj"
         })?;
     let content = std::fs::read_to_string(entry.path()).ok()?;
@@ -366,7 +380,9 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let seg = LangVersionSegment;
         let cfg = toml::Value::Table(toml::map::Map::new());
-        assert!(seg.render(&cfg, &ctx(dir.path().to_str().unwrap())).is_none());
+        assert!(seg
+            .render(&cfg, &ctx(dir.path().to_str().unwrap()))
+            .is_none());
     }
 
     #[test]
@@ -375,9 +391,15 @@ mod tests {
         std::fs::write(dir.path().join("Cargo.toml"), "[package]\nname=\"test\"").unwrap();
         let seg = LangVersionSegment;
         let cfg = toml::Value::Table(toml::map::Map::new());
-        let r = seg.render(&cfg, &ctx(dir.path().to_str().unwrap())).unwrap();
+        let r = seg
+            .render(&cfg, &ctx(dir.path().to_str().unwrap()))
+            .unwrap();
         // Icon contains Font Awesome gear \u{f013}
-        assert!(r.text.contains('\u{f013}'), "expected rust icon in: {:?}", r.text);
+        assert!(
+            r.text.contains('\u{f013}'),
+            "expected rust icon in: {:?}",
+            r.text
+        );
     }
 
     #[test]
@@ -386,7 +408,9 @@ mod tests {
         std::fs::write(dir.path().join("go.mod"), "module foo\n\ngo 1.22\n").unwrap();
         let seg = LangVersionSegment;
         let cfg = toml::Value::Table(toml::map::Map::new());
-        let r = seg.render(&cfg, &ctx(dir.path().to_str().unwrap())).unwrap();
+        let r = seg
+            .render(&cfg, &ctx(dir.path().to_str().unwrap()))
+            .unwrap();
         assert!(r.text.contains('\u{e627}'), "expected go icon");
         assert!(r.text.contains("1.22"), "expected version");
     }
@@ -398,7 +422,9 @@ mod tests {
         std::fs::write(dir.path().join(".nvmrc"), "v20.11.0\n").unwrap();
         let seg = LangVersionSegment;
         let cfg = toml::Value::Table(toml::map::Map::new());
-        let r = seg.render(&cfg, &ctx(dir.path().to_str().unwrap())).unwrap();
+        let r = seg
+            .render(&cfg, &ctx(dir.path().to_str().unwrap()))
+            .unwrap();
         assert!(r.text.contains('\u{e718}'), "expected node icon");
         assert!(r.text.contains("20.11.0"), "expected version");
     }
@@ -422,14 +448,20 @@ mod tests {
         std::fs::write(dir.path().join("Cargo.toml"), "[package]").unwrap();
         let seg = LangVersionSegment;
         let cfg: toml::Value = toml::from_str(r#"icon = "RS ""#).unwrap();
-        let r = seg.render(&cfg, &ctx(dir.path().to_str().unwrap())).unwrap();
+        let r = seg
+            .render(&cfg, &ctx(dir.path().to_str().unwrap()))
+            .unwrap();
         assert!(r.text.starts_with("RS "), "text: {}", r.text);
     }
 
     #[test]
     fn detects_dart_project() {
         let dir = tempfile::tempdir().unwrap();
-        std::fs::write(dir.path().join("pubspec.yaml"), "name: myapp\nenvironment:\n  sdk: ^3.0.0\n").unwrap();
+        std::fs::write(
+            dir.path().join("pubspec.yaml"),
+            "name: myapp\nenvironment:\n  sdk: ^3.0.0\n",
+        )
+        .unwrap();
         let r = detect(dir.path()).unwrap();
         assert_eq!(r.name, "dart");
         assert!(r.icon.contains('\u{e798}'));
@@ -438,7 +470,11 @@ mod tests {
     #[test]
     fn detects_swift_project() {
         let dir = tempfile::tempdir().unwrap();
-        std::fs::write(dir.path().join("Package.swift"), "// swift-tools-version:5.9\nimport PackageDescription\n").unwrap();
+        std::fs::write(
+            dir.path().join("Package.swift"),
+            "// swift-tools-version:5.9\nimport PackageDescription\n",
+        )
+        .unwrap();
         let r = detect(dir.path()).unwrap();
         assert_eq!(r.name, "swift");
         assert_eq!(r.version, "5.9");
@@ -447,7 +483,11 @@ mod tests {
     #[test]
     fn detects_kotlin_project() {
         let dir = tempfile::tempdir().unwrap();
-        std::fs::write(dir.path().join("build.gradle.kts"), "plugins { kotlin(\"jvm\") }").unwrap();
+        std::fs::write(
+            dir.path().join("build.gradle.kts"),
+            "plugins { kotlin(\"jvm\") }",
+        )
+        .unwrap();
         let r = detect(dir.path()).unwrap();
         assert_eq!(r.name, "kotlin");
     }
@@ -455,7 +495,11 @@ mod tests {
     #[test]
     fn detects_elixir_project() {
         let dir = tempfile::tempdir().unwrap();
-        std::fs::write(dir.path().join("mix.exs"), "defmodule MyApp do\n  elixir: \"~> 1.14\"\nend").unwrap();
+        std::fs::write(
+            dir.path().join("mix.exs"),
+            "defmodule MyApp do\n  elixir: \"~> 1.14\"\nend",
+        )
+        .unwrap();
         let r = detect(dir.path()).unwrap();
         assert_eq!(r.name, "elixir");
         assert_eq!(r.version, "~> 1.14");
@@ -464,7 +508,11 @@ mod tests {
     #[test]
     fn detects_zig_project() {
         let dir = tempfile::tempdir().unwrap();
-        std::fs::write(dir.path().join("build.zig"), "const std = @import(\"std\");").unwrap();
+        std::fs::write(
+            dir.path().join("build.zig"),
+            "const std = @import(\"std\");",
+        )
+        .unwrap();
         let r = detect(dir.path()).unwrap();
         assert_eq!(r.name, "zig");
     }

@@ -64,7 +64,10 @@ mod tests {
 
     #[test]
     fn parse_zsh_version_standard() {
-        assert_eq!(parse_zsh_version("zsh 5.9 (x86_64-apple-darwin23.0)"), Some((5, 9)));
+        assert_eq!(
+            parse_zsh_version("zsh 5.9 (x86_64-apple-darwin23.0)"),
+            Some((5, 9))
+        );
     }
 
     #[test]

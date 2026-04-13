@@ -31,10 +31,7 @@ fn smart_defaults(tool: &str) -> Option<&'static str> {
 /// - shell/aliases.zsh
 ///
 /// Returns the path to the generated plugin directory.
-pub fn generate_tool_plugin(
-    entry: &RegistryEntry,
-    plugins_dir: &Path,
-) -> Result<PathBuf> {
+pub fn generate_tool_plugin(entry: &RegistryEntry, plugins_dir: &Path) -> Result<PathBuf> {
     let name = &entry.name;
     let plugin_dir = plugins_dir.join(name);
     let shell_dir = plugin_dir.join("shell");
@@ -99,8 +96,7 @@ disabled_in = ["agent", "minimal"]
   source "${{LYNX_PLUGIN_DIR}}/{name}/shell/aliases.zsh"
 "#
     );
-    std::fs::write(shell_dir.join("init.zsh"), &init)
-        .context("failed to write init.zsh")?;
+    std::fs::write(shell_dir.join("init.zsh"), &init).context("failed to write init.zsh")?;
 
     Ok(plugin_dir)
 }
@@ -162,8 +158,14 @@ mod tests {
         generate_tool_plugin(&entry, dir.path()).unwrap();
 
         let aliases = std::fs::read_to_string(dir.path().join("eza/shell/aliases.zsh")).unwrap();
-        assert!(aliases.contains("--icons"), "expected --icons in: {aliases}");
-        assert!(aliases.contains("--color=auto"), "expected --color=auto in: {aliases}");
+        assert!(
+            aliases.contains("--icons"),
+            "expected --icons in: {aliases}"
+        );
+        assert!(
+            aliases.contains("--color=auto"),
+            "expected --color=auto in: {aliases}"
+        );
     }
 
     #[test]
@@ -173,7 +175,10 @@ mod tests {
         generate_tool_plugin(&entry, dir.path()).unwrap();
 
         let aliases = std::fs::read_to_string(dir.path().join("bat/shell/aliases.zsh")).unwrap();
-        assert!(aliases.contains("--style=auto"), "expected --style=auto in: {aliases}");
+        assert!(
+            aliases.contains("--style=auto"),
+            "expected --style=auto in: {aliases}"
+        );
     }
 
     #[test]
@@ -182,11 +187,18 @@ mod tests {
         let entry = tool_entry("ripgrep", None);
         generate_tool_plugin(&entry, dir.path()).unwrap();
 
-        let aliases = std::fs::read_to_string(dir.path().join("ripgrep/shell/aliases.zsh")).unwrap();
-        assert!(aliases.contains("No alias"), "expected no alias comment in: {aliases}");
+        let aliases =
+            std::fs::read_to_string(dir.path().join("ripgrep/shell/aliases.zsh")).unwrap();
+        assert!(
+            aliases.contains("No alias"),
+            "expected no alias comment in: {aliases}"
+        );
 
         let manifest = std::fs::read_to_string(dir.path().join("ripgrep/plugin.toml")).unwrap();
-        assert!(manifest.contains("aliases   = "), "aliases list should be empty");
+        assert!(
+            manifest.contains("aliases   = "),
+            "aliases list should be empty"
+        );
     }
 
     #[test]
@@ -206,7 +218,10 @@ mod tests {
         generate_tool_plugin(&entry, dir.path()).unwrap();
 
         let init = std::fs::read_to_string(dir.path().join("eza/shell/init.zsh")).unwrap();
-        assert!(init.contains("LYNX_CONTEXT"), "expected context gate in init.zsh");
+        assert!(
+            init.contains("LYNX_CONTEXT"),
+            "expected context gate in init.zsh"
+        );
         assert!(init.contains("agent"), "expected agent context check");
     }
 }

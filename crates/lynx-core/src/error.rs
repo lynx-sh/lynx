@@ -55,11 +55,15 @@ pub enum LynxError {
     AlreadyInstalled(String),
 
     /// An item is not installed but an operation requires it to be.
-    #[error("{0} is not installed\n  Fix: run `lx plugin add {0}` or `lx install {0}` to install it")]
+    #[error(
+        "{0} is not installed\n  Fix: run `lx plugin add {0}` or `lx install {0}` to install it"
+    )]
     NotInstalled(String),
 
     /// A registry operation failed (fetch, parse, authentication).
-    #[error("{0}\n  Fix: run `lx tap update` to refresh indexes, or check your network connection")]
+    #[error(
+        "{0}\n  Fix: run `lx tap update` to refresh indexes, or check your network connection"
+    )]
     Registry(String),
 
     /// A workflow error (missing file, invalid schema, execution failure).
@@ -116,36 +120,58 @@ impl LynxError {
     pub fn hint(&self) -> Option<&str> {
         match self {
             LynxError::Config(_) => Some("run `lx config validate` or `lx doctor` to diagnose"),
-            LynxError::Plugin(_) => Some("run `lx doctor` or `lx plugin list` to inspect plugin state"),
-            LynxError::Theme(_) => Some("run `lx theme list` to see available themes, or `lx doctor`"),
+            LynxError::Plugin(_) => {
+                Some("run `lx doctor` or `lx plugin list` to inspect plugin state")
+            }
+            LynxError::Theme(_) => {
+                Some("run `lx theme list` to see available themes, or `lx doctor`")
+            }
             LynxError::Shell(_) => Some("run `lx doctor` to check shell integration"),
             LynxError::Task(_) => Some("run `lx cron list` to inspect tasks, or `lx doctor`"),
-            LynxError::Manifest(_) => Some("check your plugin.toml against `lx plugin new <name>` template"),
+            LynxError::Manifest(_) => {
+                Some("check your plugin.toml against `lx plugin new <name>` template")
+            }
             LynxError::Io { fix, .. } => Some(fix.as_str()),
             LynxError::IoRaw(_) => Some("run `lx doctor` to diagnose"),
             LynxError::NotFound { hint, .. } => Some(hint.as_str()),
-            LynxError::AlreadyInstalled(_) => Some("use `lx plugin reinstall` to force-reinstall, or `lx plugin remove` first"),
+            LynxError::AlreadyInstalled(_) => {
+                Some("use `lx plugin reinstall` to force-reinstall, or `lx plugin remove` first")
+            }
             LynxError::NotInstalled(name) => {
                 // Can't return a reference to a temporary, so return a static hint.
                 // The renderer will use format_hint() for dynamic cases.
                 let _ = name;
                 Some("run `lx plugin add <name>` or `lx install <name>` to install it")
             }
-            LynxError::Registry(_) => Some("run `lx tap update` to refresh indexes, or check your network connection"),
-            LynxError::Workflow(_) => Some("run `lx run list` to see available workflows, or check ~/.config/lynx/workflows/"),
-            LynxError::Daemon(_) => Some("run `lx daemon status` to check the daemon, or `lx daemon restart`"),
+            LynxError::Registry(_) => {
+                Some("run `lx tap update` to refresh indexes, or check your network connection")
+            }
+            LynxError::Workflow(_) => Some(
+                "run `lx run list` to see available workflows, or check ~/.config/lynx/workflows/",
+            ),
+            LynxError::Daemon(_) => {
+                Some("run `lx daemon status` to check the daemon, or `lx daemon restart`")
+            }
         }
     }
 
     /// Extract just the primary message (without the embedded Fix: line).
     pub fn message(&self) -> String {
         match self {
-            LynxError::Config(m) | LynxError::Plugin(m) | LynxError::Theme(m)
-            | LynxError::Shell(m) | LynxError::Task(m) | LynxError::Manifest(m)
-            | LynxError::Registry(m) | LynxError::Workflow(m) | LynxError::Daemon(m) => m.clone(),
+            LynxError::Config(m)
+            | LynxError::Plugin(m)
+            | LynxError::Theme(m)
+            | LynxError::Shell(m)
+            | LynxError::Task(m)
+            | LynxError::Manifest(m)
+            | LynxError::Registry(m)
+            | LynxError::Workflow(m)
+            | LynxError::Daemon(m) => m.clone(),
             LynxError::Io { message, .. } => message.clone(),
             LynxError::IoRaw(e) => e.to_string(),
-            LynxError::NotFound { item_type, name, .. } => {
+            LynxError::NotFound {
+                item_type, name, ..
+            } => {
                 format!("{item_type} '{name}' not found")
             }
             LynxError::AlreadyInstalled(name) => format!("'{name}' is already installed"),

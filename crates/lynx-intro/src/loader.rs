@@ -6,10 +6,10 @@ use crate::schema::Intro;
 
 /// Built-in preset intros bundled into the binary.
 const BUILTIN_INTROS: &[(&str, &str)] = &[
-    ("hacker",    include_str!("../intros/hacker.toml")),
-    ("minimal",   include_str!("../intros/minimal.toml")),
-    ("neofetch",  include_str!("../intros/neofetch.toml")),
-    ("welcome",   include_str!("../intros/welcome.toml")),
+    ("hacker", include_str!("../intros/hacker.toml")),
+    ("minimal", include_str!("../intros/minimal.toml")),
+    ("neofetch", include_str!("../intros/neofetch.toml")),
+    ("welcome", include_str!("../intros/welcome.toml")),
     ("poweruser", include_str!("../intros/poweruser.toml")),
 ];
 
@@ -43,20 +43,25 @@ pub fn user_intro_dir() -> PathBuf {
 pub fn load_user(slug: &str) -> Result<Intro> {
     // Slug must be a plain identifier — no path traversal.
     if slug.contains('/') || slug.contains('\\') || slug.contains("..") {
-        return Err(lynx_core::error::LynxError::Theme(format!("invalid intro slug '{slug}': must not contain path separators")).into());
+        return Err(lynx_core::error::LynxError::Theme(format!(
+            "invalid intro slug '{slug}': must not contain path separators"
+        ))
+        .into());
     }
     let path = user_intro_dir().join(format!("{slug}.toml"));
     let content = std::fs::read_to_string(&path)
         .with_context(|| format!("failed to read user intro '{slug}' at {}", path.display()))?;
-    toml::from_str(&content)
-        .with_context(|| format!("failed to parse user intro '{slug}'"))
+    toml::from_str(&content).with_context(|| format!("failed to parse user intro '{slug}'"))
 }
 
 /// Load an intro by slug — tries user dir first, then built-ins.
 pub fn load(slug: &str) -> Result<Intro> {
     // Slug must be a plain identifier.
     if slug.contains('/') || slug.contains('\\') || slug.contains("..") {
-        return Err(lynx_core::error::LynxError::Theme(format!("invalid intro slug '{slug}': must not contain path separators")).into());
+        return Err(lynx_core::error::LynxError::Theme(format!(
+            "invalid intro slug '{slug}': must not contain path separators"
+        ))
+        .into());
     }
 
     // User intro overrides built-in.
@@ -65,12 +70,13 @@ pub fn load(slug: &str) -> Result<Intro> {
         return load_user(slug);
     }
 
-    load_builtin(slug)
-        .ok_or_else(|| anyhow::Error::from(lynx_core::error::LynxError::NotFound {
+    load_builtin(slug).ok_or_else(|| {
+        anyhow::Error::from(lynx_core::error::LynxError::NotFound {
             item_type: "Intro".into(),
             name: slug.to_string(),
             hint: "run `lx intro list` to see available intros".into(),
-        }))
+        })
+    })
 }
 
 /// List all available intros: user intros first, then built-ins not shadowed by a user intro.
@@ -96,7 +102,11 @@ pub fn list_all() -> Vec<IntroEntry> {
             let name = load_user(&slug)
                 .map(|i| i.meta.name)
                 .unwrap_or_else(|_| slug.clone());
-            entries.push(IntroEntry { slug, name, is_builtin: false });
+            entries.push(IntroEntry {
+                slug,
+                name,
+                is_builtin: false,
+            });
         }
     }
 
@@ -166,7 +176,11 @@ mod tests {
         // but we can assert all built-in slugs are present.
         let slugs: Vec<&str> = all.iter().map(|e| e.slug.as_str()).collect();
         for slug in list_builtin() {
-            assert!(slugs.contains(&slug), "missing builtin '{}' in list_all()", slug);
+            assert!(
+                slugs.contains(&slug),
+                "missing builtin '{}' in list_all()",
+                slug
+            );
         }
     }
 
@@ -175,5 +189,4 @@ mod tests {
         assert!(load("../etc/passwd").is_err());
         assert!(load_user("../evil").is_err());
     }
-
 }

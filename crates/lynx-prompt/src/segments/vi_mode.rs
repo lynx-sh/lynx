@@ -36,7 +36,10 @@ mod tests {
     use std::collections::HashMap;
 
     fn ctx_with_env(pairs: &[(&str, &str)]) -> RenderContext {
-        let env = pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect();
+        let env = pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
         RenderContext {
             cwd: "/".into(),
             shell_context: lynx_core::types::Context::Interactive,
@@ -69,10 +72,13 @@ mod tests {
 
     #[test]
     fn custom_labels() {
-        let cfg: toml::Value = toml::from_str(r#"
+        let cfg: toml::Value = toml::from_str(
+            r#"
 insert_label = "I"
 normal_label = "N"
-"#).unwrap();
+"#,
+        )
+        .unwrap();
         let ctx = ctx_with_env(&[("LYNX_VI_MODE", "insert")]);
         let r = ViModeSegment.render(&cfg, &ctx).unwrap();
         assert_eq!(r.text, "I");

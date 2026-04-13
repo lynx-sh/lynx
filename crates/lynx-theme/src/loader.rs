@@ -17,7 +17,9 @@ pub fn load(name: &str) -> Result<Theme> {
     if path.exists() {
         return load_from_path(&path);
     }
-    Err(LynxError::Theme(format!("theme '{name}' not found — run `lx setup` to set up default themes")))
+    Err(LynxError::Theme(format!(
+        "theme '{name}' not found — run `lx setup` to set up default themes"
+    )))
 }
 
 /// Load a theme from an explicit file path.
@@ -64,10 +66,7 @@ fn resolve_palette(theme: &mut Theme) {
 }
 
 /// Resolve `$varname` palette references inside the typed `LsColors` struct.
-fn resolve_ls_colors_palette(
-    lsc: &mut crate::schema::LsColors,
-    palette: &HashMap<String, String>,
-) {
+fn resolve_ls_colors_palette(lsc: &mut crate::schema::LsColors, palette: &HashMap<String, String>) {
     for entry in [
         &mut lsc.dir,
         &mut lsc.symlink,
@@ -192,7 +191,11 @@ order = ["dir", "unknown_segment_xyz"]
 order = []
 "#;
         let theme = parse_and_validate(toml, "test").expect("should not error on unknown segment");
-        assert!(theme.segments.left.order.contains(&"unknown_segment_xyz".to_string()));
+        assert!(theme
+            .segments
+            .left
+            .order
+            .contains(&"unknown_segment_xyz".to_string()));
     }
 
     #[test]
@@ -263,10 +266,16 @@ color = { fg = "$danger", bold = true }
 "###;
         let theme = parse_and_validate(toml, "palette-test").unwrap();
         let dir_fg = theme.segment["dir"]
-            .get("color").and_then(|c| c.get("fg")).and_then(|v| v.as_str()).unwrap();
+            .get("color")
+            .and_then(|c| c.get("fg"))
+            .and_then(|v| v.as_str())
+            .unwrap();
         assert_eq!(dir_fg, "#7aa2f7");
         let git_fg = theme.segment["git_branch"]
-            .get("color").and_then(|c| c.get("fg")).and_then(|v| v.as_str()).unwrap();
+            .get("color")
+            .and_then(|c| c.get("fg"))
+            .and_then(|v| v.as_str())
+            .unwrap();
         assert_eq!(git_fg, "#f7768e");
     }
 
@@ -290,7 +299,10 @@ color = { fg = "$nonexistent" }
 "###;
         let theme = parse_and_validate(toml, "unknown-var").unwrap();
         let fg = theme.segment["dir"]
-            .get("color").and_then(|c| c.get("fg")).and_then(|v| v.as_str()).unwrap();
+            .get("color")
+            .and_then(|c| c.get("fg"))
+            .and_then(|v| v.as_str())
+            .unwrap();
         assert_eq!(fg, "$nonexistent");
     }
 
@@ -314,7 +326,10 @@ color = { fg = "blue" }
 "###;
         let theme = parse_and_validate(toml, "literal-colors").unwrap();
         let fg = theme.segment["dir"]
-            .get("color").and_then(|c| c.get("fg")).and_then(|v| v.as_str()).unwrap();
+            .get("color")
+            .and_then(|c| c.get("fg"))
+            .and_then(|v| v.as_str())
+            .unwrap();
         assert_eq!(fg, "blue");
     }
 

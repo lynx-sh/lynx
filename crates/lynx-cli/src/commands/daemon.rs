@@ -1,7 +1,7 @@
 use anyhow::Result;
-use lynx_core::error::LynxError;
 use clap::{Args, Subcommand};
 use lynx_core::brand;
+use lynx_core::error::LynxError;
 use lynx_core::runtime::{pid_file, socket_path};
 use lynx_daemon::platform_backend;
 use std::path::PathBuf;
@@ -112,7 +112,11 @@ pub fn run(args: DaemonArgs) -> Result<()> {
             println!("✓ lynx-daemon removed");
         }
         DaemonCommand::Other(args) => {
-            return Err(LynxError::unknown_command(args.first().map(|s| s.as_str()).unwrap_or(""), "daemon").into());
+            return Err(LynxError::unknown_command(
+                args.first().map(|s| s.as_str()).unwrap_or(""),
+                "daemon",
+            )
+            .into());
         }
     }
 
@@ -155,7 +159,11 @@ fn start_detached() -> Result<()> {
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()
-        .map_err(|e| anyhow::Error::from(LynxError::Daemon(format!("failed to spawn lynx-daemon: {e}"))))?;
+        .map_err(|e| {
+            anyhow::Error::from(LynxError::Daemon(format!(
+                "failed to spawn lynx-daemon: {e}"
+            )))
+        })?;
 
     Ok(())
 }
@@ -181,7 +189,11 @@ fn stop_detached() -> Result<bool> {
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status()
-        .map_err(|e| anyhow::Error::from(LynxError::Daemon(format!("failed to signal lynx-daemon: {e}"))))?;
+        .map_err(|e| {
+            anyhow::Error::from(LynxError::Daemon(format!(
+                "failed to signal lynx-daemon: {e}"
+            )))
+        })?;
 
     if !status.success() {
         return Ok(false);
@@ -219,13 +231,33 @@ fn daemon_binary_path() -> Result<PathBuf> {
     }
 
     Err(LynxError::Daemon(
-        "lynx-daemon binary not found; install Lynx daemon or set LYNX_DAEMON_BIN".into()
-    ).into())
+        "lynx-daemon binary not found; install Lynx daemon or set LYNX_DAEMON_BIN".into(),
+    )
+    .into())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lynx_test_utils::env_lock;
+
+    struct EnvGuard(Option<String>);
+
+    impl EnvGuard {
+        fn new() -> Self {
+            Self(std::env::var("LYNX_DAEMON_BIN").ok())
+        }
+    }
+
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            if let Some(v) = &self.0 {
+                std::env::set_var("LYNX_DAEMON_BIN", v);
+            } else {
+                std::env::remove_var("LYNX_DAEMON_BIN");
+            }
+        }
+    }
 
     #[test]
     fn process_is_alive_returns_false_for_bogus_pid() {
@@ -241,6 +273,8 @@ mod tests {
 
     #[test]
     fn daemon_binary_path_env_override() {
+        let _lock = env_lock().lock().expect("lock");
+        let _guard = EnvGuard::new();
         let tmp = tempfile::tempdir().unwrap();
         let bin = tmp.path().join("lynx-daemon");
         std::fs::write(&bin, "").unwrap();
@@ -255,9 +289,10 @@ mod tests {
 
     #[test]
     fn daemon_binary_path_env_override_nonexistent_falls_through() {
+        let _lock = env_lock().lock().expect("lock");
+        let _guard = EnvGuard::new();
         std::env::set_var("LYNX_DAEMON_BIN", "/nonexistent/lynx-daemon");
         let result = daemon_binary_path();
-        std::env::remove_var("LYNX_DAEMON_BIN");
 
         // Should fall through to which/sibling checks, may or may not find the binary
         let _ = result;

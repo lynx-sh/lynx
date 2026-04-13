@@ -128,7 +128,10 @@ mod tests {
     #[test]
     fn full_path_when_max_depth_zero() {
         let r = DirSegment
-            .render(&cfg("max_depth = 0\ntruncate_to_repo = false"), &ctx("/home/user/projects/lynx"))
+            .render(
+                &cfg("max_depth = 0\ntruncate_to_repo = false"),
+                &ctx("/home/user/projects/lynx"),
+            )
             .unwrap();
         assert_eq!(r.text, "/home/user/projects/lynx");
     }
@@ -136,7 +139,10 @@ mod tests {
     #[test]
     fn truncates_at_max_depth() {
         let r = DirSegment
-            .render(&cfg("max_depth = 2\ntruncate_to_repo = false"), &ctx("/a/b/c/d/e"))
+            .render(
+                &cfg("max_depth = 2\ntruncate_to_repo = false"),
+                &ctx("/a/b/c/d/e"),
+            )
             .unwrap();
         assert_eq!(r.text, "…/d/e");
     }
@@ -144,7 +150,10 @@ mod tests {
     #[test]
     fn no_truncation_when_short() {
         let r = DirSegment
-            .render(&cfg("max_depth = 3\ntruncate_to_repo = false"), &ctx("/a/b"))
+            .render(
+                &cfg("max_depth = 3\ntruncate_to_repo = false"),
+                &ctx("/a/b"),
+            )
             .unwrap();
         assert_eq!(r.text, "/a/b");
     }
@@ -158,7 +167,10 @@ mod tests {
     #[test]
     fn tilde_substitution_home_dir() {
         let r = DirSegment
-            .render(&cfg("max_depth = 0\ntruncate_to_repo = false"), &ctx_with_home("/home/user", "/home/user"))
+            .render(
+                &cfg("max_depth = 0\ntruncate_to_repo = false"),
+                &ctx_with_home("/home/user", "/home/user"),
+            )
             .unwrap();
         assert_eq!(r.text, "~");
     }
@@ -166,7 +178,10 @@ mod tests {
     #[test]
     fn tilde_substitution_subdir() {
         let r = DirSegment
-            .render(&cfg("max_depth = 0\ntruncate_to_repo = false"), &ctx_with_home("/home/user/dev/projects", "/home/user"))
+            .render(
+                &cfg("max_depth = 0\ntruncate_to_repo = false"),
+                &ctx_with_home("/home/user/dev/projects", "/home/user"),
+            )
             .unwrap();
         assert_eq!(r.text, "~/dev/projects");
     }
@@ -174,7 +189,10 @@ mod tests {
     #[test]
     fn tilde_substitution_with_truncation() {
         let r = DirSegment
-            .render(&cfg("max_depth = 2\ntruncate_to_repo = false"), &ctx_with_home("/home/user/a/b/c/d", "/home/user"))
+            .render(
+                &cfg("max_depth = 2\ntruncate_to_repo = false"),
+                &ctx_with_home("/home/user/a/b/c/d", "/home/user"),
+            )
             .unwrap();
         assert_eq!(r.text, "…/c/d");
     }
@@ -182,7 +200,10 @@ mod tests {
     #[test]
     fn tilde_substitution_disabled() {
         let r = DirSegment
-            .render(&cfg("max_depth = 0\ntruncate_to_repo = false\ntilde_home = false"), &ctx_with_home("/home/user", "/home/user"))
+            .render(
+                &cfg("max_depth = 0\ntruncate_to_repo = false\ntilde_home = false"),
+                &ctx_with_home("/home/user", "/home/user"),
+            )
             .unwrap();
         assert_eq!(r.text, "/home/user");
     }
@@ -190,7 +211,10 @@ mod tests {
     #[test]
     fn no_tilde_when_not_under_home() {
         let r = DirSegment
-            .render(&cfg("max_depth = 0\ntruncate_to_repo = false"), &ctx_with_home("/tmp/work", "/home/user"))
+            .render(
+                &cfg("max_depth = 0\ntruncate_to_repo = false"),
+                &ctx_with_home("/tmp/work", "/home/user"),
+            )
             .unwrap();
         assert_eq!(r.text, "/tmp/work");
     }

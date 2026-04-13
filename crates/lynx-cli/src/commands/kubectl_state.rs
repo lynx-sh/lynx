@@ -42,7 +42,11 @@ fn kubectl(args: &[&str]) -> Option<String> {
         .ok()?;
     if out.status.success() {
         let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
-        if s.is_empty() { None } else { Some(s) }
+        if s.is_empty() {
+            None
+        } else {
+            Some(s)
+        }
     } else {
         None
     }
@@ -51,7 +55,10 @@ fn kubectl(args: &[&str]) -> Option<String> {
 pub(crate) fn gather_kubectl_state() -> KubectlState {
     // Bail fast if kubectl is not on PATH
     if lynx_core::paths::find_binary("kubectl").is_none() {
-        return KubectlState { context: None, namespace: None };
+        return KubectlState {
+            context: None,
+            namespace: None,
+        };
     }
 
     // Bail if no kubeconfig exists
@@ -64,13 +71,19 @@ pub(crate) fn gather_kubectl_state() -> KubectlState {
         .unwrap_or_else(|| std::path::Path::new(&default_kube).exists());
 
     if !has_config {
-        return KubectlState { context: None, namespace: None };
+        return KubectlState {
+            context: None,
+            namespace: None,
+        };
     }
 
     let context = kubectl(&["config", "current-context"]);
     let namespace = kubectl(&[
-        "config", "view", "--minify",
-        "--output", "jsonpath={..namespace}",
+        "config",
+        "view",
+        "--minify",
+        "--output",
+        "jsonpath={..namespace}",
     ])
     .or_else(|| Some("default".to_string()));
 
@@ -100,7 +113,10 @@ mod tests {
 
     #[test]
     fn render_clears_when_no_context() {
-        let state = KubectlState { context: None, namespace: None };
+        let state = KubectlState {
+            context: None,
+            namespace: None,
+        };
         let out = render_zsh(&state);
         assert!(out.contains("_lynx_kubectl_state=()"));
         assert!(out.contains("export LYNX_CACHE_KUBECTL_STATE=''"));

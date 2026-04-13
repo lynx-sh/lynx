@@ -58,12 +58,13 @@ pub fn run(args: UninstallArgs) -> Result<()> {
         }
         // List user-created items before removing.
         list_user_files(&config_dir);
-        std::fs::remove_dir_all(&config_dir)
-            .map_err(|e| anyhow::Error::from(lynx_core::error::LynxError::Io {
+        std::fs::remove_dir_all(&config_dir).map_err(|e| {
+            anyhow::Error::from(lynx_core::error::LynxError::Io {
                 message: format!("failed to remove config dir: {e}"),
                 path: config_dir.clone(),
                 fix: "check permissions or remove manually".into(),
-            }))?;
+            })
+        })?;
         println!("  removed config dir: {}", config_dir.display());
     } else if args.purge {
         println!("  config dir not found — nothing to remove");
@@ -163,9 +164,9 @@ fn list_user_files(config_dir: &Path) {
 }
 
 fn home_dir() -> Result<PathBuf> {
-    std::env::var_os("HOME")
-        .map(PathBuf::from)
-        .ok_or_else(|| anyhow::Error::from(lynx_core::error::LynxError::Shell("$HOME not set".into())))
+    std::env::var_os("HOME").map(PathBuf::from).ok_or_else(|| {
+        anyhow::Error::from(lynx_core::error::LynxError::Shell("$HOME not set".into()))
+    })
 }
 
 #[cfg(test)]
@@ -191,10 +192,7 @@ mod tests {
     fn remove_from_zshrc_removes_init_line() {
         let tmp = tempfile::tempdir().unwrap();
         let zshrc = tmp.path().join(".zshrc");
-        let content = format!(
-            "# my config\n{}\nexport FOO=bar\n",
-            ZSHRC_INIT_LINE
-        );
+        let content = format!("# my config\n{}\nexport FOO=bar\n", ZSHRC_INIT_LINE);
         std::fs::write(&zshrc, &content).unwrap();
 
         remove_from_zshrc(tmp.path()).unwrap();

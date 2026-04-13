@@ -211,10 +211,18 @@ mod tests {
                 description: "desc".into(),
                 authors: vec!["a".into()],
             },
-            load: LoadConfig { lazy: false, hooks: vec![] },
+            load: LoadConfig {
+                lazy: false,
+                hooks: vec![],
+            },
             deps: DepsConfig::default(),
-            exports: ExportsConfig { functions: vec!["f".into()], aliases: vec![] },
-            contexts: ContextsConfig { disabled_in: vec!["agent".into()] },
+            exports: ExportsConfig {
+                functions: vec!["f".into()],
+                aliases: vec![],
+            },
+            contexts: ContextsConfig {
+                disabled_in: vec!["agent".into()],
+            },
             state: StateConfig::default(),
             shell: ShellConfig::default(),
         };

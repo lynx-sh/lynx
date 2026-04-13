@@ -94,8 +94,7 @@ pub(crate) fn gather_git_state() -> GitState {
     let (ahead, behind) = upstream_counts();
     let action = detect_action(root.as_deref().unwrap_or(""));
     let sha = git(&["rev-parse", "HEAD"]);
-    let commit_ts = git(&["log", "--format=%at", "-1"])
-        .and_then(|s| s.parse::<u64>().ok());
+    let commit_ts = git(&["log", "--format=%at", "-1"]).and_then(|s| s.parse::<u64>().ok());
 
     GitState {
         root,
@@ -407,7 +406,10 @@ mod tests {
             commit_ts: None,
         };
         let out = render_zsh(&state);
-        assert!(out.contains(r#""action":null"#), "action field missing: {out}");
+        assert!(
+            out.contains(r#""action":null"#),
+            "action field missing: {out}"
+        );
         assert!(out.contains("action ''"), "action zsh field missing: {out}");
     }
 
@@ -428,7 +430,10 @@ mod tests {
             commit_ts: None,
         };
         let out = render_zsh(&state);
-        assert!(out.contains(r#""action":"merge""#), "action json missing: {out}");
+        assert!(
+            out.contains(r#""action":"merge""#),
+            "action json missing: {out}"
+        );
         assert!(out.contains("action 'merge'"), "action zsh missing: {out}");
     }
 
@@ -446,7 +451,10 @@ mod tests {
         let git_dir = dir.path().join(".git");
         std::fs::create_dir_all(&git_dir).unwrap();
         std::fs::write(git_dir.join("MERGE_HEAD"), "abc123").unwrap();
-        assert_eq!(detect_action(dir.path().to_str().unwrap()), Some("merge".into()));
+        assert_eq!(
+            detect_action(dir.path().to_str().unwrap()),
+            Some("merge".into())
+        );
     }
 
     #[test]
@@ -454,7 +462,10 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let git_dir = dir.path().join(".git");
         std::fs::create_dir_all(git_dir.join("rebase-merge")).unwrap();
-        assert_eq!(detect_action(dir.path().to_str().unwrap()), Some("rebase".into()));
+        assert_eq!(
+            detect_action(dir.path().to_str().unwrap()),
+            Some("rebase".into())
+        );
     }
 
     #[test]
@@ -463,7 +474,10 @@ mod tests {
         let git_dir = dir.path().join(".git");
         std::fs::create_dir_all(&git_dir).unwrap();
         std::fs::write(git_dir.join("CHERRY_PICK_HEAD"), "abc123").unwrap();
-        assert_eq!(detect_action(dir.path().to_str().unwrap()), Some("cherry-pick".into()));
+        assert_eq!(
+            detect_action(dir.path().to_str().unwrap()),
+            Some("cherry-pick".into())
+        );
     }
 
     #[test]
@@ -472,6 +486,9 @@ mod tests {
         let git_dir = dir.path().join(".git");
         std::fs::create_dir_all(&git_dir).unwrap();
         std::fs::write(git_dir.join("BISECT_LOG"), "").unwrap();
-        assert_eq!(detect_action(dir.path().to_str().unwrap()), Some("bisect".into()));
+        assert_eq!(
+            detect_action(dir.path().to_str().unwrap()),
+            Some("bisect".into())
+        );
     }
 }

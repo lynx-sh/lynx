@@ -129,10 +129,7 @@ pub fn generate_init_script(params: &InitParams<'_>) -> String {
     // A parent shell may have exported LYNX_PLUGIN_*_LOADED; if inherited, the
     // guard would block loading while aliases (shell-local) are not present.
     for plugin in params.enabled_plugins {
-        out.push_str(&format!(
-            "  unset {}\n",
-            env_vars::plugin_guard_var(plugin)
-        ));
+        out.push_str(&format!("  unset {}\n", env_vars::plugin_guard_var(plugin)));
     }
 
     // Load each enabled plugin.
@@ -152,10 +149,7 @@ pub fn generate_init_script(params: &InitParams<'_>) -> String {
     }
 
     // Not exported — must not leak into child shells or lx init would skip there too
-    out.push_str(&format!(
-        "  typeset -g {}=1\n",
-        env_vars::LYNX_INITIALIZED
-    ));
+    out.push_str(&format!("  typeset -g {}=1\n", env_vars::LYNX_INITIALIZED));
     out.push_str("fi\n");
 
     out
@@ -173,8 +167,8 @@ mod tests {
     fn base_params<'a>(ctx: &'a Context, plugins: &'a [String]) -> InitParams<'a> {
         InitParams {
             context: ctx,
-            lynx_dir: "/home/user/.local/share/lynx",
-            plugin_dir: "/home/user/.local/share/lynx/plugins",
+            lynx_dir: "/home/user/.config/lynx",
+            plugin_dir: "/home/user/.config/lynx/plugins",
             enabled_plugins: plugins,
             ls_colors: None,
             eza_colors: None,
@@ -271,14 +265,23 @@ mod tests {
         let guard_pos = script.find("if [[").unwrap();
         let ls_pos = script.find("LS_COLORS='di=1;34'").unwrap();
         let eza_pos = script.find("EZA_COLORS='di=1;34'").unwrap();
-        assert!(ls_pos > guard_pos, "LS_COLORS must be inside the init guard");
-        assert!(eza_pos > guard_pos, "EZA_COLORS must be inside the init guard");
+        assert!(
+            ls_pos > guard_pos,
+            "LS_COLORS must be inside the init guard"
+        );
+        assert!(
+            eza_pos > guard_pos,
+            "EZA_COLORS must be inside the init guard"
+        );
     }
 
     #[test]
     fn ls_colors_absent_when_not_provided() {
         let script = generate_init_script(&base_params(&Context::Interactive, &[]));
-        assert!(!script.contains("LS_COLORS="), "LS_COLORS must not appear when not provided");
+        assert!(
+            !script.contains("LS_COLORS="),
+            "LS_COLORS must not appear when not provided"
+        );
     }
 
     #[test]
@@ -286,6 +289,9 @@ mod tests {
         let script = generate_init_script(&base_params(&Context::Interactive, &[]));
         let guard_pos = script.find("if [[").unwrap();
         let hostname_pos = script.find("HOSTNAME").unwrap();
-        assert!(hostname_pos > guard_pos, "HOSTNAME must be inside the init guard");
+        assert!(
+            hostname_pos > guard_pos,
+            "HOSTNAME must be inside the init guard"
+        );
     }
 }

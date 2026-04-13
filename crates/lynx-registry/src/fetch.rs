@@ -64,7 +64,8 @@ pub fn fetch_plugin(name: &str, opts: &FetchOptions) -> Result<PathBuf> {
         return Err(LynxError::Registry(format!(
             "checksum mismatch for '{name}' v{}: expected {}, got {actual}",
             pv.version, pv.checksum_sha256
-        )).into());
+        ))
+        .into());
     }
     debug!("checksum verified for {name} v{}", pv.version);
 
@@ -152,7 +153,11 @@ fn download_file(url: &str, dest: &Path) -> Result<()> {
         .call()
         .with_context(|| format!("GET {url}"))?;
     if resp.status() >= 400 {
-        return Err(LynxError::Registry(format!("server returned status {} for {url}", resp.status())).into());
+        return Err(LynxError::Registry(format!(
+            "server returned status {} for {url}",
+            resp.status()
+        ))
+        .into());
     }
     let mut reader = resp.into_reader();
     let mut file =
@@ -206,7 +211,8 @@ fn validate_plugin_dir(dir: &Path, name: &str) -> Result<()> {
         return Err(LynxError::Plugin(format!(
             "extracted plugin '{name}' is missing plugin.toml at {}",
             manifest_path.display()
-        )).into());
+        ))
+        .into());
     }
     let content = std::fs::read_to_string(&manifest_path).context("read extracted plugin.toml")?;
     let manifest: lynx_manifest::schema::PluginManifest = toml::from_str(&content)
@@ -215,7 +221,8 @@ fn validate_plugin_dir(dir: &Path, name: &str) -> Result<()> {
         return Err(LynxError::Plugin(format!(
             "plugin '{name}' plugin.toml declares name '{}' — must match",
             manifest.plugin.name
-        )).into());
+        ))
+        .into());
     }
     Ok(())
 }
@@ -232,7 +239,11 @@ pub fn checksum_file(path: &Path) -> Result<String> {
 /// Hash input includes relative file paths and file bytes; path order is sorted.
 pub fn checksum_plugin_dir(dir: &Path) -> Result<String> {
     if !dir.exists() {
-        return Err(LynxError::Plugin(format!("plugin directory does not exist: {}", dir.display())).into());
+        return Err(LynxError::Plugin(format!(
+            "plugin directory does not exist: {}",
+            dir.display()
+        ))
+        .into());
     }
 
     let mut files = Vec::new();

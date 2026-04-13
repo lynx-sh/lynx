@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use anyhow::{Result};
-use lynx_core::error::LynxError;
+use anyhow::Result;
 use clap::Args;
+use lynx_core::error::LynxError;
 
 use lynx_core::brand;
 
@@ -87,12 +87,13 @@ fn do_update(version: &str, yes: bool) -> Result<()> {
         std::fs::set_permissions(&tmp, perms)?;
     }
 
-    std::fs::rename(&tmp, &current_bin)
-        .map_err(|e| anyhow::Error::from(lynx_core::error::LynxError::Io {
+    std::fs::rename(&tmp, &current_bin).map_err(|e| {
+        anyhow::Error::from(lynx_core::error::LynxError::Io {
             message: format!("failed to replace binary: {e}"),
             path: current_bin.clone(),
             fix: "check file permissions or try running with sudo".into(),
-        }))?;
+        })
+    })?;
 
     println!("Updated to {version}. Restart your shell or run: exec lx");
     Ok(())
@@ -107,7 +108,10 @@ fn fetch_latest_version() -> Result<String> {
 
 fn download(_url: &str) -> Result<Vec<u8>> {
     // Real: HTTP GET the binary URL.
-    Err(LynxError::Shell("download not implemented — build from source or use the install script".into()).into())
+    Err(LynxError::Shell(
+        "download not implemented — build from source or use the install script".into(),
+    )
+    .into())
 }
 
 fn verify_checksum(_bytes: &[u8], _version: &str) -> Result<()> {

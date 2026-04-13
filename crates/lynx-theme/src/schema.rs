@@ -2,9 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 // Re-export split-out types so `use crate::schema::X` keeps working everywhere.
-pub use crate::colors::{
-    AutoSuggestions, EzaColumns, LsColors, LsColorsEntry, SyntaxHighlight,
-};
+pub use crate::colors::{AutoSuggestions, EzaColumns, LsColors, LsColorsEntry, SyntaxHighlight};
 pub use crate::segments::{
     ConditionalColor, SegmentColor, SegmentCondition, SegmentSeparators, SegmentVisibility,
     StatusIcon, KNOWN_SEGMENTS,

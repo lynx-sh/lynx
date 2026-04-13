@@ -23,8 +23,7 @@ pub fn load_workflow_from(dir: &Path, name: &str) -> Result<Workflow> {
     let path = dir.join(format!("{name}.toml"));
     let content = std::fs::read_to_string(&path)
         .with_context(|| format!("workflow '{}' not found at {}", name, path.display()))?;
-    schema::parse(&content)
-        .with_context(|| format!("invalid workflow at {}", path.display()))
+    schema::parse(&content).with_context(|| format!("invalid workflow at {}", path.display()))
 }
 
 /// List all workflows in the workflows directory.

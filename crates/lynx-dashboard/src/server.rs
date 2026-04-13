@@ -31,7 +31,9 @@ impl AppState {
 
     /// Broadcast an event type to all SSE subscribers.
     pub fn broadcast(&self, event_type: &str) {
-        let _ = self.tx.send(serde_json::json!({ "type": event_type }).to_string());
+        let _ = self
+            .tx
+            .send(serde_json::json!({ "type": event_type }).to_string());
     }
 }
 
@@ -47,8 +49,14 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/css/pages.css", get(crate::frontend::pages_css))
         .route("/js/app.js", get(crate::frontend::app_js))
         .route("/js/api.js", get(crate::frontend::api_js))
-        .route("/js/components/sidebar.js", get(crate::frontend::sidebar_js))
-        .route("/js/components/color-picker.js", get(crate::frontend::color_picker_js))
+        .route(
+            "/js/components/sidebar.js",
+            get(crate::frontend::sidebar_js),
+        )
+        .route(
+            "/js/components/color-picker.js",
+            get(crate::frontend::color_picker_js),
+        )
         .route("/js/pages/overview.js", get(crate::frontend::overview_js))
         .route("/js/pages/themes.js", get(crate::frontend::themes_js))
         .route("/js/pages/plugins.js", get(crate::frontend::plugins_js))

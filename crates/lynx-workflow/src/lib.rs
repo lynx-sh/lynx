@@ -11,7 +11,5 @@ pub mod runner;
 pub mod schema;
 pub mod store;
 
-pub use schema::{
-    OnFail, ParamType, RunnerType, Step, Workflow, WorkflowMeta, WorkflowParam,
-};
 pub use schema::{parse, validate};
+pub use schema::{OnFail, ParamType, RunnerType, Step, Workflow, WorkflowMeta, WorkflowParam};

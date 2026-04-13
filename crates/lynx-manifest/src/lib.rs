@@ -137,7 +137,10 @@ key    = "^T"
 widget = "fzf_file_widget"
 "#;
         let m = parse(toml).unwrap();
-        assert_eq!(m.shell.widgets, vec!["fzf_history_widget", "fzf_file_widget"]);
+        assert_eq!(
+            m.shell.widgets,
+            vec!["fzf_history_widget", "fzf_file_widget"]
+        );
         assert_eq!(m.shell.keybindings.len(), 2);
         assert_eq!(m.shell.keybindings[0].key, "^R");
         assert_eq!(m.shell.keybindings[0].widget, "fzf_history_widget");

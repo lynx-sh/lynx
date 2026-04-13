@@ -105,7 +105,10 @@ mod tests {
 
     #[test]
     fn plugin_guard_var_normalizes_hyphens() {
-        assert_eq!(plugin_guard_var("my-plugin"), "LYNX_PLUGIN_MY_PLUGIN_LOADED");
+        assert_eq!(
+            plugin_guard_var("my-plugin"),
+            "LYNX_PLUGIN_MY_PLUGIN_LOADED"
+        );
     }
 
     #[test]

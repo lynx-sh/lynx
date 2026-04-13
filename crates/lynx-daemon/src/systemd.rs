@@ -96,7 +96,8 @@ impl ServiceBackend for SystemdBackend {
             return Err(lynx_core::error::LynxError::Daemon(format!(
                 "systemctl enable failed: {}",
                 String::from_utf8_lossy(&out.stderr)
-            )).into());
+            ))
+            .into());
         }
 
         Ok(())
@@ -119,7 +120,8 @@ impl ServiceBackend for SystemdBackend {
             return Err(lynx_core::error::LynxError::Daemon(format!(
                 "systemctl start failed: {}",
                 String::from_utf8_lossy(&out.stderr)
-            )).into());
+            ))
+            .into());
         }
         Ok(())
     }
@@ -130,7 +132,8 @@ impl ServiceBackend for SystemdBackend {
             return Err(lynx_core::error::LynxError::Daemon(format!(
                 "systemctl stop failed: {}",
                 String::from_utf8_lossy(&out.stderr)
-            )).into());
+            ))
+            .into());
         }
         Ok(())
     }
@@ -141,7 +144,8 @@ impl ServiceBackend for SystemdBackend {
             return Err(lynx_core::error::LynxError::Daemon(format!(
                 "systemctl restart failed: {}",
                 String::from_utf8_lossy(&out.stderr)
-            )).into());
+            ))
+            .into());
         }
         Ok(())
     }

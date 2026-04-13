@@ -45,15 +45,13 @@ pub fn run(args: ConfigArgs) -> Result<()> {
             crate::commands::examples::run(crate::commands::examples::ExamplesArgs {
                 command: Some("config".into()),
             })
-            
         }
-        ConfigCommand::Other(args) => {
-            Err(LynxError::NotFound {
-                item_type: "Command".into(),
-                name: args.first().map(|s| s.as_str()).unwrap_or("").into(),
-                hint: "run `lx config` for help".into(),
-            }.into())
+        ConfigCommand::Other(args) => Err(LynxError::NotFound {
+            item_type: "Command".into(),
+            name: args.first().map(|s| s.as_str()).unwrap_or("").into(),
+            hint: "run `lx config` for help".into(),
         }
+        .into()),
     }
 }
 
@@ -82,9 +80,14 @@ fn cmd_edit() -> Result<()> {
     match load() {
         Ok(_) => println!("config saved and validated"),
         Err(e) => {
-            std::fs::write(&path, &snapshot_content)
-                .map_err(|_| anyhow::Error::from(lynx_core::error::LynxError::Config("CRITICAL: failed to restore config snapshot".into())))?;
-            return Err(LynxError::Config(format!("config validation failed — rolled back: {e}")).into());
+            std::fs::write(&path, &snapshot_content).map_err(|_| {
+                anyhow::Error::from(lynx_core::error::LynxError::Config(
+                    "CRITICAL: failed to restore config snapshot".into(),
+                ))
+            })?;
+            return Err(
+                LynxError::Config(format!("config validation failed — rolled back: {e}")).into(),
+            );
         }
     }
     Ok(())
@@ -121,11 +124,15 @@ fn cmd_get(key: &str) -> Result<()> {
         "active_context" => format!("{:?}", cfg.active_context).to_lowercase(),
         "schema_version" => cfg.schema_version.to_string(),
         "sync.remote" => cfg.sync.remote.unwrap_or_default(),
-        other => return Err(LynxError::NotFound {
-            item_type: "Config key".into(),
-            name: other.into(),
-            hint: "known keys: active_theme, active_context, schema_version, sync.remote".into(),
-        }.into()),
+        other => {
+            return Err(LynxError::NotFound {
+                item_type: "Config key".into(),
+                name: other.into(),
+                hint: "known keys: active_theme, active_context, schema_version, sync.remote"
+                    .into(),
+            }
+            .into())
+        }
     };
     println!("{value}");
     Ok(())

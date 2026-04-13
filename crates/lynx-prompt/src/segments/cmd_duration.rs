@@ -66,17 +66,23 @@ mod tests {
 
     #[test]
     fn hides_under_threshold() {
-        assert!(CmdDurationSegment.render(&cfg("min_ms = 500"), &ctx(Some(200))).is_none());
+        assert!(CmdDurationSegment
+            .render(&cfg("min_ms = 500"), &ctx(Some(200)))
+            .is_none());
     }
 
     #[test]
     fn shows_when_over_threshold() {
-        assert!(CmdDurationSegment.render(&cfg("min_ms = 500"), &ctx(Some(1500))).is_some());
+        assert!(CmdDurationSegment
+            .render(&cfg("min_ms = 500"), &ctx(Some(1500)))
+            .is_some());
     }
 
     #[test]
     fn hides_when_no_duration() {
-        assert!(CmdDurationSegment.render(&empty_config(), &ctx(None)).is_none());
+        assert!(CmdDurationSegment
+            .render(&empty_config(), &ctx(None))
+            .is_none());
     }
 
     #[test]

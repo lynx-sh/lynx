@@ -3,10 +3,10 @@
 //! Resolves packages from all configured taps, detects the type,
 //! and routes to the correct installer.
 
-use anyhow::{Result};
-use lynx_core::error::LynxError;
+use anyhow::Result;
 use clap::Args;
 use lynx_config::snapshot::mutate_config_transaction;
+use lynx_core::error::LynxError;
 use lynx_core::paths;
 use lynx_registry::autoplug::generate_tool_plugin;
 use lynx_registry::installer::{install_tool_via_pm, uninstall_tool};
@@ -30,7 +30,10 @@ pub struct UninstallPkgArgs {
 
 pub async fn run_install(args: InstallPkgArgs) -> Result<()> {
     if args.names.is_empty() {
-        return Err(LynxError::Registry("provide at least one package name — e.g. `lx install eza`".into()).into());
+        return Err(LynxError::Registry(
+            "provide at least one package name — e.g. `lx install eza`".into(),
+        )
+        .into());
     }
 
     let taps_path = paths::taps_config_path();
@@ -74,7 +77,9 @@ pub async fn run_install(args: InstallPkgArgs) -> Result<()> {
                     let version = entry.resolve_version(None);
                     if let Some(v) = version {
                         lynx_registry::installer::install_theme(name, &v.url, args.force)?;
-                        println!("  ✓ installed theme '{name}' — activate with `lx theme set {name}`");
+                        println!(
+                            "  ✓ installed theme '{name}' — activate with `lx theme set {name}`"
+                        );
                     } else {
                         println!("  no version found for theme '{name}'");
                     }
@@ -110,7 +115,9 @@ pub async fn run_install(args: InstallPkgArgs) -> Result<()> {
             PackageType::Bundle => {
                 // Resolve bundle to its package list and install each.
                 let all_entries: Vec<_> = merged.iter().map(|t| t.entry.clone()).collect();
-                let idx = lynx_registry::schema::RegistryIndex { plugins: all_entries };
+                let idx = lynx_registry::schema::RegistryIndex {
+                    plugins: all_entries,
+                };
                 let resolved = lynx_registry::bundle::resolve_bundle(entry, &idx)?;
                 println!("  bundle '{name}' contains {} packages:", resolved.len());
                 for pkg in &resolved {
@@ -211,6 +218,30 @@ async fn install_plugin(
     Ok(())
 }
 
+pub fn run_uninstall(args: UninstallPkgArgs) -> Result<()> {
+    let name = &args.name;
+    let plugins_dir = paths::installed_plugins_dir();
+    let result = uninstall_tool(name, &plugins_dir)?;
+    if result.plugin_removed {
+        println!("removed Lynx plugin for '{name}'");
+    }
+    println!(
+        "system binary preserved — to remove it: {}",
+        result.system_uninstall_hint
+    );
+
+    let config = lynx_config::load()?;
+    if config.enabled_plugins.iter().any(|p| p == name) {
+        mutate_config_transaction(&format!("uninstall-{name}"), |cfg| {
+            cfg.enabled_plugins.retain(|p| p != name);
+            Ok(())
+        })?;
+        println!("disabled '{name}' in config");
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -222,7 +253,9 @@ mod tests {
             force: false,
         };
         let err = run_install(args).await.unwrap_err();
-        assert!(err.to_string().contains("provide at least one package name"));
+        assert!(err
+            .to_string()
+            .contains("provide at least one package name"));
     }
 
     #[test]
@@ -274,25 +307,4 @@ mod tests {
         let w = W::parse_from(["test", "fzf"]);
         assert_eq!(w.args.name, "fzf");
     }
-}
-
-pub fn run_uninstall(args: UninstallPkgArgs) -> Result<()> {
-    let name = &args.name;
-    let plugins_dir = paths::installed_plugins_dir();
-    let result = uninstall_tool(name, &plugins_dir)?;
-    if result.plugin_removed {
-        println!("removed Lynx plugin for '{name}'");
-    }
-    println!("system binary preserved — to remove it: {}", result.system_uninstall_hint);
-
-    let config = lynx_config::load()?;
-    if config.enabled_plugins.iter().any(|p| p == name) {
-        mutate_config_transaction(&format!("uninstall-{name}"), |cfg| {
-            cfg.enabled_plugins.retain(|p| p != name);
-            Ok(())
-        })?;
-        println!("disabled '{name}' in config");
-    }
-
-    Ok(())
 }

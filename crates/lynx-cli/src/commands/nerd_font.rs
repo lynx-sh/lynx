@@ -42,7 +42,12 @@ fn has_nerd_glyphs(s: &str) -> bool {
 pub fn theme_needs_nerd_font(theme: &lynx_theme::Theme) -> bool {
     // 1. Global separators.
     let sep = &theme.separators;
-    for opt in [&sep.left.char, &sep.right.char, &sep.left_edge.char, &sep.right_edge.char] {
+    for opt in [
+        &sep.left.char,
+        &sep.right.char,
+        &sep.left_edge.char,
+        &sep.right_edge.char,
+    ] {
         if opt.as_ref().is_some_and(|s| has_nerd_glyphs(s)) {
             return true;
         }
@@ -137,7 +142,9 @@ pub fn find_installed_nerd_fonts() -> Vec<String> {
 
 /// Collect paths of Nerd Font files (*.ttf, *.otf with "nerd" in the name).
 fn scan_dir_for_nerd_font_files(dir: &PathBuf, files: &mut Vec<PathBuf>) {
-    let Ok(entries) = std::fs::read_dir(dir) else { return };
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
@@ -217,7 +224,8 @@ enum Terminal {
 }
 
 fn detect_terminal() -> Terminal {
-    if std::env::var("ITERM_SESSION_ID").is_ok() || std::env::var("TERM_PROGRAM").as_deref() == Ok("iTerm.app")
+    if std::env::var("ITERM_SESSION_ID").is_ok()
+        || std::env::var("TERM_PROGRAM").as_deref() == Ok("iTerm.app")
     {
         Terminal::ITerm2
     } else {
@@ -248,7 +256,13 @@ fn iterm2_current_font() -> Option<String> {
         let trimmed = line.trim();
         if trimmed.starts_with("\"Normal Font\"") {
             // "Normal Font" = "Monaco 12";
-            let val = trimmed.split('=').nth(1)?.trim().trim_matches(';').trim().trim_matches('"');
+            let val = trimmed
+                .split('=')
+                .nth(1)?
+                .trim()
+                .trim_matches(';')
+                .trim()
+                .trim_matches('"');
             return Some(val.to_string());
         }
     }
@@ -312,14 +326,14 @@ pub fn configure_iterm2_font(font_family: &str, size: u32) -> Result<()> {
 pub fn install_nerd_font() -> Result<String> {
     let font_name = "FiraCode";
     let filename_family = "FiraCodeNerdFont";
-    let url = format!(
-        "https://github.com/ryanoasis/nerd-fonts/releases/latest/download/{font_name}.zip"
-    );
+    let url =
+        format!("https://github.com/ryanoasis/nerd-fonts/releases/latest/download/{font_name}.zip");
 
     println!("  downloading {font_name} Nerd Font...");
 
-    let resp =
-        ureq::get(&url).call().with_context(|| format!("failed to download font from {url}"))?;
+    let resp = ureq::get(&url)
+        .call()
+        .with_context(|| format!("failed to download font from {url}"))?;
 
     let mut bytes = Vec::new();
     resp.into_reader()
@@ -360,12 +374,14 @@ pub fn install_nerd_font() -> Result<String> {
         let _ = Command::new("fc-cache").arg("-f").status();
     }
 
-    println!("  ✓ installed {installed} font files to {}", font_dir.display());
+    println!(
+        "  ✓ installed {installed} font files to {}",
+        font_dir.display()
+    );
 
     // Resolve the real PostScript base name from the installed Regular font file.
     let regular_file = font_dir.join(format!("{filename_family}-Regular.ttf"));
-    let family = postscript_base_name(&regular_file)
-        .unwrap_or_else(|| filename_family.to_string());
+    let family = postscript_base_name(&regular_file).unwrap_or_else(|| filename_family.to_string());
     Ok(family)
 }
 
@@ -446,7 +462,13 @@ fn current_iterm2_font_size() -> Option<u32> {
     for line in text.lines() {
         let trimmed = line.trim();
         if trimmed.starts_with("\"Normal Font\"") {
-            let val = trimmed.split('=').nth(1)?.trim().trim_matches(';').trim().trim_matches('"');
+            let val = trimmed
+                .split('=')
+                .nth(1)?
+                .trim()
+                .trim_matches(';')
+                .trim()
+                .trim_matches('"');
             let size_str = val.split_whitespace().last()?;
             return size_str.parse().ok();
         }

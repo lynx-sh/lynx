@@ -188,9 +188,7 @@ pub async fn segment_order(
 }
 
 /// POST /api/theme/apply — save theme (already written by patch, this is a no-op confirmation).
-pub async fn apply_theme(
-    State(state): State<Arc<AppState>>,
-) -> impl IntoResponse {
+pub async fn apply_theme(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     // Theme patches already write to disk immediately.
     // This endpoint confirms the apply action.
     state.broadcast("theme_applied");
@@ -198,18 +196,12 @@ pub async fn apply_theme(
 }
 
 /// POST /api/theme/reset — reload theme from disk (undo unsaved changes).
-pub async fn reset_theme(
-    State(state): State<Arc<AppState>>,
-) -> impl IntoResponse {
+pub async fn reset_theme(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     state.broadcast("theme_updated");
     StatusCode::OK.into_response()
 }
 
-fn set_arr_at(
-    node: &mut toml::Value,
-    dot_path: &str,
-    order: &[String],
-) -> Result<(), String> {
+fn set_arr_at(node: &mut toml::Value, dot_path: &str, order: &[String]) -> Result<(), String> {
     let parts: Vec<&str> = dot_path.split('.').collect();
     let mut current = node;
     for (i, part) in parts.iter().enumerate() {
@@ -218,7 +210,10 @@ fn set_arr_at(
                 t.insert(
                     part.to_string(),
                     toml::Value::Array(
-                        order.iter().map(|s| toml::Value::String(s.clone())).collect(),
+                        order
+                            .iter()
+                            .map(|s| toml::Value::String(s.clone()))
+                            .collect(),
                     ),
                 );
                 return Ok(());

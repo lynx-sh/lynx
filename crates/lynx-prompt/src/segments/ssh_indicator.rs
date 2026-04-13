@@ -33,7 +33,10 @@ mod tests {
     use std::collections::HashMap;
 
     fn ctx_with_env(pairs: &[(&str, &str)]) -> RenderContext {
-        let env = pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect();
+        let env = pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
         RenderContext {
             cwd: "/".into(),
             shell_context: lynx_core::types::Context::Interactive,

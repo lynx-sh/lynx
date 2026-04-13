@@ -2,8 +2,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use anyhow::{Context as _, Result};
-use lynx_core::error::LynxError;
 use clap::{Args, Subcommand};
+use lynx_core::error::LynxError;
 
 use lynx_config::snapshot::mutate_config_transaction;
 use lynx_core::brand;
@@ -36,9 +36,11 @@ pub fn run(args: SyncArgs) -> Result<()> {
         SyncCommand::Push => cmd_push(),
         SyncCommand::Pull => cmd_pull(),
         SyncCommand::Status => cmd_status(),
-        SyncCommand::Other(args) => {
-            Err(LynxError::unknown_command(args.first().map(|s| s.as_str()).unwrap_or(""), "sync").into())
-        }
+        SyncCommand::Other(args) => Err(LynxError::unknown_command(
+            args.first().map(|s| s.as_str()).unwrap_or(""),
+            "sync",
+        )
+        .into()),
     }
 }
 
@@ -148,7 +150,10 @@ fn cmd_status() -> Result<()> {
 
 fn ensure_git_repo(dir: &Path) -> Result<()> {
     if !dir.join(".git").exists() {
-        return Err(LynxError::Config("config dir is not a git repo — run: lx sync init <remote>".into()).into());
+        return Err(LynxError::Config(
+            "config dir is not a git repo — run: lx sync init <remote>".into(),
+        )
+        .into());
     }
     Ok(())
 }
@@ -189,8 +194,14 @@ mod tests {
     #[test]
     fn timestamp_returns_numeric_string() {
         let ts = timestamp();
-        assert!(ts.parse::<u64>().is_ok(), "timestamp should be numeric: {ts}");
-        assert!(ts.len() >= 10, "timestamp should be at least 10 digits: {ts}");
+        assert!(
+            ts.parse::<u64>().is_ok(),
+            "timestamp should be numeric: {ts}"
+        );
+        assert!(
+            ts.len() >= 10,
+            "timestamp should be at least 10 digits: {ts}"
+        );
     }
 
     #[test]

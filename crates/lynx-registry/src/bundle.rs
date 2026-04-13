@@ -22,25 +22,31 @@ pub fn resolve_bundle<'a>(
     }
 
     if bundle.packages.is_empty() {
-        return Err(LynxError::Registry(format!("bundle '{}' has no packages listed", bundle.name)).into());
+        return Err(LynxError::Registry(format!(
+            "bundle '{}' has no packages listed",
+            bundle.name
+        ))
+        .into());
     }
 
     let mut resolved = Vec::new();
 
     for name in &bundle.packages {
-        let entry = index
-            .find(name)
-            .ok_or_else(|| LynxError::NotFound {
-                item_type: "Package".into(),
-                name: name.clone(),
-                hint: format!("bundle '{}' references '{}' which is not in the index", bundle.name, name),
-            })?;
+        let entry = index.find(name).ok_or_else(|| LynxError::NotFound {
+            item_type: "Package".into(),
+            name: name.clone(),
+            hint: format!(
+                "bundle '{}' references '{}' which is not in the index",
+                bundle.name, name
+            ),
+        })?;
 
         if entry.package_type == PackageType::Bundle {
             return Err(LynxError::Registry(format!(
                 "bundle '{}' contains nested bundle '{}' — nesting is not allowed",
                 bundle.name, name
-            )).into());
+            ))
+            .into());
         }
 
         resolved.push(entry);

@@ -1,12 +1,19 @@
 use lynx_config::schema::LynxConfig;
 use lynx_core::types::Context;
 use std::path::PathBuf;
+use std::sync::{Mutex, OnceLock};
 use tempfile::TempDir;
 
 /// Creates an isolated temp directory suitable for use as a fake `$HOME` in tests.
 /// The caller must keep the returned `TempDir` alive for the duration of the test.
 pub fn temp_home() -> TempDir {
     tempfile::tempdir().expect("failed to create temp home")
+}
+
+/// Global lock for tests that mutate process-global environment variables.
+pub fn env_lock() -> &'static Mutex<()> {
+    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    LOCK.get_or_init(|| Mutex::new(()))
 }
 
 /// Returns the path to the named fixture plugin directory under `plugins/`.

@@ -63,10 +63,7 @@ pub fn render_custom_template(template: &str, ctx: &RenderContext) -> String {
         lynx_core::types::Context::Minimal => "minimal",
     };
 
-    let last_cmd_ms = ctx
-        .last_cmd_ms
-        .map(|ms| ms.to_string())
-        .unwrap_or_default();
+    let last_cmd_ms = ctx.last_cmd_ms.map(|ms| ms.to_string()).unwrap_or_default();
 
     let mut result = String::with_capacity(template.len());
     let chars: Vec<char> = template.chars().collect();
@@ -167,7 +164,11 @@ mod tests {
             cwd: cwd.to_string(),
             shell_context: Context::Interactive,
             last_cmd_ms: None,
-            cache: cache.iter().cloned().map(|(k, v)| (k.to_string(), v)).collect(),
+            cache: cache
+                .iter()
+                .cloned()
+                .map(|(k, v)| (k.to_string(), v))
+                .collect(),
             env: env
                 .iter()
                 .map(|(k, v)| (k.to_string(), v.to_string()))
@@ -177,20 +178,29 @@ mod tests {
 
     fn cfg(template: &str) -> toml::Value {
         let mut map = toml::map::Map::new();
-        map.insert("template".to_string(), toml::Value::String(template.to_string()));
+        map.insert(
+            "template".to_string(),
+            toml::Value::String(template.to_string()),
+        );
         toml::Value::Table(map)
     }
 
     #[test]
     fn simple_cwd_var() {
         let ctx = ctx_with("/home/user/code", &[], &[]);
-        assert_eq!(render_custom_template("in $cwd", &ctx), "in /home/user/code");
+        assert_eq!(
+            render_custom_template("in $cwd", &ctx),
+            "in /home/user/code"
+        );
     }
 
     #[test]
     fn context_var() {
         let ctx = ctx_with("/", &[], &[]);
-        assert_eq!(render_custom_template("ctx:$context", &ctx), "ctx:interactive");
+        assert_eq!(
+            render_custom_template("ctx:$context", &ctx),
+            "ctx:interactive"
+        );
     }
 
     #[test]
@@ -247,10 +257,7 @@ mod tests {
             &[("git", serde_json::json!({"branch": "feat"}))],
         );
         let tmpl = "${env.USER} | $cwd | ${cache.git.branch}";
-        assert_eq!(
-            render_custom_template(tmpl, &ctx),
-            "bob | /projects | feat"
-        );
+        assert_eq!(render_custom_template(tmpl, &ctx), "bob | /projects | feat");
     }
 
     #[test]
@@ -281,7 +288,10 @@ mod tests {
     fn last_cmd_ms_var() {
         let mut ctx = ctx_with("/", &[], &[]);
         ctx.last_cmd_ms = Some(123);
-        assert_eq!(render_custom_template("took $last_cmd_ms ms", &ctx), "took 123 ms");
+        assert_eq!(
+            render_custom_template("took $last_cmd_ms ms", &ctx),
+            "took 123 ms"
+        );
     }
 
     #[test]

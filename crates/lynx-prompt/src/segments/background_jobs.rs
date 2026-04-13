@@ -34,7 +34,10 @@ mod tests {
     use std::collections::HashMap;
 
     fn ctx_with_env(pairs: &[(&str, &str)]) -> RenderContext {
-        let env = pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect();
+        let env = pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
         RenderContext {
             cwd: "/".into(),
             shell_context: lynx_core::types::Context::Interactive,
@@ -71,6 +74,10 @@ mod tests {
         let cfg: toml::Value = toml::from_str(r#"symbol = "&""#).unwrap();
         let ctx = ctx_with_env(&[("LYNX_BG_JOBS", "2")]);
         let r = BackgroundJobsSegment.render(&cfg, &ctx).unwrap();
-        assert!(r.text.starts_with('&'), "expected custom symbol: {}", r.text);
+        assert!(
+            r.text.starts_with('&'),
+            "expected custom symbol: {}",
+            r.text
+        );
     }
 }

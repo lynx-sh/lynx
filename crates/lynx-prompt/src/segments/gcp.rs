@@ -45,7 +45,10 @@ mod tests {
     use std::collections::HashMap;
 
     fn ctx_with_env(pairs: &[(&str, &str)]) -> RenderContext {
-        let env = pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect();
+        let env = pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
         RenderContext {
             cwd: "/".into(),
             shell_context: lynx_core::types::Context::Interactive,
@@ -63,19 +66,32 @@ mod tests {
 
     #[test]
     fn shows_cloudsdk_project() {
-        let r = GcpSegment.render(&empty_config(), &ctx_with_env(&[("CLOUDSDK_CORE_PROJECT", "my-project")])).unwrap();
+        let r = GcpSegment
+            .render(
+                &empty_config(),
+                &ctx_with_env(&[("CLOUDSDK_CORE_PROJECT", "my-project")]),
+            )
+            .unwrap();
         assert!(r.text.contains("my-project"));
     }
 
     #[test]
     fn shows_gcloud_project_fallback() {
-        let r = GcpSegment.render(&empty_config(), &ctx_with_env(&[("GCLOUD_PROJECT", "fallback-proj")])).unwrap();
+        let r = GcpSegment
+            .render(
+                &empty_config(),
+                &ctx_with_env(&[("GCLOUD_PROJECT", "fallback-proj")]),
+            )
+            .unwrap();
         assert!(r.text.contains("fallback-proj"));
     }
 
     #[test]
     fn hidden_when_empty() {
-        let r = GcpSegment.render(&empty_config(), &ctx_with_env(&[("CLOUDSDK_CORE_PROJECT", "")]));
+        let r = GcpSegment.render(
+            &empty_config(),
+            &ctx_with_env(&[("CLOUDSDK_CORE_PROJECT", "")]),
+        );
         assert!(r.is_none());
     }
 }

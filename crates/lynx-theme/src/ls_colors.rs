@@ -215,18 +215,16 @@ fn bsd_pair(entry: Option<&LsColorsEntry>) -> String {
     let Some(e) = entry else {
         return "xx".to_string();
     };
-    let fg = e
-        .fg
-        .as_deref()
-        .and_then(resolve_color_rgb)
-        .map(|(r, g, b)| rgb_to_bsd_char(r, g, b, e.bold))
-        .unwrap_or('x');
-    let bg = e
-        .bg
-        .as_deref()
-        .and_then(resolve_color_rgb)
-        .map(|(r, g, b)| rgb_to_bsd_char(r, g, b, false))
-        .unwrap_or('x');
+    let fg =
+        e.fg.as_deref()
+            .and_then(resolve_color_rgb)
+            .map(|(r, g, b)| rgb_to_bsd_char(r, g, b, e.bold))
+            .unwrap_or('x');
+    let bg =
+        e.bg.as_deref()
+            .and_then(resolve_color_rgb)
+            .map(|(r, g, b)| rgb_to_bsd_char(r, g, b, false))
+            .unwrap_or('x');
     format!("{fg}{bg}")
 }
 
@@ -244,38 +242,70 @@ fn rgb_to_bsd_char(r: u8, g: u8, b: u8, bold: bool) -> char {
 
     // Achromatic: if saturation is very low, map to black or white by brightness.
     let ch = if chroma < 30 {
-        if max < 80 { 'a' } else { 'h' } // black or white
+        if max < 80 {
+            'a'
+        } else {
+            'h'
+        } // black or white
     } else {
         // Chromatic: pick hue based on dominant channel(s).
         match (ri == max, gi == max, bi == max) {
             // Red dominant
             (true, false, false) => {
-                if gi > bi + 40 { 'd' } // red+green lean → brown/yellow
-                else if bi > gi + 40 { 'f' } // red+blue lean → magenta
-                else { 'b' } // pure red
+                if gi > bi + 40 {
+                    'd'
+                }
+                // red+green lean → brown/yellow
+                else if bi > gi + 40 {
+                    'f'
+                }
+                // red+blue lean → magenta
+                else {
+                    'b'
+                } // pure red
             }
             // Green dominant
             (false, true, false) => {
-                if bi > ri + 40 { 'g' } // green+blue lean → cyan
-                else if ri > bi + 40 { 'd' } // green+red lean → yellow/brown
-                else { 'c' } // pure green
+                if bi > ri + 40 {
+                    'g'
+                }
+                // green+blue lean → cyan
+                else if ri > bi + 40 {
+                    'd'
+                }
+                // green+red lean → yellow/brown
+                else {
+                    'c'
+                } // pure green
             }
             // Blue dominant
             (false, false, true) => {
-                if ri > gi + 40 { 'f' } // blue+red lean → magenta
-                else if gi > ri + 40 { 'g' } // blue+green lean → cyan
-                else { 'e' } // pure blue
+                if ri > gi + 40 {
+                    'f'
+                }
+                // blue+red lean → magenta
+                else if gi > ri + 40 {
+                    'g'
+                }
+                // blue+green lean → cyan
+                else {
+                    'e'
+                } // pure blue
             }
             // Ties — secondary channel decides
-            (true, true, false) => 'd',  // red+green = yellow/brown
-            (true, false, true) => 'f',  // red+blue = magenta
-            (false, true, true) => 'g',  // green+blue = cyan
-            (true, true, true) => 'h',   // all equal = white
+            (true, true, false) => 'd', // red+green = yellow/brown
+            (true, false, true) => 'f', // red+blue = magenta
+            (false, true, true) => 'g', // green+blue = cyan
+            (true, true, true) => 'h',  // all equal = white
             _ => 'h',
         }
     };
 
-    if bold { ch.to_ascii_uppercase() } else { ch }
+    if bold {
+        ch.to_ascii_uppercase()
+    } else {
+        ch
+    }
 }
 
 /// Convert a color string (named or hex) to a truecolor (24-bit) fg SGR parameter.
@@ -340,7 +370,10 @@ mod tests {
         let s = lsc.to_ls_colors_string().unwrap();
         assert!(s.starts_with("di="), "expected di= prefix, got: {s}");
         // bold + truecolor fg code
-        assert!(s.contains("1;38;2;"), "expected bold+truecolor code in: {s}");
+        assert!(
+            s.contains("1;38;2;"),
+            "expected bold+truecolor code in: {s}"
+        );
     }
 
     #[test]
@@ -382,7 +415,10 @@ mod tests {
             ..Default::default()
         };
         let s = lsc.to_ls_colors_string().unwrap();
-        assert!(s.contains("38;2;122;162;247"), "expected truecolor code in: {s}");
+        assert!(
+            s.contains("38;2;122;162;247"),
+            "expected truecolor code in: {s}"
+        );
     }
 
     #[test]
@@ -421,7 +457,10 @@ order = []
 dir = { fg = "blue", bold = true }
 "#;
         let theme: crate::schema::Theme = toml::from_str(toml).expect("should parse");
-        assert!(theme.ls_colors.dir.is_some(), "dir should be Some after parse");
+        assert!(
+            theme.ls_colors.dir.is_some(),
+            "dir should be Some after parse"
+        );
         let s = theme.ls_colors.to_ls_colors_string().unwrap();
         assert!(s.contains("di="), "expected di= in: {s}");
     }
@@ -448,15 +487,23 @@ sh = { fg = "#e0af68", bold = true }
         let s = theme.ls_colors.to_ls_colors_string().unwrap();
         assert!(s.contains("*.rs=38;2;231;137;79"), "missing rs ext in: {s}");
         assert!(s.contains("*.py=38;2;69;132;182"), "missing py ext in: {s}");
-        assert!(s.contains("*.sh=1;38;2;224;175;104"), "missing sh ext in: {s}");
+        assert!(
+            s.contains("*.sh=1;38;2;224;175;104"),
+            "missing sh ext in: {s}"
+        );
     }
 
     #[test]
     fn tokyo_night_extensions_roundtrip() {
         let theme = crate::loader::parse_and_validate(
-            include_str!("../../../themes/tokyo-night.toml"), "tokyo-night"
-        ).unwrap();
-        assert!(!theme.ls_colors.extensions.is_empty(), "extensions should be non-empty");
+            include_str!("../../../themes/tokyo-night.toml"),
+            "tokyo-night",
+        )
+        .unwrap();
+        assert!(
+            !theme.ls_colors.extensions.is_empty(),
+            "extensions should be non-empty"
+        );
         let s = theme.ls_colors.to_ls_colors_string().unwrap();
         assert!(s.contains("*.rs="), "missing *.rs in: {s}");
         assert!(s.contains("*.py="), "missing *.py in: {s}");
@@ -467,19 +514,24 @@ sh = { fg = "#e0af68", bold = true }
     #[test]
     fn default_theme_ls_colors_is_non_empty() {
         let theme = crate::loader::parse_and_validate(
-            include_str!("../../../themes/default.toml"), "default"
-        ).unwrap();
+            include_str!("../../../themes/default.toml"),
+            "default",
+        )
+        .unwrap();
         assert!(
             theme.ls_colors.to_ls_colors_string().is_some(),
-            "default theme should have non-empty ls_colors; dir={:?}", theme.ls_colors.dir
+            "default theme should have non-empty ls_colors; dir={:?}",
+            theme.ls_colors.dir
         );
     }
 
     #[test]
     fn minimal_theme_ls_colors_is_non_empty() {
         let theme = crate::loader::parse_and_validate(
-            include_str!("../../../themes/minimal.toml"), "minimal"
-        ).unwrap();
+            include_str!("../../../themes/minimal.toml"),
+            "minimal",
+        )
+        .unwrap();
         assert!(
             theme.ls_colors.to_ls_colors_string().is_some(),
             "minimal theme should have non-empty ls_colors"

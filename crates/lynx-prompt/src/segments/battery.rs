@@ -57,10 +57,12 @@ impl Segment for BatterySegment {
         }
 
         let icon = match state.status {
-            BatteryStatus::Charging => cfg.charging_icon.unwrap_or_else(|| "\u{f0e7}".to_string()),     // nf-fa-bolt
-            BatteryStatus::Discharging => cfg.discharging_icon.unwrap_or_else(|| "\u{f242}".to_string()), // nf-fa-battery_half
-            BatteryStatus::Full => cfg.full_icon.unwrap_or_else(|| "\u{f240}".to_string()),              // nf-fa-battery_full
-            BatteryStatus::Unknown => "\u{f244}".to_string(),                                            // nf-fa-battery_empty
+            BatteryStatus::Charging => cfg.charging_icon.unwrap_or_else(|| "\u{f0e7}".to_string()), // nf-fa-bolt
+            BatteryStatus::Discharging => cfg
+                .discharging_icon
+                .unwrap_or_else(|| "\u{f242}".to_string()), // nf-fa-battery_half
+            BatteryStatus::Full => cfg.full_icon.unwrap_or_else(|| "\u{f240}".to_string()), // nf-fa-battery_full
+            BatteryStatus::Unknown => "\u{f244}".to_string(), // nf-fa-battery_empty
         };
 
         let text = format!("{icon} {}%", state.percentage);
@@ -158,7 +160,11 @@ mod tests {
     fn charging_icon() {
         let ctx = ctx_with_battery(50, "charging");
         let r = BatterySegment.render(&empty_config(), &ctx).unwrap();
-        assert!(r.text.contains('\u{f0e7}'), "expected bolt icon: {:?}", r.text);
+        assert!(
+            r.text.contains('\u{f0e7}'),
+            "expected bolt icon: {:?}",
+            r.text
+        );
     }
 
     #[test]

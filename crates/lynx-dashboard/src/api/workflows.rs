@@ -101,7 +101,9 @@ pub async fn run_workflow(Json(body): Json<serde_json::Value>) -> impl IntoRespo
 }
 
 /// GET /api/job/:id — get job result by ID.
-pub async fn get_job(axum::extract::Path(job_id): axum::extract::Path<String>) -> impl IntoResponse {
+pub async fn get_job(
+    axum::extract::Path(job_id): axum::extract::Path<String>,
+) -> impl IntoResponse {
     match lynx_workflow::jobs::get_job(&job_id) {
         Ok(val) => Json(val),
         Err(_) => Json(serde_json::json!({ "error": format!("job '{}' not found", job_id) })),

@@ -79,9 +79,11 @@ fn is_visible(config: &toml::Value, seg: &dyn Segment, ctx: &RenderContext) -> b
 /// Pure — no I/O, no shell calls.
 fn eval_condition(cond: &SegmentCondition, ctx: &RenderContext) -> bool {
     match cond {
-        SegmentCondition::EnvSet { env_set } => {
-            ctx.env.get(env_set.as_str()).map(|v| !v.is_empty()).unwrap_or(false)
-        }
+        SegmentCondition::EnvSet { env_set } => ctx
+            .env
+            .get(env_set.as_str())
+            .map(|v| !v.is_empty())
+            .unwrap_or(false),
         SegmentCondition::EnvMatches { env_matches } => env_matches.iter().all(|(var, pattern)| {
             ctx.env
                 .get(var.as_str())
@@ -92,9 +94,7 @@ fn eval_condition(cond: &SegmentCondition, ctx: &RenderContext) -> bool {
             let has_git = ctx.cache.contains_key(crate::cache_keys::GIT_STATE);
             *in_git_repo == has_git
         }
-        SegmentCondition::CwdMatches { cwd_matches } => {
-            glob_match(cwd_matches, &ctx.cwd, &ctx.env)
-        }
+        SegmentCondition::CwdMatches { cwd_matches } => glob_match(cwd_matches, &ctx.cwd, &ctx.env),
         SegmentCondition::ExitCodeNonzero { exit_code_nonzero } => {
             let is_nonzero = ctx
                 .env
@@ -242,7 +242,12 @@ pub async fn evaluate_theme(
     let left = evaluate(segments, &theme.segments.left.order, &theme.segment, ctx);
     let right = evaluate(segments, &theme.segments.right.order, &theme.segment, ctx);
     let top = evaluate(segments, &theme.segments.top.order, &theme.segment, ctx);
-    let top_right = evaluate(segments, &theme.segments.top_right.order, &theme.segment, ctx);
+    let top_right = evaluate(
+        segments,
+        &theme.segments.top_right.order,
+        &theme.segment,
+        ctx,
+    );
     let continuation = evaluate(
         segments,
         &theme.segments.continuation.order,
@@ -371,7 +376,9 @@ mod tests {
 
     struct AlwaysSegment;
     impl Segment for AlwaysSegment {
-        fn name(&self) -> &'static str { "always" }
+        fn name(&self) -> &'static str {
+            "always"
+        }
         fn render(&self, _: &toml::Value, _: &RenderContext) -> Option<RenderedSegment> {
             Some(RenderedSegment::new("ok"))
         }
@@ -407,7 +414,8 @@ mod tests {
     #[test]
     fn show_when_env_matches_glob() {
         let mut ctx = ctx();
-        ctx.env.insert("VIRTUAL_ENV".into(), "/home/user/.venv/myproject".into());
+        ctx.env
+            .insert("VIRTUAL_ENV".into(), "/home/user/.venv/myproject".into());
         let cfg = cfg_from_toml(r#"show_when = { env_matches = { VIRTUAL_ENV = "*myproject*" } }"#);
         assert!(is_visible(&cfg, &AlwaysSegment, &ctx));
     }
@@ -415,7 +423,8 @@ mod tests {
     #[test]
     fn show_when_env_matches_glob_no_match() {
         let mut ctx = ctx();
-        ctx.env.insert("VIRTUAL_ENV".into(), "/home/user/.venv/other".into());
+        ctx.env
+            .insert("VIRTUAL_ENV".into(), "/home/user/.venv/other".into());
         let cfg = cfg_from_toml(r#"show_when = { env_matches = { VIRTUAL_ENV = "*myproject*" } }"#);
         assert!(!is_visible(&cfg, &AlwaysSegment, &ctx));
     }

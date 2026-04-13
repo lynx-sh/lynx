@@ -4,7 +4,7 @@ mod commands;
 mod error_display;
 
 use anyhow::Result;
-use clap::{CommandFactory, Parser, error::ErrorKind};
+use clap::{error::ErrorKind, CommandFactory, Parser};
 use cli::Cli;
 
 #[tokio::main]
@@ -15,10 +15,12 @@ async fn main() {
     // commands rather than parse errors.
     let result = match Cli::try_parse() {
         Ok(cli) => commands::dispatch(cli).await,
-        Err(e) if matches!(
-            e.kind(),
-            ErrorKind::MissingSubcommand | ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand
-        ) => {
+        Err(e)
+            if matches!(
+                e.kind(),
+                ErrorKind::MissingSubcommand | ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand
+            ) =>
+        {
             let args: Vec<String> = std::env::args().skip(1).collect();
             if args.is_empty() || args.first().map(|s| s.as_str()) == Some("help") {
                 // Bare `lx` or `lx help` → interactive help browser.

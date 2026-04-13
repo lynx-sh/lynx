@@ -80,7 +80,17 @@ mod tests {
         let r = TimeSegment.render(&cfg, &ctx()).unwrap();
         // YYYY-MM-DD HH:MM:SS — 19 chars, dash at pos 4 and 7
         assert_eq!(r.text.len(), 19, "unexpected length: {}", r.text);
-        assert_eq!(r.text.chars().nth(4), Some('-'), "expected dash at pos 4: {}", r.text);
-        assert_eq!(r.text.chars().nth(10), Some(' '), "expected space at pos 10: {}", r.text);
+        assert_eq!(
+            r.text.chars().nth(4),
+            Some('-'),
+            "expected dash at pos 4: {}",
+            r.text
+        );
+        assert_eq!(
+            r.text.chars().nth(10),
+            Some(' '),
+            "expected space at pos 10: {}",
+            r.text
+        );
     }
 }

@@ -34,19 +34,20 @@ pub async fn update_config(
     State(state): State<Arc<AppState>>,
     Json(req): Json<ConfigUpdateRequest>,
 ) -> impl IntoResponse {
-    let result = lynx_config::snapshot::mutate_config_transaction("dashboard-config-update", |cfg| {
-        if let Some(ref theme) = req.active_theme {
-            cfg.active_theme = theme.clone();
-        }
-        if let Some(ref ctx) = req.active_context {
-            cfg.active_context = match ctx.as_str() {
-                "agent" => lynx_core::types::Context::Agent,
-                "minimal" => lynx_core::types::Context::Minimal,
-                _ => lynx_core::types::Context::Interactive,
-            };
-        }
-        Ok(())
-    });
+    let result =
+        lynx_config::snapshot::mutate_config_transaction("dashboard-config-update", |cfg| {
+            if let Some(ref theme) = req.active_theme {
+                cfg.active_theme = theme.clone();
+            }
+            if let Some(ref ctx) = req.active_context {
+                cfg.active_context = match ctx.as_str() {
+                    "agent" => lynx_core::types::Context::Agent,
+                    "minimal" => lynx_core::types::Context::Minimal,
+                    _ => lynx_core::types::Context::Interactive,
+                };
+            }
+            Ok(())
+        });
 
     match result {
         Ok(_) => {

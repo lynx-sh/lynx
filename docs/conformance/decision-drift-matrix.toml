@@ -22,9 +22,9 @@ owner_phase = "B13-P03"
 [captures.context_detection_env_vars]
 status = "deviating"
 actual = [
-  "shell loader checks CLAUDE_CODE and CURSOR_SESSION",
-  "lynx-shell detects CLAUDE_CODE, CURSOR_SESSION, CODEIUM_SESSION, COPILOT_AGENT, WINDSURF_AGENT + CI/TTY heuristics",
-  "lynx-cli context status checks CLAUDE_CODE_ENTRYPOINT and CURSOR_SESSION_ID",
+  "shell loader checks CLAUDECODE and CURSOR_CLI",
+  "lynx-shell detects CLAUDECODE and CURSOR_CLI plus CI fallback",
+  "lynx-cli context status reports detector output from the same canonical env-var set",
   "docs reference CURSOR_IDE and LYNX_MINIMAL in places, plus CI behavior mismatches"
 ]
 evidence = [
@@ -153,7 +153,7 @@ evidence = [
 id = "M-D004-01"
 severity = "high"
 anchor = "crates/lynx-cli/src/commands/context.rs:67"
-current = "CLI auto-detection uses CLAUDE_CODE_ENTRYPOINT/CURSOR_SESSION_ID; shell and rust use different names."
+current = "CLI context status previously diverged from shell/rust detector env var names; canonical names are now CLAUDECODE/CURSOR_CLI."
 expected = "Shared detector source and env list used by shell, cli, and docs."
 fix_phase = "B13-P02"
 target_fix_paths = ["crates/lynx-cli/src/commands/context.rs", "crates/lynx-shell/src/context.rs", "shell/core/loader.zsh"]

@@ -31,9 +31,9 @@ impl Segment for AwsProfileSegment {
             return None;
         }
 
-        let patterns = cfg.prod_patterns.unwrap_or_else(|| {
-            vec!["*prod*".to_string(), "*production*".to_string()]
-        });
+        let patterns = cfg
+            .prod_patterns
+            .unwrap_or_else(|| vec!["*prod*".to_string(), "*production*".to_string()]);
 
         let is_prod = patterns.iter().any(|p| {
             let needle = p.trim_matches('*');
@@ -112,9 +112,17 @@ mod tests {
         override_capability(TermCapability::TrueColor);
         let ctx = ctx_with_profile("staging");
         let seg = AwsProfileSegment.render(&empty_config(), &ctx).unwrap();
-        assert!(seg.text.contains("staging"), "expected profile name: {:?}", seg.text);
+        assert!(
+            seg.text.contains("staging"),
+            "expected profile name: {:?}",
+            seg.text
+        );
         // green = (158,206,106) → 38;2;158;206;106
-        assert!(seg.text.contains("38;2;158;206;106"), "expected green color: {:?}", seg.text);
+        assert!(
+            seg.text.contains("38;2;158;206;106"),
+            "expected green color: {:?}",
+            seg.text
+        );
     }
 
     #[test]
@@ -122,11 +130,23 @@ mod tests {
         override_capability(TermCapability::TrueColor);
         let ctx = ctx_with_profile("my-prod-account");
         let seg = AwsProfileSegment.render(&empty_config(), &ctx).unwrap();
-        assert!(seg.text.contains("my-prod-account"), "expected profile: {:?}", seg.text);
+        assert!(
+            seg.text.contains("my-prod-account"),
+            "expected profile: {:?}",
+            seg.text
+        );
         // red = (247,118,142) → 38;2;247;118;142
-        assert!(seg.text.contains("38;2;247;118;142"), "expected red color: {:?}", seg.text);
+        assert!(
+            seg.text.contains("38;2;247;118;142"),
+            "expected red color: {:?}",
+            seg.text
+        );
         // bold
-        assert!(seg.text.contains("\x1b[1m"), "expected bold for prod: {:?}", seg.text);
+        assert!(
+            seg.text.contains("\x1b[1m"),
+            "expected bold for prod: {:?}",
+            seg.text
+        );
     }
 
     #[test]
@@ -134,7 +154,11 @@ mod tests {
         override_capability(TermCapability::TrueColor);
         let ctx = ctx_with_profile("us-east-production");
         let seg = AwsProfileSegment.render(&empty_config(), &ctx).unwrap();
-        assert!(seg.text.contains("38;2;247;118;142"), "expected red for production: {:?}", seg.text);
+        assert!(
+            seg.text.contains("38;2;247;118;142"),
+            "expected red for production: {:?}",
+            seg.text
+        );
     }
 
     #[test]

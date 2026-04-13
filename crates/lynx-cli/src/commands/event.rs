@@ -1,6 +1,6 @@
-use lynx_core::error::LynxError;
 use anyhow::Result;
 use clap::{Args, Subcommand};
+use lynx_core::error::LynxError;
 use lynx_events::{logger, types::Event};
 
 #[derive(Args)]
@@ -63,7 +63,11 @@ pub async fn run(args: EventArgs) -> Result<()> {
             })?;
         }
         EventCommand::Other(args) => {
-            return Err(LynxError::unknown_command(args.first().map(|s| s.as_str()).unwrap_or(""), "event").into())
+            return Err(LynxError::unknown_command(
+                args.first().map(|s| s.as_str()).unwrap_or(""),
+                "event",
+            )
+            .into())
         }
     }
     Ok(())

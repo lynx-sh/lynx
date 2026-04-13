@@ -1,39 +1,39 @@
+pub mod audit;
 pub mod benchmark;
-pub mod help;
-pub mod dashboard;
-pub mod intro;
-pub mod diag;
+pub mod browse;
 pub mod config;
 pub mod context;
+pub mod cron;
 pub mod daemon;
+pub mod dashboard;
+pub mod diag;
 pub mod doctor;
-pub mod git;
-pub mod kubectl_state;
-pub mod refresh_state;
 pub mod event;
 pub mod examples;
+pub mod git;
+pub mod help;
 pub mod init;
+pub mod install;
+pub mod intro;
 pub mod jobs;
-pub mod setup;
+pub mod kubectl_state;
 pub mod migrate;
+pub mod nerd_font;
 pub mod plugin;
 pub mod prompt;
+pub mod refresh_state;
 pub mod rollback;
 pub mod run;
+pub mod setup;
 pub mod sync;
-pub mod audit;
-pub mod browse;
-pub mod install;
 pub mod tap;
-pub mod cron;
-pub mod nerd_font;
 pub mod theme;
 mod theme_convert;
 pub mod uninstall;
 pub mod update;
 
 use crate::cli::{Cli, Command};
-use anyhow::{Result};
+use anyhow::Result;
 use lynx_core::error::LynxError;
 
 /// Load TUI colors from the active theme. Falls back to defaults.
@@ -59,25 +59,12 @@ pub(crate) fn open_in_vscode(path: &std::path::Path) -> Result<()> {
         )))?;
 
     if !status.success() {
-        return Err(LynxError::Shell("VS Code exited with an error — file may not have been saved".into()).into());
+        return Err(LynxError::Shell(
+            "VS Code exited with an error — file may not have been saved".into(),
+        )
+        .into());
     }
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn tui_colors_returns_default_without_config() {
-        // In test environment, config may not exist — should fallback gracefully.
-        let colors = tui_colors();
-        // Just ensure it doesn't panic and returns something.
-        let _ = colors;
-    }
-
-    // Note: open_in_vscode is not unit-testable without mocking Command.
-    // It spawns VS Code with --wait which blocks. Tested via integration tests.
 }
 
 pub async fn dispatch(cli: Cli) -> Result<()> {
@@ -114,4 +101,20 @@ pub async fn dispatch(cli: Cli) -> Result<()> {
         Command::Jobs(args) => jobs::run(args),
         Command::Run(args) => run::run(args).await,
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tui_colors_returns_default_without_config() {
+        // In test environment, config may not exist — should fallback gracefully.
+        let colors = tui_colors();
+        // Just ensure it doesn't panic and returns something.
+        let _ = colors;
+    }
+
+    // Note: open_in_vscode is not unit-testable without mocking Command.
+    // It spawns VS Code with --wait which blocks. Tested via integration tests.
 }

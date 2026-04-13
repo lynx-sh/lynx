@@ -78,7 +78,9 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         std::fs::create_dir_all(dir.path().join(".terraform")).unwrap();
         std::fs::write(dir.path().join(".terraform/environment"), "staging").unwrap();
-        let r = TerraformSegment.render(&empty_config(), &ctx(dir.path().to_str().unwrap())).unwrap();
+        let r = TerraformSegment
+            .render(&empty_config(), &ctx(dir.path().to_str().unwrap()))
+            .unwrap();
         assert!(r.text.contains("staging"));
     }
 }

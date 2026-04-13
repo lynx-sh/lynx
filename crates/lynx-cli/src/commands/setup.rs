@@ -55,7 +55,8 @@ pub fn run(args: SetupArgs) -> Result<()> {
         return Err(LynxError::Config(format!(
             "shell/ not found at {} — run lx setup from the Lynx source directory or pass --source",
             shell_src.display()
-        )).into());
+        ))
+        .into());
     }
 
     if plugins_src.exists() {
@@ -63,7 +64,10 @@ pub fn run(args: SetupArgs) -> Result<()> {
             .with_context(|| format!("failed to copy plugins/ from {}", plugins_src.display()))?;
         println!("  ✓ plugins/ → {}/plugins/", lynx_dir.display());
     } else {
-        println!("  ⚠ plugins/ not found at {} — skipping", plugins_src.display());
+        println!(
+            "  ⚠ plugins/ not found at {} — skipping",
+            plugins_src.display()
+        );
     }
 
     if themes_src.exists() {
@@ -78,11 +82,8 @@ pub fn run(args: SetupArgs) -> Result<()> {
     // Write default config if none exists
     let config_path = lynx_dir.join(brand::CONFIG_FILE);
     if !config_path.exists() {
-        std::fs::write(
-            &config_path,
-            default_config(),
-        )
-        .with_context(|| format!("failed to write config.toml to {}", config_path.display()))?;
+        std::fs::write(&config_path, default_config())
+            .with_context(|| format!("failed to write config.toml to {}", config_path.display()))?;
         println!("  ✓ config.toml written (default)");
     } else {
         println!("  ✓ config.toml preserved (already exists)");
@@ -254,9 +255,9 @@ enabled = true
 }
 
 fn home_dir() -> Result<PathBuf> {
-    std::env::var_os("HOME")
-        .map(PathBuf::from)
-        .ok_or_else(|| anyhow::Error::from(lynx_core::error::LynxError::Shell("$HOME not set".into())))
+    std::env::var_os("HOME").map(PathBuf::from).ok_or_else(|| {
+        anyhow::Error::from(lynx_core::error::LynxError::Shell("$HOME not set".into()))
+    })
 }
 
 #[cfg(test)]
@@ -290,7 +291,10 @@ mod tests {
 
         let content = fs::read_to_string(&zshrc).unwrap();
         assert_eq!(
-            content.lines().filter(|l| l.contains(ZSHRC_INIT_LINE)).count(),
+            content
+                .lines()
+                .filter(|l| l.contains(ZSHRC_INIT_LINE))
+                .count(),
             1,
             "should not duplicate init line"
         );

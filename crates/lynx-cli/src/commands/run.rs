@@ -1,6 +1,6 @@
-use anyhow::{Result};
-use lynx_core::error::LynxError;
+use anyhow::Result;
 use clap::Args;
+use lynx_core::error::LynxError;
 use std::collections::HashMap;
 
 #[derive(Args)]
@@ -57,7 +57,10 @@ pub async fn run(args: RunArgs) -> Result<()> {
         if let Some((k, v)) = param.split_once('=') {
             provided.insert(k.to_string(), v.to_string());
         } else {
-            return Err(LynxError::Workflow(format!("invalid param format '{param}' — expected key=value")).into());
+            return Err(LynxError::Workflow(format!(
+                "invalid param format '{param}' — expected key=value"
+            ))
+            .into());
         }
     }
 
@@ -73,12 +76,7 @@ pub async fn run(args: RunArgs) -> Result<()> {
         println!();
         for (i, step) in wf.steps.iter().enumerate() {
             let run_str = lynx_workflow::params::expand_template(&step.run, &params);
-            println!(
-                "  Step {}: {} ({:?})",
-                i + 1,
-                step.name,
-                step.runner
-            );
+            println!("  Step {}: {} ({:?})", i + 1, step.name, step.runner);
             println!("    run: {run_str}");
             if let Some(ref g) = step.group {
                 println!("    group: {g}");
@@ -170,13 +168,8 @@ pub async fn run(args: RunArgs) -> Result<()> {
         let params_clone = params.clone();
         let ld = Some(log_dir.clone());
         let exec_handle = tokio::spawn(async move {
-            lynx_workflow::executor::execute_workflow_streaming(
-                &wf_clone,
-                &params_clone,
-                ld,
-                tx,
-            )
-            .await
+            lynx_workflow::executor::execute_workflow_streaming(&wf_clone, &params_clone, ld, tx)
+                .await
         });
 
         // Print events as they arrive.
@@ -202,7 +195,10 @@ pub async fn run(args: RunArgs) -> Result<()> {
                     };
                     println!("  {icon} {name} ({duration_ms}ms)");
                 }
-                Ok(lynx_workflow::executor::StreamEvent::Done { success, duration_ms }) => {
+                Ok(lynx_workflow::executor::StreamEvent::Done {
+                    success,
+                    duration_ms,
+                }) => {
                     println!();
                     if success {
                         println!("\u{2713} Workflow completed ({duration_ms}ms)");
@@ -226,27 +222,43 @@ struct WorkflowListEntry {
 }
 
 impl lynx_tui::ListItem for WorkflowListEntry {
-    fn title(&self) -> &str { &self.name }
-    fn subtitle(&self) -> String { self.description.clone() }
+    fn title(&self) -> &str {
+        &self.name
+    }
+    fn subtitle(&self) -> String {
+        self.description.clone()
+    }
     fn detail(&self) -> String {
         format!("{}\n\nRun: lx run {}", self.description, self.name)
     }
-    fn category(&self) -> Option<&str> { Some("workflow") }
+    fn category(&self) -> Option<&str> {
+        Some("workflow")
+    }
 }
 
 /// Map executor StreamEvent to TUI WorkflowEvent.
 fn map_stream_to_tui(
     ev: lynx_workflow::executor::StreamEvent,
 ) -> lynx_tui::workflow::WorkflowEvent {
-    use lynx_workflow::executor::{StepStatus, StreamEvent};
     use lynx_tui::workflow::{WorkflowEvent, WorkflowStepStatus};
+    use lynx_workflow::executor::{StepStatus, StreamEvent};
 
     match ev {
         StreamEvent::StepStarted { name } => WorkflowEvent::StepStarted { name },
-        StreamEvent::StepOutput { name, line, is_stderr } => {
-            WorkflowEvent::StepOutput { name, line, is_stderr }
-        }
-        StreamEvent::StepFinished { name, status, duration_ms } => {
+        StreamEvent::StepOutput {
+            name,
+            line,
+            is_stderr,
+        } => WorkflowEvent::StepOutput {
+            name,
+            line,
+            is_stderr,
+        },
+        StreamEvent::StepFinished {
+            name,
+            status,
+            duration_ms,
+        } => {
             let tui_status = match status {
                 StepStatus::Passed => WorkflowStepStatus::Passed,
                 StepStatus::Failed => WorkflowStepStatus::Failed,
@@ -259,9 +271,13 @@ fn map_stream_to_tui(
                 duration_ms,
             }
         }
-        StreamEvent::Done { success, duration_ms } => {
-            WorkflowEvent::Done { success, duration_ms }
-        }
+        StreamEvent::Done {
+            success,
+            duration_ms,
+        } => WorkflowEvent::Done {
+            success,
+            duration_ms,
+        },
     }
 }
 
@@ -340,6 +356,28 @@ fn print_run_help() {
     );
 }
 
+fn cmd_list() -> Result<()> {
+    let entries = lynx_workflow::store::list_workflows()?;
+    if entries.is_empty() {
+        println!("No workflows found.");
+        println!("Create workflow files in ~/.config/lynx/workflows/");
+        return Ok(());
+    }
+
+    let items: Vec<WorkflowListEntry> = entries
+        .iter()
+        .map(|e| WorkflowListEntry {
+            name: e.name.clone(),
+            description: e.description.clone(),
+        })
+        .collect();
+
+    if let Some(idx) = lynx_tui::show(&items, "Workflows", &super::tui_colors())? {
+        println!("  Run: lx run {}", items[idx].name);
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -360,9 +398,13 @@ mod tests {
     #[test]
     fn map_stream_to_tui_step_started() {
         use lynx_workflow::executor::StreamEvent;
-        let ev = StreamEvent::StepStarted { name: "lint".to_string() };
+        let ev = StreamEvent::StepStarted {
+            name: "lint".to_string(),
+        };
         let tui_ev = map_stream_to_tui(ev);
-        assert!(matches!(tui_ev, lynx_tui::workflow::WorkflowEvent::StepStarted { name } if name == "lint"));
+        assert!(
+            matches!(tui_ev, lynx_tui::workflow::WorkflowEvent::StepStarted { name } if name == "lint")
+        );
     }
 
     #[test]
@@ -374,13 +416,16 @@ mod tests {
             is_stderr: false,
         };
         let tui_ev = map_stream_to_tui(ev);
-        assert!(matches!(tui_ev, lynx_tui::workflow::WorkflowEvent::StepOutput { .. }));
+        assert!(matches!(
+            tui_ev,
+            lynx_tui::workflow::WorkflowEvent::StepOutput { .. }
+        ));
     }
 
     #[test]
     fn map_stream_to_tui_step_finished_all_statuses() {
-        use lynx_workflow::executor::{StreamEvent, StepStatus};
         use lynx_tui::workflow::{WorkflowEvent, WorkflowStepStatus};
+        use lynx_workflow::executor::{StepStatus, StreamEvent};
 
         for (input, expected) in [
             (StepStatus::Passed, WorkflowStepStatus::Passed),
@@ -404,9 +449,18 @@ mod tests {
     #[test]
     fn map_stream_to_tui_done() {
         use lynx_workflow::executor::StreamEvent;
-        let ev = StreamEvent::Done { success: true, duration_ms: 500 };
+        let ev = StreamEvent::Done {
+            success: true,
+            duration_ms: 500,
+        };
         let tui_ev = map_stream_to_tui(ev);
-        assert!(matches!(tui_ev, lynx_tui::workflow::WorkflowEvent::Done { success: true, duration_ms: 500 }));
+        assert!(matches!(
+            tui_ev,
+            lynx_tui::workflow::WorkflowEvent::Done {
+                success: true,
+                duration_ms: 500
+            }
+        ));
     }
 
     #[test]
@@ -462,23 +516,4 @@ mod tests {
     fn print_run_help_does_not_panic() {
         print_run_help();
     }
-}
-
-fn cmd_list() -> Result<()> {
-    let entries = lynx_workflow::store::list_workflows()?;
-    if entries.is_empty() {
-        println!("No workflows found.");
-        println!("Create workflow files in ~/.config/lynx/workflows/");
-        return Ok(());
-    }
-
-    let items: Vec<WorkflowListEntry> = entries.iter().map(|e| WorkflowListEntry {
-        name: e.name.clone(),
-        description: e.description.clone(),
-    }).collect();
-
-    if let Some(idx) = lynx_tui::show(&items, "Workflows", &super::tui_colors())? {
-        println!("  Run: lx run {}", items[idx].name);
-    }
-    Ok(())
 }

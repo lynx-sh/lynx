@@ -26,7 +26,9 @@ fn parse_type(s: &str) -> Result<PackageType, String> {
         "theme" => Ok(PackageType::Theme),
         "intro" => Ok(PackageType::Intro),
         "bundle" => Ok(PackageType::Bundle),
-        other => Err(format!("unknown type '{other}' — use plugin, tool, theme, intro, or bundle")),
+        other => Err(format!(
+            "unknown type '{other}' — use plugin, tool, theme, intro, or bundle"
+        )),
     }
 }
 
@@ -38,13 +40,14 @@ pub fn run(args: BrowseArgs) -> Result<()> {
     let config = match load_config() {
         Ok(c) => Some(c),
         Err(e) => {
-            lynx_core::diag::warn("browse", &format!("failed to load config — installed filter may be incomplete: {e}"));
+            lynx_core::diag::warn(
+                "browse",
+                &format!("failed to load config — installed filter may be incomplete: {e}"),
+            );
             None
         }
     };
-    let enabled: Vec<String> = config
-        .map(|c| c.enabled_plugins)
-        .unwrap_or_default();
+    let enabled: Vec<String> = config.map(|c| c.enabled_plugins).unwrap_or_default();
 
     // Apply filters.
     let filtered: Vec<&TappedEntry> = merged

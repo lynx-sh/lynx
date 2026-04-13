@@ -31,7 +31,11 @@ impl Segment for PromptCharSegment {
             .and_then(|v| v.parse().ok())
             .unwrap_or(0);
         let is_error = exit_code != 0;
-        let is_root = ctx.env.get("LYNX_USER_IS_ROOT").map(|v| v == "1").unwrap_or(false);
+        let is_root = ctx
+            .env
+            .get("LYNX_USER_IS_ROOT")
+            .map(|v| v == "1")
+            .unwrap_or(false);
         let in_git_repo = ctx
             .cache
             .get(crate::cache_keys::GIT_STATE)
@@ -66,11 +70,13 @@ impl Segment for PromptCharSegment {
 mod tests {
     use super::*;
     use crate::segment::empty_config;
-    use serde_json::json;
     use std::collections::HashMap;
 
     fn ctx_with_env(pairs: &[(&str, &str)]) -> RenderContext {
-        let env = pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect();
+        let env = pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
         RenderContext {
             cwd: "/".into(),
             shell_context: lynx_core::types::Context::Interactive,
@@ -96,10 +102,13 @@ mod tests {
 
     #[test]
     fn uses_error_symbol_on_nonzero_exit() {
-        let cfg: toml::Value = toml::from_str(r#"
+        let cfg: toml::Value = toml::from_str(
+            r#"
 symbol = "❯"
 error_symbol = "✗"
-"#).unwrap();
+"#,
+        )
+        .unwrap();
         let ctx = ctx_with_env(&[("LYNX_LAST_EXIT_CODE", "1")]);
         let r = PromptCharSegment.render(&cfg, &ctx).unwrap();
         assert_eq!(r.text, "✗");
@@ -143,7 +152,8 @@ error_symbol = "✗"
 
     #[test]
     fn root_takes_priority_over_git_repo() {
-        let cfg: toml::Value = toml::from_str("root_symbol = \"#\"\nin_git_repo_symbol = \"±\"").unwrap();
+        let cfg: toml::Value =
+            toml::from_str("root_symbol = \"#\"\nin_git_repo_symbol = \"±\"").unwrap();
         let mut ctx = ctx_with_env(&[("LYNX_USER_IS_ROOT", "1")]);
         ctx.cache.insert(
             crate::cache_keys::GIT_STATE.to_string(),
