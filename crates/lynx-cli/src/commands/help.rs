@@ -329,7 +329,14 @@ pub fn show_interactive_help() -> Result<()> {
         println!("\n  lx {}\n", entry.command);
         println!("  {}\n", entry.description);
         println!("  Usage: lx {}\n", entry.usage);
-        println!("  For full options: lx {} --help", entry.command.split_whitespace().next().unwrap_or(entry.command));
+        println!(
+            "  For full options: lx {} --help",
+            entry
+                .command
+                .split_whitespace()
+                .next()
+                .unwrap_or(entry.command)
+        );
     }
 
     Ok(())
@@ -359,18 +366,36 @@ mod tests {
     fn all_entries_have_command_and_description() {
         for entry in ENTRIES {
             assert!(!entry.command.is_empty(), "entry has empty command");
-            assert!(!entry.description.is_empty(), "entry {} has empty description", entry.command);
-            assert!(!entry.usage.is_empty(), "entry {} has empty usage", entry.command);
+            assert!(
+                !entry.description.is_empty(),
+                "entry {} has empty description",
+                entry.command
+            );
+            assert!(
+                !entry.usage.is_empty(),
+                "entry {} has empty usage",
+                entry.command
+            );
         }
     }
 
     #[test]
     fn all_entries_have_valid_category() {
-        let valid_cats = ["core", "themes", "plugins", "registry", "shell", "automation", "developer"];
+        let valid_cats = [
+            "core",
+            "themes",
+            "plugins",
+            "registry",
+            "shell",
+            "automation",
+            "developer",
+        ];
         for entry in ENTRIES {
             assert!(
                 valid_cats.contains(&entry.category),
-                "entry {} has unknown category '{}'", entry.command, entry.category
+                "entry {} has unknown category '{}'",
+                entry.command,
+                entry.category
             );
         }
     }
@@ -391,14 +416,21 @@ mod tests {
         // Find an entry with non-empty extra (the "run" command has it)
         let run_entry = ENTRIES.iter().find(|e| e.command == "run").unwrap();
         let detail = run_entry.detail();
-        assert!(detail.contains("Workflows"), "run entry detail should contain extended help");
+        assert!(
+            detail.contains("Workflows"),
+            "run entry detail should contain extended help"
+        );
     }
 
     #[test]
     fn no_duplicate_commands() {
         let mut seen = std::collections::HashSet::new();
         for entry in ENTRIES {
-            assert!(seen.insert(entry.command), "duplicate help entry for '{}'", entry.command);
+            assert!(
+                seen.insert(entry.command),
+                "duplicate help entry for '{}'",
+                entry.command
+            );
         }
     }
 

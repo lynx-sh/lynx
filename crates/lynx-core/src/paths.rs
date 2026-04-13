@@ -27,8 +27,22 @@ use crate::env_vars;
 use std::path::PathBuf;
 
 /// Resolve `$HOME` — base for all config/data paths.
-fn home() -> PathBuf {
-    PathBuf::from(std::env::var_os(env_vars::HOME).unwrap_or_default())
+///
+/// Use this instead of reading `$HOME` directly so all HOME derivation
+/// goes through a single place. For Lynx config paths, prefer the
+/// specific helpers (`lynx_dir()`, `config_file()`, etc.) over calling
+/// `home()` directly.
+///
+/// # Panics
+///
+/// Panics if `$HOME` is unset or empty. HOME is a fundamental requirement
+/// for Lynx to function — there is no sensible fallback.
+pub fn home() -> PathBuf {
+    let val = std::env::var_os(env_vars::HOME).unwrap_or_default();
+    if val.is_empty() {
+        panic!("lynx: HOME environment variable is not set and home directory could not be determined");
+    }
+    PathBuf::from(val)
 }
 
 /// Resolve the Lynx config/install directory.
@@ -101,6 +115,21 @@ pub fn taps_config_path() -> PathBuf {
 /// `~/.config/lynx/registry/` — cached registry indexes.
 pub fn registry_cache_dir() -> PathBuf {
     lynx_dir().join("registry")
+}
+
+/// `~/.config/lynx/lynx.lock` — installed plugin lock file.
+pub fn lynx_lock_path() -> PathBuf {
+    lynx_dir().join("lynx.lock")
+}
+
+/// `~/.config/lynx/benchmarks.jsonl` — benchmark results log.
+pub fn benchmarks_log_file() -> PathBuf {
+    lynx_dir().join("benchmarks.jsonl")
+}
+
+/// `~/.config/lynx/.update-check` — cached update version check.
+pub fn update_check_file() -> PathBuf {
+    lynx_dir().join(".update-check")
 }
 
 /// `~/.config/lynx/shell/init.zsh` — the shell init file sourced from `.zshrc`.
@@ -202,5 +231,13 @@ mod tests {
     fn cli_bin_uses_home() {
         let _h = HomeGuard::set("/home/testuser");
         assert_eq!(cli_bin(), PathBuf::from("/home/testuser/.local/bin/lx"));
+    }
+
+    #[test]
+    #[should_panic(expected = "HOME environment variable is not set")]
+    fn home_panics_when_unset() {
+        // HomeGuard with empty string simulates missing HOME
+        let _h = HomeGuard::set("");
+        home();
     }
 }

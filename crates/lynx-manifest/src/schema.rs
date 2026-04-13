@@ -31,7 +31,7 @@ pub struct PluginManifest {
 pub struct ShellConfig {
     /// Directories to prepend to `$fpath` (relative to plugin dir).
     /// Convention: `completions/` for zsh completion files.
-    /// Emitted as `fpath=("$LYNX_PLUGIN_DIR/<dir>" $fpath)` before init.zsh is sourced.
+    /// Emitted as `fpath=("${plugin_dir_var}/<dir>" $fpath)` before init.zsh is sourced.
     #[serde(default)]
     pub fpath: Vec<String>,
     /// ZLE widgets to register with `zle -N`.
@@ -211,10 +211,18 @@ mod tests {
                 description: "desc".into(),
                 authors: vec!["a".into()],
             },
-            load: LoadConfig { lazy: false, hooks: vec![] },
+            load: LoadConfig {
+                lazy: false,
+                hooks: vec![],
+            },
             deps: DepsConfig::default(),
-            exports: ExportsConfig { functions: vec!["f".into()], aliases: vec![] },
-            contexts: ContextsConfig { disabled_in: vec!["agent".into()] },
+            exports: ExportsConfig {
+                functions: vec!["f".into()],
+                aliases: vec![],
+            },
+            contexts: ContextsConfig {
+                disabled_in: vec!["agent".into()],
+            },
             state: StateConfig::default(),
             shell: ShellConfig::default(),
         };

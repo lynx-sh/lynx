@@ -2,9 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 // Re-export split-out types so `use crate::schema::X` keeps working everywhere.
-pub use crate::colors::{
-    AutoSuggestions, EzaColumns, LsColors, LsColorsEntry, SyntaxHighlight,
-};
+pub use crate::colors::{AutoSuggestions, EzaColumns, LsColors, LsColorsEntry, SyntaxHighlight};
 pub use crate::segments::{
     ConditionalColor, SegmentColor, SegmentCondition, SegmentSeparators, SegmentVisibility,
     StatusIcon, KNOWN_SEGMENTS,
@@ -74,6 +72,10 @@ pub struct Theme {
     /// full prompt. When absent, falls back to `prompt_char` segment's symbol.
     #[serde(default)]
     pub transient: Option<TransientConfig>,
+    /// Debug prompt config — PROMPT4, shown for each line traced when `set -x`
+    /// (xtrace) is active. When absent, zsh uses its built-in `+` prefix.
+    #[serde(default)]
+    pub debug_prompt: Option<DebugPromptConfig>,
     /// Per-segment config tables — raw TOML values.
     /// Each segment impl deserializes its own typed config from these.
     /// Universal fields (`show_in`, `hide_in`, `color`, `cache_ttl_ms`) are
@@ -107,9 +109,12 @@ pub struct SegmentLayout {
     /// Uses `$COLUMNS` to compute padding so content is flush to the right edge.
     #[serde(default)]
     pub top_right: SegmentOrder,
-    /// Segments rendered as PROMPT2 (continuation prompt for multi-line input).
+    /// Continuation prompt config — PROMPT2 (multi-line input).
+    /// When a `template` is set, it is rendered directly (with optional `fg`/`bg`)
+    /// instead of the segment `order`. When only `order` is set, segments are
+    /// evaluated and assembled as usual.
     #[serde(default)]
-    pub continuation: SegmentOrder,
+    pub continuation: ContinuationConfig,
     /// Insert a blank line before the prompt. Default: `false`.
     #[serde(default)]
     pub spacing: bool,
@@ -148,6 +153,51 @@ pub struct FillerConfig {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TransientConfig {
     /// The text to display as the transient prompt.
+    pub template: String,
+    /// Foreground color (named or hex).
+    pub fg: Option<String>,
+    /// Background color (named or hex).
+    pub bg: Option<String>,
+}
+
+/// Continuation prompt config — drives PROMPT2 (multi-line input continuation).
+///
+/// TOML examples:
+/// ```toml
+/// # Template mode — renders a fixed string (no segments evaluated)
+/// [segments.continuation]
+/// template = "… "
+/// fg = "#6272a4"
+///
+/// # Segment mode — reuses existing segment infrastructure
+/// [segments.continuation]
+/// order = ["prompt_char"]
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct ContinuationConfig {
+    /// Segment names to evaluate (used when `template` is absent).
+    #[serde(default)]
+    pub order: Vec<String>,
+    /// Fixed text to render as PROMPT2. When set, `order` is ignored.
+    pub template: Option<String>,
+    /// Foreground color for the template (named or hex). Ignored when `template` is absent.
+    pub fg: Option<String>,
+    /// Background color for the template (named or hex). Ignored when `template` is absent.
+    pub bg: Option<String>,
+}
+
+/// Debug prompt config — drives PROMPT4 (`set -x` xtrace output prefix).
+/// When absent, zsh uses its default `+ ` prefix.
+///
+/// TOML example:
+/// ```toml
+/// [debug_prompt]
+/// template = "+ "
+/// fg = "#565f89"
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DebugPromptConfig {
+    /// The text to display as the debug/trace prompt.
     pub template: String,
     /// Foreground color (named or hex).
     pub fg: Option<String>,

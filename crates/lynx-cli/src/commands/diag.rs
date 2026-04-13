@@ -1,3 +1,6 @@
+use anyhow::Result;
+use clap::{Args, Subcommand};
+use lynx_core::diag;
 /// `lx diag` — view and manage the Lynx diagnostic log.
 ///
 /// Background operations (init, plugin load) write errors here instead of
@@ -5,9 +8,6 @@
 /// Use `lx diag` to see what Lynx has logged. Use `lx doctor` for a full
 /// health check with actionable fixes.
 use lynx_core::error::LynxError;
-use anyhow::Result;
-use clap::{Args, Subcommand};
-use lynx_core::diag;
 
 #[derive(Args)]
 pub struct DiagArgs {
@@ -40,7 +40,11 @@ pub fn run(args: DiagArgs) -> Result<()> {
             println!("{}", diag::log_path().display());
         }
         Some(DiagCommand::Other(args)) => {
-            return Err(LynxError::unknown_command(args.first().map(|s| s.as_str()).unwrap_or(""), "diag").into())
+            return Err(LynxError::unknown_command(
+                super::unknown_subcmd_name(&args),
+                "diag",
+            )
+            .into())
         }
         None => {
             let lines = diag::tail(args.lines);

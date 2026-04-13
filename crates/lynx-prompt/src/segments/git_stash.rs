@@ -87,6 +87,10 @@ mod tests {
         let cfg: toml::Value = toml::from_str(r#"symbol = "S""#).unwrap();
         let ctx = ctx_with_stash(2);
         let r = GitStashSegment.render(&cfg, &ctx).unwrap();
-        assert!(r.text.starts_with('S'), "expected custom symbol: {}", r.text);
+        assert!(
+            r.text.starts_with('S'),
+            "expected custom symbol: {}",
+            r.text
+        );
     }
 }

@@ -33,15 +33,28 @@ index). Anyone can create a tap — no approval required.
 | Verified   | ◆     | Passes automated validation              |
 | Community  | ○     | Unreviewed — user warned before install   |
 
-### Commands
+### Tap Management
+
+| Command                   | Description                                              |
+|---------------------------|----------------------------------------------------------|
+| `lx tap list`             | Browse all configured taps with name, URL, and trust tier |
+| `lx tap add <source>`     | Register a new tap by GitHub shorthand or full URL       |
+| `lx tap remove <name>`    | Remove a tap (official tap cannot be removed)            |
+| `lx tap update`           | Fetch all tap indexes to local cache                     |
+
+**Adding a tap**
 
 ```bash
-lx tap list                        # show all taps with trust tier
-lx tap add user/repo               # add a community tap
-lx tap add https://url/to/repo     # add by full URL
-lx tap remove <name>               # remove (official cannot be removed)
-lx tap update                      # refresh all tap indexes
+lx tap add community/lynx-taps              # GitHub shorthand — name becomes "community/lynx-taps"
+lx tap add https://github.com/user/repo/raw/main/index.toml  # full URL — name becomes "user/repo"
 ```
+
+After adding a tap, run `lx tap update` before packages from it appear in `lx browse` or `lx install`.
+
+Name derivation: GitHub URLs (`github.com` or `raw.githubusercontent.com`) extract `user/repo`
+from the path. Other URLs use `hostname/last-segment`.
+
+Trust tiers apply to all tap packages — see [Trust Tiers](#trust-tiers) above.
 
 ### Creating a Community Tap
 

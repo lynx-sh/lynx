@@ -81,11 +81,26 @@ impl TuiColors {
     pub fn from_palette(colors: &std::collections::HashMap<String, String>) -> Self {
         let def = Self::default();
         Self {
-            accent: colors.get("accent").map(|s| hex_to_color(s)).unwrap_or(def.accent),
-            success: colors.get("success").map(|s| hex_to_color(s)).unwrap_or(def.success),
-            warning: colors.get("warning").map(|s| hex_to_color(s)).unwrap_or(def.warning),
-            error: colors.get("error").map(|s| hex_to_color(s)).unwrap_or(def.error),
-            muted: colors.get("muted").map(|s| hex_to_color(s)).unwrap_or(def.muted),
+            accent: colors
+                .get("accent")
+                .map(|s| hex_to_color(s))
+                .unwrap_or(def.accent),
+            success: colors
+                .get("success")
+                .map(|s| hex_to_color(s))
+                .unwrap_or(def.success),
+            warning: colors
+                .get("warning")
+                .map(|s| hex_to_color(s))
+                .unwrap_or(def.warning),
+            error: colors
+                .get("error")
+                .map(|s| hex_to_color(s))
+                .unwrap_or(def.error),
+            muted: colors
+                .get("muted")
+                .map(|s| hex_to_color(s))
+                .unwrap_or(def.muted),
         }
     }
 }

@@ -108,7 +108,9 @@ pub fn save_taps(list: &TapList, path: &Path) -> Result<()> {
 /// Add a community tap. Returns error if name already exists.
 pub fn add_tap(list: &mut TapList, name: &str, url: &str) -> Result<()> {
     if list.taps.iter().any(|t| t.name == name) {
-        return Err(lynx_core::error::LynxError::Registry(format!("tap '{name}' already exists")).into());
+        return Err(
+            lynx_core::error::LynxError::Registry(format!("tap '{name}' already exists")).into(),
+        );
     }
     list.taps.push(TapConfig {
         name: name.to_string(),
@@ -130,7 +132,8 @@ pub fn remove_tap(list: &mut TapList, name: &str) -> Result<()> {
             item_type: "Tap".into(),
             name: name.into(),
             hint: "run `lx tap list` to see available taps".into(),
-        }.into());
+        }
+        .into());
     }
     Ok(())
 }
@@ -148,9 +151,7 @@ pub fn resolve_tap_url(input: &str) -> String {
         input.to_string()
     } else {
         // GitHub shorthand: user/repo → raw URL
-        format!(
-            "https://raw.githubusercontent.com/{input}/main/index.toml"
-        )
+        format!("https://raw.githubusercontent.com/{input}/main/index.toml")
     }
 }
 
@@ -242,7 +243,11 @@ fn fetch_tap_index(url: &str) -> Result<RegistryIndex> {
         .call()
         .with_context(|| format!("HTTP GET failed for {url}"))?;
     if resp.status() >= 400 {
-        return Err(LynxError::Registry(format!("registry returned status {} from {url}", resp.status())).into());
+        return Err(LynxError::Registry(format!(
+            "registry returned status {} from {url}",
+            resp.status()
+        ))
+        .into());
     }
     let body = resp.into_string().context("failed to read response")?;
     parse_index(&body)
@@ -289,12 +294,16 @@ mod tests {
     fn load_taps_preserves_existing_and_adds_official() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("taps.toml");
-        std::fs::write(&path, r#"
+        std::fs::write(
+            &path,
+            r#"
 [[tap]]
 name = "mytools"
 url = "https://example.com/index.toml"
 trust = "community"
-"#).unwrap();
+"#,
+        )
+        .unwrap();
         let list = load_taps(&path).unwrap();
         assert_eq!(list.taps.len(), 2);
         assert_eq!(list.taps[0].name, "official");
@@ -371,10 +380,7 @@ trust = "community"
         let official_idx = sample_index(&["git", "fzf"]);
         let community_idx = sample_index(&["git", "custom-tool"]);
 
-        let merged = merge_indexes(&[
-            (community_tap, community_idx),
-            (official_tap, official_idx),
-        ]);
+        let merged = merge_indexes(&[(community_tap, community_idx), (official_tap, official_idx)]);
 
         assert_eq!(merged.len(), 3); // git, custom-tool, fzf
         let git = merged.iter().find(|t| t.entry.name == "git").unwrap();
@@ -392,7 +398,10 @@ trust = "community"
     #[test]
     fn resolve_github_shorthand() {
         let url = resolve_tap_url("myuser/my-tools");
-        assert_eq!(url, "https://raw.githubusercontent.com/myuser/my-tools/main/index.toml");
+        assert_eq!(
+            url,
+            "https://raw.githubusercontent.com/myuser/my-tools/main/index.toml"
+        );
     }
 
     #[test]

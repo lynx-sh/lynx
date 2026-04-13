@@ -87,15 +87,20 @@ mod tests {
 
     #[test]
     fn custom_label_from_config() {
-        let cfg: toml::Value = toml::from_str(r#"[label]
+        let cfg: toml::Value = toml::from_str(
+            r#"[label]
 agent = "🤖"
-"#).unwrap();
+"#,
+        )
+        .unwrap();
         let r = ContextBadgeSegment.render(&cfg, &ctx(Context::Agent));
         assert_eq!(r.unwrap().text, "🤖");
     }
 
     #[test]
     fn default_hide_in_includes_interactive() {
-        assert!(ContextBadgeSegment.default_hide_in().contains(&"interactive"));
+        assert!(ContextBadgeSegment
+            .default_hide_in()
+            .contains(&"interactive"));
     }
 }

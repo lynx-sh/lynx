@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 
+use lynx_config::schema::{AliasContext, UserAlias};
 use lynx_core::env_vars;
 use lynx_core::types::Context;
 
@@ -22,6 +23,18 @@ pub struct InitParams<'a> {
     /// Plugins that hook into ZLE (zle -N) and must be sourced directly.
     /// These cannot go through eval "$()" — zle widget binding fails inside eval.
     pub zle_hook_plugins: HashSet<String>,
+    /// User-defined aliases to emit in the init script (context-gated).
+    /// Only emitted when context is Interactive.
+    pub user_aliases: &'a [UserAlias],
+    /// User-defined PATH entries to prepend. Always emitted regardless of context.
+    pub user_paths: &'a [String],
+    /// Preferred editor binary from config (e.g. `code`, `zed`, `vim`).
+    /// When set, exported as `$VISUAL` only if `$VISUAL` is not already set in the environment.
+    pub editor: Option<&'a str>,
+    /// Path to the directory containing the `_lx` completion file.
+    /// Added to `$fpath` so compinit finds it, plus conditional `compdef` for
+    /// shells where compinit has already run (e.g. macOS /etc/zshrc).
+    pub completions_zsh: Option<&'a str>,
 }
 
 /// Generate the zsh init script that the shell evals on startup.
@@ -129,10 +142,7 @@ pub fn generate_init_script(params: &InitParams<'_>) -> String {
     // A parent shell may have exported LYNX_PLUGIN_*_LOADED; if inherited, the
     // guard would block loading while aliases (shell-local) are not present.
     for plugin in params.enabled_plugins {
-        out.push_str(&format!(
-            "  unset {}\n",
-            env_vars::plugin_guard_var(plugin)
-        ));
+        out.push_str(&format!("  unset {}\n", env_vars::plugin_guard_var(plugin)));
     }
 
     // Load each enabled plugin.
@@ -144,18 +154,62 @@ pub fn generate_init_script(params: &InitParams<'_>) -> String {
             let guard = env_vars::plugin_guard_var(plugin);
             let full_plugin_dir = shell_quote(&format!("{}/{}", params.plugin_dir, plugin));
             out.push_str(&format!(
-                "  if [[ -z \"${{{guard}}}\" ]]; then\n    LYNX_PLUGIN_DIR={full_plugin_dir}\n    source \"$LYNX_PLUGIN_DIR/shell/init.zsh\" 2>/dev/null\n    typeset -g {guard}=1\n  fi\n",
+                "  if [[ -z \"${{{guard}}}\" ]]; then\n    {plugin_dir_var}={full_plugin_dir}\n    source \"${plugin_dir_ref}/shell/init.zsh\" 2>/dev/null\n    typeset -g {guard}=1\n  fi\n",
+                plugin_dir_var = env_vars::LYNX_PLUGIN_DIR,
+                plugin_dir_ref = env_vars::LYNX_PLUGIN_DIR,
             ));
         } else {
             out.push_str(&format!("  lynx_eval_plugin {}\n", shell_quote(plugin)));
         }
     }
 
+    // User-defined aliases — only emit in interactive context (D-010/D-004).
+    if *params.context == Context::Interactive {
+        for alias in params.user_aliases {
+            // Only emit aliases tagged Interactive or All.
+            if matches!(alias.context, AliasContext::Interactive | AliasContext::All) {
+                out.push_str(&format!(
+                    "  alias {}={}\n",
+                    alias.name,
+                    shell_quote(&alias.command)
+                ));
+            }
+        }
+    }
+
+    // lx tab completions — add the completions dir to $fpath so compinit picks up
+    // _lx automatically. Also call compdef conditionally for shells where compinit
+    // has already run (e.g. macOS sources /etc/zshrc before ~/.zshrc).
+    if let Some(completions_dir) = params.completions_zsh {
+        out.push_str(&format!(
+            "  fpath=({} $fpath)\n",
+            shell_quote(completions_dir)
+        ));
+        // compdef is only available after compinit. Use (( $+functions[compdef] )) to
+        // guard so this is safe regardless of where compinit sits in the user's zshrc.
+        out.push_str("  (( $+functions[compdef] )) && compdef _lx lx\n");
+    }
+
+    // Editor preference from config — exported as $VISUAL only if not already set.
+    // Uses ${VISUAL:-} so the user's existing env always wins over the config value.
+    // Works with any editor binary: code, zed, vim, nano, etc.
+    if let Some(editor) = params.editor {
+        out.push_str(&format!(
+            "  export VISUAL=${{VISUAL:-{}}}\n",
+            shell_quote(editor)
+        ));
+    }
+
+    // User-defined PATH entries — prepend regardless of context.
+    for path in params.user_paths {
+        out.push_str(&format!(
+            "  export PATH={path_q}:\"$PATH\"\n",
+            path_q = shell_quote(path)
+        ));
+    }
+
     // Not exported — must not leak into child shells or lx init would skip there too
-    out.push_str(&format!(
-        "  typeset -g {}=1\n",
-        env_vars::LYNX_INITIALIZED
-    ));
+    out.push_str(&format!("  typeset -g {}=1\n", env_vars::LYNX_INITIALIZED));
     out.push_str("fi\n");
 
     out
@@ -173,8 +227,8 @@ mod tests {
     fn base_params<'a>(ctx: &'a Context, plugins: &'a [String]) -> InitParams<'a> {
         InitParams {
             context: ctx,
-            lynx_dir: "/home/user/.local/share/lynx",
-            plugin_dir: "/home/user/.local/share/lynx/plugins",
+            lynx_dir: "/home/user/.config/lynx",
+            plugin_dir: "/home/user/.config/lynx/plugins",
             enabled_plugins: plugins,
             ls_colors: None,
             eza_colors: None,
@@ -182,6 +236,10 @@ mod tests {
             syntax_highlight_styles: None,
             autosuggest_style: None,
             zle_hook_plugins: HashSet::new(),
+            user_aliases: &[],
+            user_paths: &[],
+            editor: None,
+            completions_zsh: None,
         }
     }
 
@@ -189,9 +247,9 @@ mod tests {
     fn output_contains_required_exports() {
         let plugins = vec!["git".to_string()];
         let script = generate_init_script(&base_params(&Context::Interactive, &plugins));
-        assert!(script.contains("LYNX_DIR="));
-        assert!(script.contains("LYNX_CONTEXT=interactive"));
-        assert!(script.contains("LYNX_PLUGIN_DIR="));
+        assert!(script.contains(&format!("{}=", env_vars::LYNX_DIR)));
+        assert!(script.contains(&format!("{}=interactive", env_vars::LYNX_CONTEXT)));
+        assert!(script.contains(&format!("{}=", env_vars::LYNX_PLUGIN_DIR)));
     }
 
     #[test]
@@ -223,7 +281,7 @@ mod tests {
     #[test]
     fn agent_context_sets_correct_value() {
         let script = generate_init_script(&base_params(&Context::Agent, &[]));
-        assert!(script.contains("LYNX_CONTEXT=agent"));
+        assert!(script.contains(&format!("{}=agent", env_vars::LYNX_CONTEXT)));
     }
 
     #[test]
@@ -237,7 +295,7 @@ mod tests {
     #[test]
     fn idempotency_guard_present() {
         let script = generate_init_script(&base_params(&Context::Interactive, &[]));
-        assert!(script.contains("LYNX_INITIALIZED"));
+        assert!(script.contains(env_vars::LYNX_INITIALIZED));
     }
 
     #[test]
@@ -248,7 +306,10 @@ mod tests {
         let script = generate_init_script(&params);
         // ZLE plugin must use direct source, not lynx_eval_plugin
         assert!(!script.contains("lynx_eval_plugin 'syntax-highlight'"));
-        assert!(script.contains("source \"$LYNX_PLUGIN_DIR/shell/init.zsh\""));
+        assert!(script.contains(&format!(
+            "source \"${}/shell/init.zsh\"",
+            env_vars::LYNX_PLUGIN_DIR
+        )));
         // Non-ZLE plugin still uses eval bridge
         assert!(script.contains("lynx_eval_plugin 'git'"));
     }
@@ -256,7 +317,7 @@ mod tests {
     #[test]
     fn no_plugins_produces_valid_structure() {
         let script = generate_init_script(&base_params(&Context::Minimal, &[]));
-        assert!(script.contains("LYNX_CONTEXT=minimal"));
+        assert!(script.contains(&format!("{}=minimal", env_vars::LYNX_CONTEXT)));
         assert!(!script.contains("lynx_eval_plugin"));
     }
 
@@ -271,14 +332,23 @@ mod tests {
         let guard_pos = script.find("if [[").unwrap();
         let ls_pos = script.find("LS_COLORS='di=1;34'").unwrap();
         let eza_pos = script.find("EZA_COLORS='di=1;34'").unwrap();
-        assert!(ls_pos > guard_pos, "LS_COLORS must be inside the init guard");
-        assert!(eza_pos > guard_pos, "EZA_COLORS must be inside the init guard");
+        assert!(
+            ls_pos > guard_pos,
+            "LS_COLORS must be inside the init guard"
+        );
+        assert!(
+            eza_pos > guard_pos,
+            "EZA_COLORS must be inside the init guard"
+        );
     }
 
     #[test]
     fn ls_colors_absent_when_not_provided() {
         let script = generate_init_script(&base_params(&Context::Interactive, &[]));
-        assert!(!script.contains("LS_COLORS="), "LS_COLORS must not appear when not provided");
+        assert!(
+            !script.contains("LS_COLORS="),
+            "LS_COLORS must not appear when not provided"
+        );
     }
 
     #[test]
@@ -286,6 +356,93 @@ mod tests {
         let script = generate_init_script(&base_params(&Context::Interactive, &[]));
         let guard_pos = script.find("if [[").unwrap();
         let hostname_pos = script.find("HOSTNAME").unwrap();
-        assert!(hostname_pos > guard_pos, "HOSTNAME must be inside the init guard");
+        assert!(
+            hostname_pos > guard_pos,
+            "HOSTNAME must be inside the init guard"
+        );
+    }
+
+    #[test]
+    fn user_aliases_emitted_in_interactive_context() {
+        use lynx_config::schema::{AliasContext, UserAlias};
+        let plugins = vec![];
+        let aliases = vec![UserAlias {
+            name: "gs".into(),
+            command: "git status".into(),
+            description: None,
+            context: AliasContext::Interactive,
+        }];
+        let mut params = base_params(&Context::Interactive, &plugins);
+        params.user_aliases = &aliases;
+        let script = generate_init_script(&params);
+        assert!(
+            script.contains("alias gs="),
+            "interactive alias must be emitted: {script}"
+        );
+    }
+
+    #[test]
+    fn user_aliases_not_emitted_in_agent_context() {
+        use lynx_config::schema::{AliasContext, UserAlias};
+        let plugins = vec![];
+        let aliases = vec![UserAlias {
+            name: "gs".into(),
+            command: "git status".into(),
+            description: None,
+            context: AliasContext::Interactive,
+        }];
+        let mut params = base_params(&Context::Agent, &plugins);
+        params.user_aliases = &aliases;
+        let script = generate_init_script(&params);
+        assert!(
+            !script.contains("alias gs="),
+            "aliases must NOT be emitted in agent context"
+        );
+    }
+
+    #[test]
+    fn user_paths_always_emitted() {
+        let plugins = vec![];
+        let paths = vec!["/usr/local/sbin".to_string()];
+        let mut params = base_params(&Context::Agent, &plugins);
+        params.user_paths = &paths;
+        let script = generate_init_script(&params);
+        assert!(
+            script.contains("/usr/local/sbin"),
+            "user paths must be emitted even in agent context"
+        );
+    }
+
+    #[test]
+    fn editor_exported_as_visual_when_set() {
+        let mut params = base_params(&Context::Interactive, &[]);
+        params.editor = Some("zed");
+        let script = generate_init_script(&params);
+        assert!(
+            script.contains("export VISUAL=${VISUAL:-'zed'}"),
+            "editor must be exported as VISUAL with env fallback: {script}"
+        );
+    }
+
+    #[test]
+    fn editor_not_exported_when_unset() {
+        let script = generate_init_script(&base_params(&Context::Interactive, &[]));
+        assert!(
+            !script.contains("VISUAL="),
+            "VISUAL must not appear when editor is not configured"
+        );
+    }
+
+    #[test]
+    fn user_paths_prepend_to_path() {
+        let plugins = vec![];
+        let paths = vec!["/opt/custom/bin".to_string()];
+        let mut params = base_params(&Context::Interactive, &plugins);
+        params.user_paths = &paths;
+        let script = generate_init_script(&params);
+        assert!(
+            script.contains("PATH='/opt/custom/bin':\"$PATH\""),
+            "path must be prepended: {script}"
+        );
     }
 }

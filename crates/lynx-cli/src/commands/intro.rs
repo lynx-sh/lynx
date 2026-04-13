@@ -1,7 +1,7 @@
 use anyhow::{Context as _, Result};
 use lynx_core::error::LynxError;
 
-use super::open_in_vscode;
+use super::open_in_editor;
 use clap::{Args, Subcommand};
 
 use lynx_config::{load, snapshot::mutate_config_transaction};
@@ -71,12 +71,19 @@ pub fn run(args: IntroArgs) -> Result<()> {
             if args.len() == 1 {
                 cmd_set(&args[0])
             } else {
-                Err(LynxError::unknown_command(args.first().map(|s| s.as_str()).unwrap_or(""), "intro").into())
+                Err(LynxError::unknown_command(
+                    super::unknown_subcmd_name(&args),
+                    "intro",
+                )
+                .into())
             }
         }
-        IntroCommand::Logo { text, font, list_fonts, append } => {
-            cmd_logo(&text, &font, list_fonts, append)
-        }
+        IntroCommand::Logo {
+            text,
+            font,
+            list_fonts,
+            append,
+        } => cmd_logo(&text, &font, list_fonts, append),
     }
 }
 
@@ -141,7 +148,11 @@ impl lynx_tui::ListItem for IntroListEntry {
         let mut lines = vec![self.name.clone()];
         lines.push(format!("Type: {}", self.kind));
         if self.is_current {
-            let status = if self.enabled { "active" } else { "active (disabled)" };
+            let status = if self.enabled {
+                "active"
+            } else {
+                "active (disabled)"
+            };
             lines.push(format!("Status: {status}"));
         }
         lines.join("\n")
@@ -172,7 +183,11 @@ fn cmd_list() -> Result<()> {
         .map(|e| IntroListEntry {
             slug: e.slug.clone(),
             name: e.name.clone(),
-            kind: if e.is_builtin { "built-in".into() } else { "user".into() },
+            kind: if e.is_builtin {
+                "built-in".into()
+            } else {
+                "user".into()
+            },
             is_current: e.slug == active,
             enabled,
         })
@@ -208,7 +223,7 @@ fn cmd_edit(slug: &str) -> Result<()> {
     let snapshot = std::fs::read_to_string(&path)
         .with_context(|| format!("failed to read intro file {path:?}"))?;
 
-    open_in_vscode(&path)?;
+    open_in_editor(&path)?;
 
     // Validate the saved file.
     match lynx_intro::loader::load_user(slug) {
@@ -218,7 +233,10 @@ fn cmd_edit(slug: &str) -> Result<()> {
         Err(e) => {
             std::fs::write(&path, &snapshot)
                 .context("CRITICAL: failed to restore intro snapshot")?;
-            return Err(LynxError::Config(format!("intro validation failed — changes reverted: {e}")).into());
+            return Err(LynxError::Config(format!(
+                "intro validation failed — changes reverted: {e}"
+            ))
+            .into());
         }
     }
     Ok(())
@@ -227,16 +245,23 @@ fn cmd_edit(slug: &str) -> Result<()> {
 fn cmd_delete(slug: &str) -> Result<()> {
     // Only user intros can be deleted.
     if loader::list_builtin().contains(&slug) {
-        return Err(LynxError::Config(format!("cannot delete built-in intro '{slug}' — built-ins are read-only")).into());
+        return Err(LynxError::Config(format!(
+            "cannot delete built-in intro '{slug}' — built-ins are read-only"
+        ))
+        .into());
     }
 
     let path = user_intro_dir().join(format!("{slug}.toml"));
     if !path.exists() {
-        return Err(LynxError::NotFound { item_type: "Intro".into(), name: slug.to_string(), hint: "run `lx intro list` to see available intros".into() }.into());
+        return Err(LynxError::NotFound {
+            item_type: "Intro".into(),
+            name: slug.to_string(),
+            hint: "run `lx intro list` to see available intros".into(),
+        }
+        .into());
     }
 
-    std::fs::remove_file(&path)
-        .with_context(|| format!("failed to delete intro '{slug}'"))?;
+    std::fs::remove_file(&path).with_context(|| format!("failed to delete intro '{slug}'"))?;
 
     // If this was the active intro, clear it from config.
     let cfg = load().context("failed to load config")?;
@@ -245,7 +270,10 @@ fn cmd_delete(slug: &str) -> Result<()> {
             cfg.intro.active = None;
             Ok(())
         }) {
-            lynx_core::diag::warn("intro", &format!("failed to clear active intro from config: {e}"));
+            lynx_core::diag::warn(
+                "intro",
+                &format!("failed to clear active intro from config: {e}"),
+            );
             eprintln!("warning: could not clear active intro from config: {e}");
         }
     }
@@ -257,7 +285,10 @@ fn cmd_delete(slug: &str) -> Result<()> {
 fn cmd_new(slug: &str) -> Result<()> {
     // Validate slug is a safe identifier.
     if slug.contains('/') || slug.contains('\\') || slug.contains("..") || slug.is_empty() {
-        return Err(LynxError::Config(format!("invalid slug '{slug}': use only letters, numbers, hyphens, and underscores")).into());
+        return Err(LynxError::Config(format!(
+            "invalid slug '{slug}': use only letters, numbers, hyphens, and underscores"
+        ))
+        .into());
     }
 
     let user_dir = user_intro_dir();
@@ -265,7 +296,10 @@ fn cmd_new(slug: &str) -> Result<()> {
 
     let path = user_dir.join(format!("{slug}.toml"));
     if path.exists() {
-        return Err(LynxError::Config(format!("intro '{slug}' already exists — use `lx intro edit {slug}` to modify it")).into());
+        return Err(LynxError::Config(format!(
+            "intro '{slug}' already exists — use `lx intro edit {slug}` to modify it"
+        ))
+        .into());
     }
 
     let template = format!(
@@ -297,17 +331,22 @@ color = "muted"
     std::fs::write(&path, &template)
         .with_context(|| format!("failed to write new intro '{slug}'"))?;
 
-    open_in_vscode(&path)?;
+    open_in_editor(&path)?;
 
     // Validate after edit.
     match lynx_intro::loader::load_user(slug) {
         Ok(_) => println!("intro '{slug}' created"),
         Err(e) => {
             if let Err(rm_err) = std::fs::remove_file(&path) {
-                lynx_core::diag::warn("intro", &format!("failed to clean up invalid intro file {path:?}: {rm_err}"));
+                lynx_core::diag::warn(
+                    "intro",
+                    &format!("failed to clean up invalid intro file {path:?}: {rm_err}"),
+                );
                 eprintln!("warning: could not remove invalid intro file: {rm_err}");
             }
-            return Err(LynxError::Config(format!("intro validation failed — file removed: {e}")).into());
+            return Err(
+                LynxError::Config(format!("intro validation failed — file removed: {e}")).into(),
+            );
         }
     }
     Ok(())
@@ -315,12 +354,13 @@ color = "muted"
 
 fn cmd_preview(slug: Option<&str>) -> Result<()> {
     let cfg = load().context("failed to load config")?;
-    let target = slug
-        .or(cfg.intro.active.as_deref())
-        .ok_or_else(|| anyhow::Error::from(lynx_core::error::LynxError::Config("no intro specified and no active intro set".into())))?;
+    let target = slug.or(cfg.intro.active.as_deref()).ok_or_else(|| {
+        anyhow::Error::from(lynx_core::error::LynxError::Config(
+            "no intro specified and no active intro set".into(),
+        ))
+    })?;
 
-    let intro = loader::load(target)
-        .with_context(|| format!("failed to load intro '{target}'"))?;
+    let intro = loader::load(target).with_context(|| format!("failed to load intro '{target}'"))?;
 
     let env: std::collections::HashMap<String, String> = std::env::vars().collect();
     let tokens = lynx_intro::build_token_map(&env);
@@ -354,8 +394,11 @@ fn cmd_logo(text: &str, font: &str, list_fonts: bool, append: bool) -> Result<()
 /// Append (or update) an AsciiLogo block in the active intro's user file.
 fn append_logo_to_active_intro(font: &str, text: &str) -> Result<()> {
     let cfg = load().context("failed to load config")?;
-    let slug = cfg.intro.active.as_deref()
-        .ok_or_else(|| anyhow::Error::from(lynx_core::error::LynxError::Config("no active intro — use `lx intro set <slug>` first".into())))?;
+    let slug = cfg.intro.active.as_deref().ok_or_else(|| {
+        anyhow::Error::from(lynx_core::error::LynxError::Config(
+            "no active intro — use `lx intro set <slug>` first".into(),
+        ))
+    })?;
 
     // Ensure it's in user dir (copy built-in if needed).
     let user_dir = user_intro_dir();
@@ -385,15 +428,33 @@ fn append_logo_to_active_intro(font: &str, text: &str) -> Result<()> {
         intro.blocks.insert(0, new_block);
     }
 
-    let content = toml::to_string_pretty(&intro)
-        .context("failed to serialize updated intro")?;
-    std::fs::write(&path, content)
-        .with_context(|| format!("failed to write intro '{slug}'"))?;
+    let content = toml::to_string_pretty(&intro).context("failed to serialize updated intro")?;
+    std::fs::write(&path, content).with_context(|| format!("failed to write intro '{slug}'"))?;
 
     Ok(())
 }
 
 /// Copy a built-in intro to the user intro directory and return the path.
+fn copy_builtin_to_user(slug: &str) -> Result<std::path::PathBuf> {
+    let intro = loader::load_builtin(slug).ok_or_else(|| {
+        anyhow::Error::from(lynx_core::error::LynxError::NotFound {
+            item_type: "Intro".into(),
+            name: slug.to_string(),
+            hint: "run `lx intro list` to see available intros".into(),
+        })
+    })?;
+
+    let user_dir = user_intro_dir();
+    std::fs::create_dir_all(&user_dir).context("failed to create user intro directory")?;
+
+    let path = user_dir.join(format!("{slug}.toml"));
+    let content = toml::to_string_pretty(&intro).context("failed to serialize built-in intro")?;
+    std::fs::write(&path, &content)
+        .with_context(|| format!("failed to copy built-in intro '{slug}' to user dir"))?;
+
+    Ok(path)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -426,7 +487,10 @@ mod tests {
             enabled: false,
         };
         let sub = entry.subtitle();
-        assert!(sub.contains("disabled"), "subtitle should note disabled: {sub}");
+        assert!(
+            sub.contains("disabled"),
+            "subtitle should note disabled: {sub}"
+        );
     }
 
     #[test]
@@ -475,25 +539,4 @@ mod tests {
         let err = run(args).unwrap_err();
         assert!(err.to_string().contains("a"));
     }
-}
-
-fn copy_builtin_to_user(slug: &str) -> Result<std::path::PathBuf> {
-    let intro = loader::load_builtin(slug)
-        .ok_or_else(|| anyhow::Error::from(lynx_core::error::LynxError::NotFound {
-            item_type: "Intro".into(),
-            name: slug.to_string(),
-            hint: "run `lx intro list` to see available intros".into(),
-        }))?;
-
-    let user_dir = user_intro_dir();
-    std::fs::create_dir_all(&user_dir)
-        .context("failed to create user intro directory")?;
-
-    let path = user_dir.join(format!("{slug}.toml"));
-    let content = toml::to_string_pretty(&intro)
-        .context("failed to serialize built-in intro")?;
-    std::fs::write(&path, &content)
-        .with_context(|| format!("failed to copy built-in intro '{slug}' to user dir"))?;
-
-    Ok(path)
 }

@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use super::open_in_vscode;
+use super::open_in_editor;
 use clap::{Args, Subcommand};
 
 use lynx_config::snapshot::{create as snapshot, mutate_config_transaction};
@@ -45,15 +45,13 @@ pub fn run(args: ConfigArgs) -> Result<()> {
             crate::commands::examples::run(crate::commands::examples::ExamplesArgs {
                 command: Some("config".into()),
             })
-            
         }
-        ConfigCommand::Other(args) => {
-            Err(LynxError::NotFound {
-                item_type: "Command".into(),
-                name: args.first().map(|s| s.as_str()).unwrap_or("").into(),
-                hint: "run `lx config` for help".into(),
-            }.into())
+        ConfigCommand::Other(args) => Err(LynxError::NotFound {
+            item_type: "Command".into(),
+            name: super::unknown_subcmd_name(&args).into(),
+            hint: "run `lx config` for help".into(),
         }
+        .into()),
     }
 }
 
@@ -70,7 +68,7 @@ fn cmd_edit() -> Result<()> {
 
     let file_existed = path.exists();
     let snapshot_content = std::fs::read_to_string(&path).unwrap_or_default();
-    open_in_vscode(&path)?;
+    open_in_editor(&path)?;
     // VS Code edits in place; re-read to check for changes.
     let after = std::fs::read_to_string(&path).unwrap_or_default();
     if after == snapshot_content && (file_existed || after.is_empty()) {
@@ -82,9 +80,14 @@ fn cmd_edit() -> Result<()> {
     match load() {
         Ok(_) => println!("config saved and validated"),
         Err(e) => {
-            std::fs::write(&path, &snapshot_content)
-                .map_err(|_| anyhow::Error::from(lynx_core::error::LynxError::Config("CRITICAL: failed to restore config snapshot".into())))?;
-            return Err(LynxError::Config(format!("config validation failed — rolled back: {e}")).into());
+            std::fs::write(&path, &snapshot_content).map_err(|_| {
+                anyhow::Error::from(lynx_core::error::LynxError::Config(
+                    "CRITICAL: failed to restore config snapshot".into(),
+                ))
+            })?;
+            return Err(
+                LynxError::Config(format!("config validation failed — rolled back: {e}")).into(),
+            );
         }
     }
     Ok(())
@@ -121,11 +124,16 @@ fn cmd_get(key: &str) -> Result<()> {
         "active_context" => format!("{:?}", cfg.active_context).to_lowercase(),
         "schema_version" => cfg.schema_version.to_string(),
         "sync.remote" => cfg.sync.remote.unwrap_or_default(),
-        other => return Err(LynxError::NotFound {
-            item_type: "Config key".into(),
-            name: other.into(),
-            hint: "known keys: active_theme, active_context, schema_version, sync.remote".into(),
-        }.into()),
+        "tui.enabled" => cfg.tui.enabled.to_string(),
+        other => {
+            return Err(LynxError::NotFound {
+                item_type: "Config key".into(),
+                name: other.into(),
+                hint: "known keys: active_theme, active_context, schema_version, sync.remote, tui.enabled"
+                    .into(),
+            }
+            .into())
+        }
     };
     println!("{value}");
     Ok(())
@@ -158,6 +166,17 @@ fn cmd_set(key: &str, value: &str) -> Result<()> {
                     None
                 } else {
                     Some(value.to_string())
+                };
+            }
+            "tui.enabled" => {
+                cfg.tui.enabled = match value {
+                    "true" | "1" | "yes" => true,
+                    "false" | "0" | "no" => false,
+                    other => {
+                        return Err(lynx_core::error::LynxError::Config(format!(
+                            "invalid value '{other}' for tui.enabled — use true or false"
+                        )))
+                    }
                 };
             }
             other => {

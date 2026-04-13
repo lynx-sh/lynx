@@ -31,9 +31,28 @@ pub async fn get_doctor() -> impl IntoResponse {
 /// GET /api/colors — named color registry for picker suggestions.
 pub async fn get_colors() -> impl IntoResponse {
     let names = [
-        "black", "red", "green", "yellow", "blue", "magenta", "cyan", "white", "grey",
-        "light-red", "light-green", "light-yellow", "light-blue", "light-magenta", "light-cyan",
-        "orange", "pink", "purple", "brown", "navy", "teal", "lime",
+        "black",
+        "red",
+        "green",
+        "yellow",
+        "blue",
+        "magenta",
+        "cyan",
+        "white",
+        "grey",
+        "light-red",
+        "light-green",
+        "light-yellow",
+        "light-blue",
+        "light-magenta",
+        "light-cyan",
+        "orange",
+        "pink",
+        "purple",
+        "brown",
+        "navy",
+        "teal",
+        "lime",
     ];
     let colors: Vec<serde_json::Value> = names
         .iter()

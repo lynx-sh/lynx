@@ -1,6 +1,6 @@
-use lynx_core::error::LynxError;
 use anyhow::Result;
 use clap::{Args, Subcommand};
+use lynx_core::error::LynxError;
 
 #[derive(Args)]
 #[command(arg_required_else_help = true)]
@@ -46,9 +46,11 @@ pub fn run(args: JobsArgs) -> Result<()> {
         JobsCommand::Kill { id } => cmd_kill(&id),
         JobsCommand::Log { id } => cmd_log(&id),
         JobsCommand::Clean { hours } => cmd_clean(hours),
-        JobsCommand::Other(args) => {
-            Err(LynxError::unknown_command(args.first().map(|s| s.as_str()).unwrap_or(""), "jobs").into())
-        }
+        JobsCommand::Other(args) => Err(LynxError::unknown_command(
+            super::unknown_subcmd_name(&args),
+            "jobs",
+        )
+        .into()),
     }
 }
 
@@ -60,7 +62,9 @@ struct JobListEntry {
 }
 
 impl lynx_tui::ListItem for JobListEntry {
-    fn title(&self) -> &str { &self.job_id }
+    fn title(&self) -> &str {
+        &self.job_id
+    }
     fn subtitle(&self) -> String {
         let status = if self.success { "pass" } else { "fail" };
         format!("{} — {status}", self.workflow)
@@ -73,7 +77,9 @@ impl lynx_tui::ListItem for JobListEntry {
             self.duration_ms
         )
     }
-    fn is_active(&self) -> bool { self.success }
+    fn is_active(&self) -> bool {
+        self.success
+    }
 }
 
 fn cmd_list() -> Result<()> {
@@ -83,12 +89,15 @@ fn cmd_list() -> Result<()> {
         return Ok(());
     }
 
-    let items: Vec<JobListEntry> = entries.iter().map(|e| JobListEntry {
-        job_id: e.job_id.clone(),
-        workflow: e.workflow.clone(),
-        success: e.success,
-        duration_ms: e.duration_ms,
-    }).collect();
+    let items: Vec<JobListEntry> = entries
+        .iter()
+        .map(|e| JobListEntry {
+            job_id: e.job_id.clone(),
+            workflow: e.workflow.clone(),
+            success: e.success,
+            duration_ms: e.duration_ms,
+        })
+        .collect();
 
     lynx_tui::show(&items, "Jobs", &super::tui_colors())?;
     Ok(())
@@ -164,7 +173,10 @@ mod tests {
             duration_ms: 5000,
         };
         let detail = entry.detail();
-        assert!(detail.contains("5000"), "detail should contain duration: {detail}");
+        assert!(
+            detail.contains("5000"),
+            "detail should contain duration: {detail}"
+        );
         assert!(detail.contains("deploy"));
     }
 

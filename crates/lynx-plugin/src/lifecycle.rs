@@ -157,7 +157,9 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let plugin_dir = tmp.path().join("test-plugin");
         std::fs::create_dir_all(&plugin_dir).unwrap();
-        std::fs::write(plugin_dir.join("plugin.toml"), r#"
+        std::fs::write(
+            plugin_dir.join("plugin.toml"),
+            r#"
             [plugin]
             name = "test-plugin"
             version = "1.0.0"
@@ -165,7 +167,9 @@ mod tests {
             [deps]
             [exports]
             [contexts]
-        "#).unwrap();
+        "#,
+        )
+        .unwrap();
 
         let reg = declare(tmp.path());
         assert_eq!(reg.all().count(), 1);

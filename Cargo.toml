@@ -39,6 +39,7 @@ toml = "0.8"
 
 # CLI
 clap = { version = "4", features = ["derive", "color"] }
+clap_complete = "4"
 owo-colors = { version = "4", features = ["supports-colors"] }
 
 # Async
@@ -78,6 +79,9 @@ tar = "0.4"
 # TUI (interactive terminal UI — D-040)
 ratatui = "0.29"
 crossterm = "0.28"
+
+# PTY (pseudo-terminal for interactive workflow streaming)
+portable-pty = "0.8"
 
 # Testing utilities
 tempfile = "3"

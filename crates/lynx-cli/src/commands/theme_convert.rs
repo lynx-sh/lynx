@@ -4,22 +4,20 @@ use lynx_theme::loader::user_theme_dir;
 
 /// Convert an OMZ .zsh-theme or Oh-My-Posh .omp.json theme to Lynx TOML format.
 pub fn run(source: &str, name: Option<&str>, force: bool) -> Result<()> {
-    let resolved = lynx_convert::fetch::resolve_source(source)
-        .context("failed to resolve theme source")?;
+    let resolved =
+        lynx_convert::fetch::resolve_source(source).context("failed to resolve theme source")?;
 
-    let theme_name = name
-        .map(|n| n.to_string())
-        .unwrap_or_else(|| {
-            let stem = std::path::Path::new(source)
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("converted")
-                .to_string();
-            stem.strip_suffix(".omp")
-                .or_else(|| stem.strip_suffix(".zsh-theme"))
-                .unwrap_or(&stem)
-                .to_string()
-        });
+    let theme_name = name.map(|n| n.to_string()).unwrap_or_else(|| {
+        let stem = std::path::Path::new(source)
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("converted")
+            .to_string();
+        stem.strip_suffix(".omp")
+            .or_else(|| stem.strip_suffix(".zsh-theme"))
+            .unwrap_or(&stem)
+            .to_string()
+    });
 
     let out_path = user_theme_dir().join(format!("{theme_name}.toml"));
     if out_path.exists() && !force {
@@ -31,8 +29,8 @@ pub fn run(source: &str, name: Option<&str>, force: bool) -> Result<()> {
         .into());
     }
 
-    let content = lynx_convert::fetch::fetch_content(&resolved)
-        .context("failed to fetch theme content")?;
+    let content =
+        lynx_convert::fetch::fetch_content(&resolved).context("failed to fetch theme content")?;
 
     let is_omp = content.trim_start().starts_with('{');
 
@@ -89,7 +87,8 @@ mod tests {
             .and_then(|s| s.to_str())
             .unwrap_or("converted")
             .to_string();
-        let name = stem.strip_suffix(".omp")
+        let name = stem
+            .strip_suffix(".omp")
             .or_else(|| stem.strip_suffix(".zsh-theme"))
             .unwrap_or(&stem)
             .to_string();
@@ -104,7 +103,8 @@ mod tests {
             .and_then(|s| s.to_str())
             .unwrap_or("converted")
             .to_string();
-        let name = stem.strip_suffix(".omp")
+        let name = stem
+            .strip_suffix(".omp")
             .or_else(|| stem.strip_suffix(".zsh-theme"))
             .unwrap_or(&stem)
             .to_string();
@@ -119,7 +119,8 @@ mod tests {
             .and_then(|s| s.to_str())
             .unwrap_or("converted")
             .to_string();
-        let name = stem.strip_suffix(".omp")
+        let name = stem
+            .strip_suffix(".omp")
             .or_else(|| stem.strip_suffix(".zsh-theme"))
             .unwrap_or(&stem)
             .to_string();

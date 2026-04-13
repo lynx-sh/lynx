@@ -36,92 +36,281 @@ lx run build
 lx run list
 ```
 
-## Workflow Schema
+---
+
+## Workflow TOML Schema
+
+### `[workflow]` — Metadata
+
+| Field         | Type     | Required | Default | Description                                       |
+|---------------|----------|----------|---------|---------------------------------------------------|
+| `name`        | string   | yes      | —       | Unique workflow name                              |
+| `description` | string   | no       | `""`    | Human-readable description shown in `lx run list` |
+| `context`     | string   | no       | any     | Restrict to a context: `interactive`, `agent`, or `minimal` |
+
+### `[[workflow.param]]` — Parameters
+
+Workflows accept typed parameters passed as `key=value` on the command line.
+Inside `run` strings, reference them as `$param_name`.
+
+| Field         | Type     | Required | Default  | Description                                          |
+|---------------|----------|----------|----------|------------------------------------------------------|
+| `name`        | string   | yes      | —        | Parameter name                                       |
+| `type`        | string   | no       | `string` | One of: `string`, `int`, `bool`                      |
+| `required`    | bool     | no       | `true`   | Whether the caller must supply this parameter         |
+| `default`     | string   | no       | —        | Value used when the parameter is not provided         |
+| `choices`     | string[] | no       | any      | Allowed values; Lynx rejects anything outside the list |
+| `description` | string   | no       | `""`     | Help text shown in error messages and prompts         |
 
 ```toml
 [workflow]
 name = "deploy"
-description = "Build, test, and deploy"
-context = "interactive"     # only runs in interactive context (optional)
 
-[workflow.params]
-env = { type = "string", required = true, choices = ["staging", "production"] }
-version = { type = "string", default = "latest" }
+[[workflow.param]]
+name = "env"
+type = "string"
+required = true
+choices = ["staging", "production"]
+description = "Target environment"
 
+[[workflow.param]]
+name = "dry_run"
+type = "bool"
+required = false
+default = "false"
+```
+
+```bash
+lx run deploy env=staging
+lx run deploy env=production dry_run=true
+```
+
+### `[[step]]` — Steps
+
+| Field         | Type     | Required | Default  | Description                                                      |
+|---------------|----------|----------|----------|------------------------------------------------------------------|
+| `name`        | string   | yes      | —        | Unique step name within the workflow                             |
+| `run`         | string   | yes      | —        | Command or script to execute; `$param_name` is substituted       |
+| `runner`      | string   | no       | `sh`     | Runner to use — see [Runners](#runners) below                    |
+| `confirm`     | bool     | no       | `false`  | Prompt for confirmation before executing this step               |
+| `timeout_sec` | integer  | no       | none     | Kill the step after N seconds                                    |
+| `on_fail`     | string   | no       | `abort`  | `abort` \| `retry` \| `continue`                                |
+| `retry_count` | integer  | no       | `0`      | Retry attempts when `on_fail = "retry"`                          |
+| `condition`   | string   | no       | —        | Skip step unless truthy: `"$param == value"` or `"env:VAR_NAME"` |
+| `depends_on`  | string[] | no       | `[]`     | Steps that must complete before this one starts                  |
+| `group`       | string   | no       | —        | Steps sharing a group name run concurrently                      |
+| `env`         | table    | no       | `{}`     | Extra environment variables scoped to this step                  |
+| `cwd`         | string   | no       | current  | Working directory for this step                                  |
+
+---
+
+## Runners
+
+| Runner   | Executes via       | Notes                                    |
+|----------|--------------------|------------------------------------------|
+| `sh`     | `sh -c`            | Default runner                           |
+| `bash`   | `bash -c`          | Use for `set -euo pipefail` scripts      |
+| `zsh`    | `zsh -c`           | Use for zsh-specific syntax              |
+| `python` | `python3`          | Runs a file path or inline script        |
+| `node`   | `node -e` / `npx`  | JS/TS scripts                            |
+| `go`     | `go`               | Prepends `go` to the run string          |
+| `cargo`  | `cargo`            | Prepends `cargo` to the run string       |
+| `curl`   | `curl`             | Prepends `curl` to the run string        |
+| `docker` | `docker`           | Prepends `docker` to the run string      |
+| custom   | plugin-defined     | Register via `[runners.*]` in plugin.toml |
+
+---
+
+## Concurrency and Ordering
+
+Steps run sequentially by default. Two mechanisms change that:
+
+**`group`** — steps sharing a group name run in parallel:
+
+```toml
 [[step]]
-name = "build"
-runner = "cargo"            # default: "sh"
-run = "build --release"
-group = "build"             # steps with same group run concurrently
-env = { RUSTFLAGS = "-C target-cpu=native" }
-cwd = "./backend"           # working directory for this step
-on_fail = "abort"           # abort | retry | continue
-timeout = 300               # seconds
+name = "lint"
+run = "cargo clippy --all"
+group = "checks"
 
 [[step]]
 name = "test"
-run = "cargo nextest run"
-depends_on = ["build"]      # wait for build to complete
+run = "cargo nextest run --all"
+group = "checks"          # runs at the same time as lint
 
 [[step]]
-name = "deploy"
-run = "scripts/deploy.sh --env $env"
-confirm = true              # ask before running
+name = "report"
+run = "scripts/report.sh"
+depends_on = ["lint", "test"]   # waits for both
 ```
 
-## Built-in Runners
+**`depends_on`** — explicit ordering across groups. Lynx validates that every
+referenced step name exists at parse time.
 
-| Runner | Binary | Example |
-|--------|--------|---------|
-| sh | sh -c | `run = "echo hello"` |
-| zsh | zsh -c | `run = "print -P '%F{green}ok%f'"` |
-| bash | bash -c | `run = "set -euo pipefail; ..."` |
-| python | python3 | `run = "scripts/validate.py"` |
-| node | node -e / npx | `run = "npm run build"` |
-| go | go | `run = "run cmd/main.go"` |
-| cargo | cargo | `run = "build --release"` |
-| curl | curl | `run = "-X POST https://api.example.com"` |
-| docker | docker | `run = "compose up -d"` |
+---
 
-Custom runners can be registered via plugin.toml `[runners.*]` tables.
+## Failure Handling
 
-## Execution Model
+| `on_fail`  | Behaviour                                              |
+|------------|--------------------------------------------------------|
+| `abort`    | Stop the workflow immediately (default)                |
+| `retry`    | Retry the step up to `retry_count` times, then abort   |
+| `continue` | Log the failure and proceed to the next step           |
 
-```
-lx run deploy env=staging           # foreground, live output
-lx run deploy env=staging --bg      # immediate background
-lx run deploy --dry-run             # show steps without executing
-lx run deploy env=production --yes  # skip confirms (CI mode)
+```toml
+[[step]]
+name = "flaky-check"
+run = "curl -f https://api.example.com/health"
+on_fail = "retry"
+retry_count = 3
+timeout_sec = 10
 ```
 
-During foreground execution:
-- **Ctrl+B**: Migrate to background (output redirected to log file)
-- **Ctrl+C**: Cancel workflow, run cleanup
+---
 
-## Job Management
+## lx run
 
 ```bash
-lx jobs                    # list running and recent jobs
-lx jobs view J-001         # live tail of a running job
-lx jobs kill J-001         # cancel a running job
-lx jobs log J-001          # view completed job's output
-lx jobs clean              # remove old job logs
+lx run <name>                       # run a workflow (foreground, live TUI)
+lx run <name> key=val key2=val2     # pass parameters
+lx run <name> --dry-run             # print steps without executing
+lx run <name> --bg                  # run immediately in background
+lx run <name> --yes                 # skip all confirmation prompts (CI mode)
+lx run list                         # browse available workflows (TUI)
+lx run examples                     # show full TOML examples
+
+LYNX_NO_TUI=1 lx run <name>        # plain streaming output (no TUI)
 ```
+
+The workflow TUI is automatically disabled for pipes, CI (`CI=true`), AI agent terminals
+(`CLAUDECODE`, `CURSOR_CLI`), and when `[tui] enabled = false` is set in config.
+
+**Interactive mode** uses a PTY so programs that buffer output when stdout is piped
+(e.g. `cargo`, `grep`) flush line-by-line. If a PTY cannot be allocated (e.g. in
+containers without `/dev/ptmx`), Lynx falls back to piped I/O automatically.
+
+**Agent mode** (`CLAUDECODE`, `CURSOR_CLI`, or `LYNX_CONTEXT=agent`) suppresses all
+per-line output to avoid flooding the agent's context window. If a step fails, a single
+excerpt of the last 20 stderr lines is emitted so the agent can diagnose the failure.
+`StepStarted` and `StepFinished` events always fire regardless of context.
+
+**Flags**
+
+| Flag        | Description                                             |
+|-------------|---------------------------------------------------------|
+| `--dry-run` | Print each step's resolved run string; do not execute   |
+| `--bg`      | Send to background immediately; tail with `lx jobs log` |
+| `--yes`     | Auto-confirm all `confirm = true` steps                 |
+
+**During foreground execution**
+
+- **Ctrl+B** — migrate to background (output redirected to log file)
+- **Ctrl+C** — cancel workflow and run cleanup
+
+Workflow files live in `~/.config/lynx/workflows/`.
+
+---
+
+## lx jobs
+
+Manage workflow job history and running jobs.
+
+| Subcommand                  | Description                                         |
+|-----------------------------|-----------------------------------------------------|
+| `lx jobs list`              | Browse recent jobs (TUI) with status and duration — plain text when TUI is disabled |
+| `lx jobs view <id>`         | Print full JSON record for a job                    |
+| `lx jobs kill <id>`         | Send kill signal to a running job                   |
+| `lx jobs log <id>`          | Print captured stdout/stderr for a job (always logged, regardless of context) |
+| `lx jobs clean`             | Remove job records older than 72 hours (default)    |
+| `lx jobs clean --hours <N>` | Remove records older than N hours                   |
+
+---
 
 ## Scheduled Workflows
 
 Combine with `lx cron` to run workflows on a schedule:
 
 ```bash
-lx cron add nightly-backup "0 3 * * *" "lx run backup"
+lx cron add nightly-backup --run "lx run backup" --cron "0 3 * * *"
+lx cron list                        # see all scheduled tasks and last-run status
+lx cron logs nightly-backup         # view cron execution logs
 ```
+
+---
 
 ## Distribution
 
 Workflows are distributable via the registry tap system:
 
 ```bash
-lx install devops-workflows    # installs workflow TOML files
+lx install devops-workflows    # installs workflow TOML files to workflows/
 lx run list                    # shows newly available workflows
 lx audit devops-workflows      # shows every step before running
+```
+
+---
+
+## Worked Example
+
+A complete multi-step release workflow with parameters, concurrency, and failure handling:
+
+```toml
+[workflow]
+name = "release"
+description = "Build, test, and publish a release"
+context = "interactive"
+
+[[workflow.param]]
+name = "version"
+type = "string"
+required = true
+description = "Release version (e.g. 1.2.3)"
+
+[[workflow.param]]
+name = "env"
+type = "string"
+required = false
+default = "staging"
+choices = ["staging", "production"]
+
+# --- parallel checks ---
+
+[[step]]
+name = "lint"
+run = "cargo clippy --all -- -D warnings"
+group = "checks"
+
+[[step]]
+name = "test"
+run = "cargo nextest run --all"
+group = "checks"
+
+# --- build (waits for checks) ---
+
+[[step]]
+name = "build"
+runner = "cargo"
+run = "build --release"
+depends_on = ["lint", "test"]
+timeout_sec = 300
+
+# --- publish (confirm before running) ---
+
+[[step]]
+name = "publish"
+runner = "bash"
+run = "scripts/publish.sh --version $version --env $env"
+depends_on = ["build"]
+confirm = true
+on_fail = "retry"
+retry_count = 2
+[step.env]
+RELEASE_TOKEN = "${RELEASE_TOKEN}"
+```
+
+```bash
+lx run release version=1.2.3
+lx run release version=1.2.3 env=production
+lx run release version=1.2.3 --dry-run   # preview steps
+lx run release version=1.2.3 --yes       # skip confirm prompt (CI)
 ```

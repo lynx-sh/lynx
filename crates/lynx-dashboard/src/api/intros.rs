@@ -80,12 +80,11 @@ pub async fn set_intro(
             .into_response();
     }
 
-    let result =
-        lynx_config::snapshot::mutate_config_transaction("dashboard-intro-set", |cfg| {
-            cfg.intro.active = Some(req.slug.clone());
-            cfg.intro.enabled = true;
-            Ok(())
-        });
+    let result = lynx_config::snapshot::mutate_config_transaction("dashboard-intro-set", |cfg| {
+        cfg.intro.active = Some(req.slug.clone());
+        cfg.intro.enabled = true;
+        Ok(())
+    });
 
     match result {
         Ok(_) => {

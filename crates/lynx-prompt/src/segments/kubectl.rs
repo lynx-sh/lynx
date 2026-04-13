@@ -94,7 +94,8 @@ mod tests {
 
     #[test]
     fn hidden_when_context_is_default() {
-        let r = KubectlContextSegment.render(&empty_config(), &ctx_with_kubectl("default", "default"));
+        let r =
+            KubectlContextSegment.render(&empty_config(), &ctx_with_kubectl("default", "default"));
         assert!(r.is_none());
     }
 

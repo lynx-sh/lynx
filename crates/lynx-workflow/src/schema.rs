@@ -30,6 +30,12 @@ pub struct WorkflowMeta {
     /// Typed parameters the workflow accepts.
     #[serde(rename = "param", default)]
     pub params: Vec<WorkflowParam>,
+    /// Default working directory for all steps. Overridden per-step by `cwd`.
+    /// Supports param substitution (e.g. `path = "$source"`).
+    /// When set, the workflow always runs from this directory regardless of
+    /// where `lx run` is invoked.
+    #[serde(default)]
+    pub path: Option<String>,
 }
 
 /// A typed parameter for parameterized workflows.
@@ -164,17 +170,22 @@ pub fn validate(wf: &Workflow) -> anyhow::Result<()> {
             return Err(LynxError::Workflow("step name is required".into()).into());
         }
         if !seen_names.insert(&step.name) {
-            return Err(LynxError::Workflow(format!("duplicate step name: '{}'", step.name)).into());
+            return Err(
+                LynxError::Workflow(format!("duplicate step name: '{}'", step.name)).into(),
+            );
         }
         if step.run.is_empty() {
-            return Err(LynxError::Workflow(format!("step '{}': run is required", step.name)).into());
+            return Err(
+                LynxError::Workflow(format!("step '{}': run is required", step.name)).into(),
+            );
         }
         for dep in &step.depends_on {
             if !wf.steps.iter().any(|s| &s.name == dep) {
                 return Err(LynxError::Workflow(format!(
                     "step '{}': depends_on '{}' does not exist",
                     step.name, dep
-                )).into());
+                ))
+                .into());
             }
         }
     }
@@ -268,7 +279,9 @@ mod tests {
 
     #[test]
     fn parse_all_runners() {
-        for runner in ["sh", "bash", "zsh", "python", "node", "go", "cargo", "curl", "docker"] {
+        for runner in [
+            "sh", "bash", "zsh", "python", "node", "go", "cargo", "curl", "docker",
+        ] {
             let toml = format!(
                 r#"
                 [workflow]

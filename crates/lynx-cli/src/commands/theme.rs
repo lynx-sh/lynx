@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use anyhow::{Context as _, Result};
 use lynx_core::error::LynxError;
 
-use super::open_in_vscode;
+use super::open_in_editor;
 use clap::{Args, Subcommand};
 
 use lynx_config::{load, snapshot::mutate_config_transaction};
@@ -110,17 +110,17 @@ pub async fn run(args: ThemeArgs) -> Result<()> {
             })
         }
         ThemeCommand::Patch { path, value } => cmd_patch(&path, &value).await,
-        ThemeCommand::Palette { key, value } => {
-            cmd_patch(&format!("colors.{key}"), &value).await
-        }
-        ThemeCommand::Caret { symbol } => {
-            cmd_patch("segment.prompt_char.symbol", &symbol).await
-        }
+        ThemeCommand::Palette { key, value } => cmd_patch(&format!("colors.{key}"), &value).await,
+        ThemeCommand::Caret { symbol } => cmd_patch("segment.prompt_char.symbol", &symbol).await,
         ThemeCommand::CaretColor { color } => {
             cmd_patch("segment.prompt_char.color.fg", &color).await
         }
         ThemeCommand::Segment(seg) => cmd_segment(seg).await,
-        ThemeCommand::Convert { source, name, force } => super::theme_convert::run(&source, name.as_deref(), force),
+        ThemeCommand::Convert {
+            source,
+            name,
+            force,
+        } => super::theme_convert::run(&source, name.as_deref(), force),
         ThemeCommand::Studio => {
             eprintln!("Note: `lx theme studio` is deprecated. Use `lx dashboard` instead.");
             lynx_dashboard::run().await
@@ -129,7 +129,11 @@ pub async fn run(args: ThemeArgs) -> Result<()> {
             if args.len() == 1 {
                 cmd_set(&args[0]).await
             } else {
-                Err(LynxError::unknown_command(args.first().map(|s| s.as_str()).unwrap_or(""), "theme").into())
+                Err(LynxError::unknown_command(
+                    super::unknown_subcmd_name(&args),
+                    "theme",
+                )
+                .into())
             }
         }
     }
@@ -141,10 +145,11 @@ async fn cmd_set(name: &str) -> Result<()> {
 
     // Check if theme uses powerline/nerd font glyphs.
     if super::nerd_font::theme_needs_nerd_font(&theme)
-        && !super::nerd_font::ensure_nerd_font_ready()? {
-            println!("theme not changed");
-            return Ok(());
-        }
+        && !super::nerd_font::ensure_nerd_font_ready()?
+    {
+        println!("theme not changed");
+        return Ok(());
+    }
 
     mutate_config_transaction(&format!("theme-set-{name}"), |cfg| {
         cfg.active_theme = name.to_string();
@@ -241,25 +246,28 @@ async fn cmd_list() -> Result<()> {
     let entries: Vec<ThemeListEntry> = names
         .iter()
         .map(|name| {
-            let (description, author, segments, palette_keys) =
-                match load_theme(name) {
-                    Ok(theme) => {
-                        let desc = theme.meta.description.clone();
-                        let auth = theme.meta.author.clone();
-                        let segs: Vec<String> = theme.segments.top.order.iter()
-                            .chain(theme.segments.left.order.iter())
-                            .chain(theme.segments.right.order.iter())
-                            .cloned()
-                            .collect();
-                        let pal: Vec<String> = {
-                            let mut keys: Vec<String> = theme.colors.keys().cloned().collect();
-                            keys.sort();
-                            keys
-                        };
-                        (desc, auth, segs, pal)
-                    }
-                    Err(_) => (String::new(), String::new(), vec![], vec![]),
-                };
+            let (description, author, segments, palette_keys) = match load_theme(name) {
+                Ok(theme) => {
+                    let desc = theme.meta.description.clone();
+                    let auth = theme.meta.author.clone();
+                    let segs: Vec<String> = theme
+                        .segments
+                        .top
+                        .order
+                        .iter()
+                        .chain(theme.segments.left.order.iter())
+                        .chain(theme.segments.right.order.iter())
+                        .cloned()
+                        .collect();
+                    let pal: Vec<String> = {
+                        let mut keys: Vec<String> = theme.colors.keys().cloned().collect();
+                        keys.sort();
+                        keys
+                    };
+                    (desc, auth, segs, pal)
+                }
+                Err(_) => (String::new(), String::new(), vec![], vec![]),
+            };
             ThemeListEntry {
                 name: name.clone(),
                 description,
@@ -294,14 +302,19 @@ async fn cmd_edit() -> Result<()> {
     // Determine the path: prefer user theme dir, else error (built-ins are read-only).
     let user_path = user_theme_dir().join(format!("{theme_name}.toml"));
     if !user_path.exists() {
-        return Err(LynxError::NotFound { item_type: "Theme".into(), name: theme_name.to_string(), hint: "run `lx setup` to set up default themes".into() }.into());
+        return Err(LynxError::NotFound {
+            item_type: "Theme".into(),
+            name: theme_name.to_string(),
+            hint: "run `lx setup` to set up default themes".into(),
+        }
+        .into());
     }
     let path = user_path;
 
     let snapshot = std::fs::read_to_string(&path)
         .with_context(|| format!("failed to read theme file {path:?}"))?;
 
-    open_in_vscode(&path)?;
+    open_in_editor(&path)?;
 
     // Validate the saved file.
     match lynx_theme::loader::load_from_path(&path) {
@@ -313,7 +326,9 @@ async fn cmd_edit() -> Result<()> {
             // Roll back to snapshot.
             std::fs::write(&path, &snapshot)
                 .context("CRITICAL: failed to restore theme snapshot")?;
-            return Err(LynxError::Theme(format!("theme validation failed — rolled back: {e}")).into());
+            return Err(
+                LynxError::Theme(format!("theme validation failed — rolled back: {e}")).into(),
+            );
         }
     }
 
@@ -342,7 +357,9 @@ async fn cmd_patch(dot_path: &str, value: &str) -> Result<()> {
         Err(e) => {
             std::fs::write(&path, &snapshot)
                 .context("CRITICAL: failed to restore theme snapshot after validation failure")?;
-            return Err(LynxError::Theme(format!("theme validation failed — rolled back: {e}")).into());
+            return Err(
+                LynxError::Theme(format!("theme validation failed — rolled back: {e}")).into(),
+            );
         }
     }
 
@@ -366,10 +383,8 @@ async fn cmd_segment(cmd: SegmentCommand) -> Result<()> {
             patch::segment_add(&snapshot, name, side, after.as_deref())
                 .with_context(|| format!("failed to add segment '{name}'"))?
         }
-        SegmentCommand::Remove { name } => {
-            patch::segment_remove(&snapshot, name)
-                .with_context(|| format!("failed to remove segment '{name}'"))?
-        }
+        SegmentCommand::Remove { name } => patch::segment_remove(&snapshot, name)
+            .with_context(|| format!("failed to remove segment '{name}'"))?,
         SegmentCommand::Move { name, side, after } => {
             let side: Side = side
                 .parse()
@@ -394,7 +409,9 @@ async fn cmd_segment(cmd: SegmentCommand) -> Result<()> {
         Err(e) => {
             std::fs::write(&path, &snapshot)
                 .context("CRITICAL: failed to restore theme snapshot after validation failure")?;
-            return Err(LynxError::Theme(format!("theme validation failed — rolled back: {e}")).into());
+            return Err(
+                LynxError::Theme(format!("theme validation failed — rolled back: {e}")).into(),
+            );
         }
     }
 
@@ -407,7 +424,12 @@ fn resolve_user_theme_path(theme_name: &str) -> Result<PathBuf> {
     if user_path.exists() {
         Ok(user_path)
     } else {
-        Err(LynxError::NotFound { item_type: "Theme".into(), name: theme_name.to_string(), hint: "run `lx setup` to set up default themes".into() }.into())
+        Err(LynxError::NotFound {
+            item_type: "Theme".into(),
+            name: theme_name.to_string(),
+            hint: "run `lx setup` to set up default themes".into(),
+        }
+        .into())
     }
 }
 
@@ -426,10 +448,45 @@ async fn emit_theme_changed(name: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lynx_test_utils::env_lock;
+
+    struct LynxDirGuard(Option<String>);
+
+    impl LynxDirGuard {
+        fn new() -> Self {
+            Self(std::env::var(lynx_core::env_vars::LYNX_DIR).ok())
+        }
+    }
+
+    impl Drop for LynxDirGuard {
+        fn drop(&mut self) {
+            if let Some(v) = &self.0 {
+                std::env::set_var(lynx_core::env_vars::LYNX_DIR, v);
+            } else {
+                std::env::remove_var(lynx_core::env_vars::LYNX_DIR);
+            }
+        }
+    }
 
     #[test]
     fn list_marks_active() {
-        // Just ensure list() + load() produce consistent output (no panic).
+        let _lock = env_lock().lock().expect("lock");
+        let _guard = LynxDirGuard::new();
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let themes_dir = tmp.path().join("themes");
+        std::fs::create_dir_all(&themes_dir).expect("create themes dir");
+        std::fs::write(
+            themes_dir.join("default.toml"),
+            "[segments]\nleft = []\nright = []\n",
+        )
+        .expect("write default");
+        std::fs::write(
+            themes_dir.join("minimal.toml"),
+            "[segments]\nleft = []\nright = []\n",
+        )
+        .expect("write minimal");
+        std::env::set_var(lynx_core::env_vars::LYNX_DIR, tmp.path());
+
         let themes = list();
         assert!(themes.contains(&"default".to_string()));
         assert!(themes.contains(&"minimal".to_string()));

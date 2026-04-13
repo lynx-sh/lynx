@@ -44,7 +44,10 @@ mod tests {
     use std::collections::HashMap;
 
     fn ctx_with_env(pairs: &[(&str, &str)]) -> RenderContext {
-        let env = pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect();
+        let env = pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
         RenderContext {
             cwd: "/".into(),
             shell_context: lynx_core::types::Context::Interactive,
@@ -62,13 +65,21 @@ mod tests {
 
     #[test]
     fn hidden_when_default() {
-        let r = DockerSegment.render(&empty_config(), &ctx_with_env(&[("DOCKER_CONTEXT", "default")]));
+        let r = DockerSegment.render(
+            &empty_config(),
+            &ctx_with_env(&[("DOCKER_CONTEXT", "default")]),
+        );
         assert!(r.is_none());
     }
 
     #[test]
     fn shows_non_default_context() {
-        let r = DockerSegment.render(&empty_config(), &ctx_with_env(&[("DOCKER_CONTEXT", "remote-prod")])).unwrap();
+        let r = DockerSegment
+            .render(
+                &empty_config(),
+                &ctx_with_env(&[("DOCKER_CONTEXT", "remote-prod")]),
+            )
+            .unwrap();
         assert!(r.text.contains("remote-prod"));
     }
 }

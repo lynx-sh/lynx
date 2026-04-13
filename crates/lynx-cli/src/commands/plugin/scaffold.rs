@@ -4,13 +4,16 @@
 // with inline comments that explain each field so new contributors don't need
 // to read the full protocol docs to get started.
 
-use anyhow::{Result};
+use anyhow::Result;
 use lynx_core::error::LynxError;
 use lynx_plugin::namespace::scaffold_convention_comment;
-use std::path::PathBuf;
 
 pub(super) fn cmd_new(name: &str) -> Result<()> {
-    let dir = PathBuf::from(name);
+    cmd_new_in(name, &std::env::current_dir()?)
+}
+
+fn cmd_new_in(name: &str, base_dir: &std::path::Path) -> Result<()> {
+    let dir = base_dir.join(name);
     if dir.exists() {
         return Err(LynxError::Plugin(format!("directory '{name}' already exists")).into());
     }
@@ -49,8 +52,9 @@ disabled_in = ["agent", "minimal"]
     let init_zsh = format!(
         "# {name} — init.zsh  (keep this file under 10 lines)\n\
          # Sources functions and aliases; actual logic lives in functions.zsh.\n\
-         source \"${{LYNX_PLUGIN_DIR}}/{name}/shell/functions.zsh\"\n\
-         source \"${{LYNX_PLUGIN_DIR}}/{name}/shell/aliases.zsh\"\n",
+         source \"${{{plugin_dir_var}}}/{name}/shell/functions.zsh\"\n\
+         source \"${{{plugin_dir_var}}}/{name}/shell/aliases.zsh\"\n",
+        plugin_dir_var = lynx_core::env_vars::LYNX_PLUGIN_DIR,
     );
     std::fs::write(dir.join("shell/init.zsh"), init_zsh)?;
 
@@ -106,32 +110,22 @@ disabled_in = ["agent", "minimal"]
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn scaffold_refuses_existing_directory() {
         let tmp = tempfile::tempdir().unwrap();
         let existing = tmp.path().join("existing-plugin");
         std::fs::create_dir_all(&existing).unwrap();
 
-        // Change to temp dir so the relative path resolves
-        let _orig = std::env::current_dir().unwrap();
-        std::env::set_current_dir(tmp.path()).unwrap();
-
-        let result = cmd_new("existing-plugin");
+        let result = cmd_new_in("existing-plugin", tmp.path());
         assert!(result.is_err());
         let msg = result.unwrap_err().to_string();
         assert!(msg.contains("already exists"), "unexpected error: {msg}");
-
-        std::env::set_current_dir(_orig).unwrap();
     }
 
     #[test]
     fn scaffold_creates_all_files() {
         let tmp = tempfile::tempdir().unwrap();
-        let _orig = std::env::current_dir().unwrap();
-        std::env::set_current_dir(tmp.path()).unwrap();
-
-        let result = cmd_new("test-scaffold");
+        let result = cmd_new_in("test-scaffold", tmp.path());
         assert!(result.is_ok(), "scaffold failed: {:?}", result.err());
 
         let dir = tmp.path().join("test-scaffold");
@@ -144,17 +138,12 @@ mod tests {
         let content = std::fs::read_to_string(dir.join(lynx_core::brand::PLUGIN_MANIFEST)).unwrap();
         let parsed: toml::Value = toml::from_str(&content).unwrap();
         assert_eq!(parsed["plugin"]["name"].as_str().unwrap(), "test-scaffold");
-
-        std::env::set_current_dir(_orig).unwrap();
     }
 
     #[test]
     fn scaffold_zsh_files_are_valid_syntax() {
         let tmp = tempfile::tempdir().unwrap();
-        let _orig = std::env::current_dir().unwrap();
-        std::env::set_current_dir(tmp.path()).unwrap();
-
-        cmd_new("zsh-check").unwrap();
+        cmd_new_in("zsh-check", tmp.path()).unwrap();
 
         let dir = tmp.path().join("zsh-check");
         let init = std::fs::read_to_string(dir.join("shell/init.zsh")).unwrap();
@@ -164,7 +153,5 @@ mod tests {
         lynx_test_utils::assert_valid_zsh(&init);
         lynx_test_utils::assert_valid_zsh(&funcs);
         lynx_test_utils::assert_valid_zsh(&aliases);
-
-        std::env::set_current_dir(_orig).unwrap();
     }
 }

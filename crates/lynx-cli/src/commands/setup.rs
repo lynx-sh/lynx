@@ -22,13 +22,13 @@ pub struct SetupArgs {
 }
 
 pub fn run(args: SetupArgs) -> Result<()> {
-    let home = home_dir()?;
+    let home = lynx_core::paths::home();
 
     let lynx_dir: PathBuf = args
         .dir
         .as_deref()
         .map(PathBuf::from)
-        .unwrap_or_else(|| home.join(brand::CONFIG_DIR));
+        .unwrap_or_else(lynx_core::paths::lynx_dir);
 
     let source_dir = resolve_source_dir(args.source.as_deref())?;
 
@@ -55,7 +55,8 @@ pub fn run(args: SetupArgs) -> Result<()> {
         return Err(LynxError::Config(format!(
             "shell/ not found at {} — run lx setup from the Lynx source directory or pass --source",
             shell_src.display()
-        )).into());
+        ))
+        .into());
     }
 
     if plugins_src.exists() {
@@ -63,7 +64,10 @@ pub fn run(args: SetupArgs) -> Result<()> {
             .with_context(|| format!("failed to copy plugins/ from {}", plugins_src.display()))?;
         println!("  ✓ plugins/ → {}/plugins/", lynx_dir.display());
     } else {
-        println!("  ⚠ plugins/ not found at {} — skipping", plugins_src.display());
+        println!(
+            "  ⚠ plugins/ not found at {} — skipping",
+            plugins_src.display()
+        );
     }
 
     if themes_src.exists() {
@@ -78,11 +82,8 @@ pub fn run(args: SetupArgs) -> Result<()> {
     // Write default config if none exists
     let config_path = lynx_dir.join(brand::CONFIG_FILE);
     if !config_path.exists() {
-        std::fs::write(
-            &config_path,
-            default_config(),
-        )
-        .with_context(|| format!("failed to write config.toml to {}", config_path.display()))?;
+        std::fs::write(&config_path, default_config())
+            .with_context(|| format!("failed to write config.toml to {}", config_path.display()))?;
         println!("  ✓ config.toml written (default)");
     } else {
         println!("  ✓ config.toml preserved (already exists)");
@@ -96,18 +97,27 @@ pub fn run(args: SetupArgs) -> Result<()> {
     println!();
     println!("Lynx installed to {}.", lynx_dir.display());
 
-    if !args.zshrc {
+    // Auto-launch the onboarding wizard if:
+    // - stdout is a TTY (not a pipe or agent context)
+    // - onboarding has not already been completed
+    // Errors in onboard are non-fatal — always fall through to the manual instruction.
+    let already_onboarded = lynx_config::load()
+        .map(|c| c.onboarding_complete)
+        .unwrap_or(false);
+
+    if !already_onboarded && lynx_tui::is_tui_active() {
         println!();
-        println!("Add this to your ~/.zshrc to activate Lynx:");
+        println!("Starting setup wizard...");
         println!();
-        println!("    {ZSHRC_INIT_LINE}");
+        let onboard_args = super::onboard::OnboardArgs { force: false };
+        if let Err(e) = super::onboard::run(onboard_args) {
+            eprintln!("  ⚠ Wizard encountered an error: {e}");
+            eprintln!("    Run `lx onboard` to complete setup manually.");
+        }
+    } else if !already_onboarded {
+        // Non-interactive or agent context — print the manual instruction.
         println!();
-        println!("Or run `lx setup --zshrc` to do it automatically.");
-    } else {
-        println!();
-        println!("Restart your shell or run:");
-        println!();
-        println!("    source ~/.zshrc");
+        println!("Run `lx onboard` to complete setup.");
     }
 
     Ok(())
@@ -200,7 +210,7 @@ fn copy_dir_all(src: &Path, dst: &Path) -> Result<()> {
 }
 
 /// Append the Lynx init line to ~/.zshrc if not already present.
-fn patch_zshrc(home: &Path) -> Result<()> {
+pub(crate) fn patch_zshrc(home: &Path) -> Result<()> {
     let zshrc = home.join(".zshrc");
 
     if zshrc.exists() {
@@ -253,11 +263,6 @@ enabled = true
 "#
 }
 
-fn home_dir() -> Result<PathBuf> {
-    std::env::var_os("HOME")
-        .map(PathBuf::from)
-        .ok_or_else(|| anyhow::Error::from(lynx_core::error::LynxError::Shell("$HOME not set".into())))
-}
 
 #[cfg(test)]
 mod tests {
@@ -290,7 +295,10 @@ mod tests {
 
         let content = fs::read_to_string(&zshrc).unwrap();
         assert_eq!(
-            content.lines().filter(|l| l.contains(ZSHRC_INIT_LINE)).count(),
+            content
+                .lines()
+                .filter(|l| l.contains(ZSHRC_INIT_LINE))
+                .count(),
             1,
             "should not duplicate init line"
         );

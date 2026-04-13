@@ -42,7 +42,12 @@ fn has_nerd_glyphs(s: &str) -> bool {
 pub fn theme_needs_nerd_font(theme: &lynx_theme::Theme) -> bool {
     // 1. Global separators.
     let sep = &theme.separators;
-    for opt in [&sep.left.char, &sep.right.char, &sep.left_edge.char, &sep.right_edge.char] {
+    for opt in [
+        &sep.left.char,
+        &sep.right.char,
+        &sep.left_edge.char,
+        &sep.right_edge.char,
+    ] {
         if opt.as_ref().is_some_and(|s| has_nerd_glyphs(s)) {
             return true;
         }
@@ -86,21 +91,17 @@ fn toml_value_has_nerd_glyphs(value: &toml::Value) -> bool {
 /// On macOS, queries the font system for real PostScript names.
 /// Falls back to filename-based extraction on other platforms.
 pub fn find_installed_nerd_fonts() -> Vec<String> {
-    let home = std::env::var_os("HOME").map(PathBuf::from);
+    let home = lynx_core::paths::home();
     let font_dirs: Vec<PathBuf> = {
-        let mut dirs = Vec::new();
-        if let Some(ref h) = home {
-            dirs.push(h.join("Library/Fonts"));
-        }
-        dirs.push("/Library/Fonts".into());
-        dirs.push("/System/Library/Fonts".into());
-        if let Some(ref h) = home {
-            dirs.push(h.join(".local/share/fonts"));
-            dirs.push(h.join(".fonts"));
-        }
-        dirs.push("/usr/share/fonts".into());
-        dirs.push("/usr/local/share/fonts".into());
-        dirs
+        vec![
+            home.join("Library/Fonts"),
+            "/Library/Fonts".into(),
+            "/System/Library/Fonts".into(),
+            home.join(".local/share/fonts"),
+            home.join(".fonts"),
+            "/usr/share/fonts".into(),
+            "/usr/local/share/fonts".into(),
+        ]
     };
 
     // Collect Nerd Font file paths first.
@@ -137,7 +138,9 @@ pub fn find_installed_nerd_fonts() -> Vec<String> {
 
 /// Collect paths of Nerd Font files (*.ttf, *.otf with "nerd" in the name).
 fn scan_dir_for_nerd_font_files(dir: &PathBuf, files: &mut Vec<PathBuf>) {
-    let Ok(entries) = std::fs::read_dir(dir) else { return };
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
@@ -217,7 +220,8 @@ enum Terminal {
 }
 
 fn detect_terminal() -> Terminal {
-    if std::env::var("ITERM_SESSION_ID").is_ok() || std::env::var("TERM_PROGRAM").as_deref() == Ok("iTerm.app")
+    if std::env::var("ITERM_SESSION_ID").is_ok()
+        || std::env::var("TERM_PROGRAM").as_deref() == Ok("iTerm.app")
     {
         Terminal::ITerm2
     } else {
@@ -248,7 +252,13 @@ fn iterm2_current_font() -> Option<String> {
         let trimmed = line.trim();
         if trimmed.starts_with("\"Normal Font\"") {
             // "Normal Font" = "Monaco 12";
-            let val = trimmed.split('=').nth(1)?.trim().trim_matches(';').trim().trim_matches('"');
+            let val = trimmed
+                .split('=')
+                .nth(1)?
+                .trim()
+                .trim_matches(';')
+                .trim()
+                .trim_matches('"');
             return Some(val.to_string());
         }
     }
@@ -278,17 +288,15 @@ pub fn configure_iterm2_font(font_family: &str, size: u32) -> Result<()> {
     let font_value = format!("{font_family}-Regular {size}");
 
     // Use PlistBuddy to update the Default profile's font.
-    let plist = format!(
-        "{}/Library/Preferences/com.googlecode.iterm2.plist",
-        std::env::var("HOME").context("HOME not set")?
-    );
+    let plist = lynx_core::paths::home()
+        .join("Library/Preferences/com.googlecode.iterm2.plist");
 
     // Update Normal Font in the first (default) profile.
     let status = Command::new("/usr/libexec/PlistBuddy")
         .args([
             "-c",
             &format!("Set ':New Bookmarks':0:'Normal Font' '{font_value}'"),
-            &plist,
+            plist.to_str().unwrap_or_default(),
         ])
         .status()
         .context("failed to run PlistBuddy")?;
@@ -312,14 +320,14 @@ pub fn configure_iterm2_font(font_family: &str, size: u32) -> Result<()> {
 pub fn install_nerd_font() -> Result<String> {
     let font_name = "FiraCode";
     let filename_family = "FiraCodeNerdFont";
-    let url = format!(
-        "https://github.com/ryanoasis/nerd-fonts/releases/latest/download/{font_name}.zip"
-    );
+    let url =
+        format!("https://github.com/ryanoasis/nerd-fonts/releases/latest/download/{font_name}.zip");
 
     println!("  downloading {font_name} Nerd Font...");
 
-    let resp =
-        ureq::get(&url).call().with_context(|| format!("failed to download font from {url}"))?;
+    let resp = ureq::get(&url)
+        .call()
+        .with_context(|| format!("failed to download font from {url}"))?;
 
     let mut bytes = Vec::new();
     resp.into_reader()
@@ -327,11 +335,9 @@ pub fn install_nerd_font() -> Result<String> {
         .context("failed to read font download")?;
 
     let font_dir = if cfg!(target_os = "macos") {
-        let home = std::env::var("HOME").context("HOME not set")?;
-        PathBuf::from(home).join("Library/Fonts")
+        lynx_core::paths::home().join("Library/Fonts")
     } else {
-        let home = std::env::var("HOME").context("HOME not set")?;
-        PathBuf::from(home).join(".local/share/fonts")
+        lynx_core::paths::home().join(".local/share/fonts")
     };
     std::fs::create_dir_all(&font_dir)?;
 
@@ -360,12 +366,14 @@ pub fn install_nerd_font() -> Result<String> {
         let _ = Command::new("fc-cache").arg("-f").status();
     }
 
-    println!("  ✓ installed {installed} font files to {}", font_dir.display());
+    println!(
+        "  ✓ installed {installed} font files to {}",
+        font_dir.display()
+    );
 
     // Resolve the real PostScript base name from the installed Regular font file.
     let regular_file = font_dir.join(format!("{filename_family}-Regular.ttf"));
-    let family = postscript_base_name(&regular_file)
-        .unwrap_or_else(|| filename_family.to_string());
+    let family = postscript_base_name(&regular_file).unwrap_or_else(|| filename_family.to_string());
     Ok(family)
 }
 
@@ -446,7 +454,13 @@ fn current_iterm2_font_size() -> Option<u32> {
     for line in text.lines() {
         let trimmed = line.trim();
         if trimmed.starts_with("\"Normal Font\"") {
-            let val = trimmed.split('=').nth(1)?.trim().trim_matches(';').trim().trim_matches('"');
+            let val = trimmed
+                .split('=')
+                .nth(1)?
+                .trim()
+                .trim_matches(';')
+                .trim()
+                .trim_matches('"');
             let size_str = val.split_whitespace().last()?;
             return size_str.parse().ok();
         }

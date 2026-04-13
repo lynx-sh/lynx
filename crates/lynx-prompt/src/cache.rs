@@ -27,10 +27,7 @@ impl SegmentCache {
 
     /// Insert or update a cache entry.
     pub fn set(&self, key: impl Into<String>, value: Value, ttl: Duration) {
-        let mut map = self
-            .inner
-            .write()
-            .unwrap_or_else(|e| e.into_inner());
+        let mut map = self.inner.write().unwrap_or_else(|e| e.into_inner());
         map.insert(
             key.into(),
             CacheEntry {

@@ -9,5 +9,6 @@ repository.workspace = true
 
 [dependencies]
 lynx-core = { path = "../lynx-core" }
+lynx-config = { path = "../lynx-config" }
 ratatui = { workspace = true }
 crossterm = { workspace = true }

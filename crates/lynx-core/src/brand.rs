@@ -44,8 +44,7 @@ pub const DEFAULT_REGISTRY_URL: &str =
 
 /// The line written to `.zshrc` by `lx setup` and matched by `lx uninstall`.
 /// Must be a single exact string — both install and uninstall use this for matching.
-pub const ZSHRC_INIT_LINE: &str =
-    r#"source "${HOME}/.config/lynx/shell/init.zsh""#;
+pub const ZSHRC_INIT_LINE: &str = r#"source "${HOME}/.config/lynx/shell/init.zsh""#;
 
 #[cfg(test)]
 mod tests {

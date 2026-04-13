@@ -44,7 +44,10 @@ mod tests {
     use std::collections::HashMap;
 
     fn ctx_with_env(pairs: &[(&str, &str)]) -> RenderContext {
-        let env = pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect();
+        let env = pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
         RenderContext {
             cwd: "/".into(),
             shell_context: lynx_core::types::Context::Interactive,
@@ -63,7 +66,10 @@ mod tests {
 
     #[test]
     fn shows_during_ssh_connection() {
-        let ctx = ctx_with_env(&[("HOSTNAME", "mybox"), ("SSH_CONNECTION", "1.2.3.4 22 5.6.7.8 12345")]);
+        let ctx = ctx_with_env(&[
+            ("HOSTNAME", "mybox"),
+            ("SSH_CONNECTION", "1.2.3.4 22 5.6.7.8 12345"),
+        ]);
         let r = HostnameSegment.render(&empty_config(), &ctx).unwrap();
         assert_eq!(r.text, "mybox");
     }

@@ -66,21 +66,37 @@ pub fn resolve_install_command(
     pm: &PackageManager,
 ) -> Option<(String, Vec<String>)> {
     match pm {
-        PackageManager::Brew => install.brew.as_ref().map(|pkg| {
-            ("brew".into(), vec!["install".into(), pkg.clone()])
-        }),
+        PackageManager::Brew => install
+            .brew
+            .as_ref()
+            .map(|pkg| ("brew".into(), vec!["install".into(), pkg.clone()])),
         PackageManager::Apt => install.apt.as_ref().map(|pkg| {
-            ("sudo".into(), vec!["apt".into(), "install".into(), "-y".into(), pkg.clone()])
+            (
+                "sudo".into(),
+                vec!["apt".into(), "install".into(), "-y".into(), pkg.clone()],
+            )
         }),
         PackageManager::Dnf => install.dnf.as_ref().map(|pkg| {
-            ("sudo".into(), vec!["dnf".into(), "install".into(), "-y".into(), pkg.clone()])
+            (
+                "sudo".into(),
+                vec!["dnf".into(), "install".into(), "-y".into(), pkg.clone()],
+            )
         }),
         PackageManager::Pacman => install.pacman.as_ref().map(|pkg| {
-            ("sudo".into(), vec!["pacman".into(), "-S".into(), "--noconfirm".into(), pkg.clone()])
+            (
+                "sudo".into(),
+                vec![
+                    "pacman".into(),
+                    "-S".into(),
+                    "--noconfirm".into(),
+                    pkg.clone(),
+                ],
+            )
         }),
-        PackageManager::Cargo => install.cargo.as_ref().map(|pkg| {
-            ("cargo".into(), vec!["install".into(), pkg.clone()])
-        }),
+        PackageManager::Cargo => install
+            .cargo
+            .as_ref()
+            .map(|pkg| ("cargo".into(), vec!["install".into(), pkg.clone()])),
         PackageManager::None => None,
     }
 }
@@ -96,10 +112,12 @@ pub fn resolve_url_install(url: &str, name: &str) -> (PathBuf, String) {
 /// Install a tool using the system package manager.
 /// Returns the binary name that was installed.
 pub fn install_tool_via_pm(entry: &RegistryEntry) -> Result<String> {
-    let install = entry
-        .install
-        .as_ref()
-        .ok_or_else(|| LynxError::Registry(format!("package '{}' has no install methods defined", entry.name)))?;
+    let install = entry.install.as_ref().ok_or_else(|| {
+        LynxError::Registry(format!(
+            "package '{}' has no install methods defined",
+            entry.name
+        ))
+    })?;
 
     let pm = detect_package_manager();
 
@@ -114,8 +132,11 @@ pub fn install_tool_via_pm(entry: &RegistryEntry) -> Result<String> {
         if !status.success() {
             return Err(LynxError::Registry(format!(
                 "{} {} failed with exit code {}",
-                cmd, args.join(" "), status.code().unwrap_or(-1)
-            )).into());
+                cmd,
+                args.join(" "),
+                status.code().unwrap_or(-1)
+            ))
+            .into());
         }
 
         // Verify the binary exists after install.
@@ -123,7 +144,11 @@ pub fn install_tool_via_pm(entry: &RegistryEntry) -> Result<String> {
         if lynx_core::paths::find_binary(binary_name).is_none() {
             // Some tools install under a different name — check the entry name too.
             if lynx_core::paths::find_binary(&entry.name).is_none() {
-                tracing::warn!("'{}' installed but binary '{}' not found on PATH", entry.name, binary_name);
+                tracing::warn!(
+                    "'{}' installed but binary '{}' not found on PATH",
+                    entry.name,
+                    binary_name
+                );
             }
         }
 
@@ -138,8 +163,10 @@ pub fn install_tool_via_pm(entry: &RegistryEntry) -> Result<String> {
 
     Err(LynxError::Registry(format!(
         "no install method available for '{}' on {} — try installing manually",
-        entry.name, pm.label()
-    )).into())
+        entry.name,
+        pm.label()
+    ))
+    .into())
 }
 
 /// Download a tool binary from a URL to ~/.local/bin/.
@@ -155,7 +182,11 @@ fn install_tool_via_url(url: &str, name: &str) -> Result<String> {
         .call()
         .with_context(|| format!("GET {url}"))?;
     if resp.status() >= 400 {
-        return Err(LynxError::Registry(format!("server returned status {} for {url}", resp.status())).into());
+        return Err(LynxError::Registry(format!(
+            "server returned status {} for {url}",
+            resp.status()
+        ))
+        .into());
     }
 
     let mut reader = resp.into_reader();
@@ -191,14 +222,15 @@ pub fn install_theme(name: &str, url: &str, force: bool) -> Result<PathBuf> {
 
     // Validate before writing.
     if let Err(e) = toml::from_str::<toml::Value>(&body) {
-        return Err(LynxError::Theme(format!("downloaded theme '{name}' is invalid TOML: {e}")).into());
+        return Err(
+            LynxError::Theme(format!("downloaded theme '{name}' is invalid TOML: {e}")).into(),
+        );
     }
 
     if let Some(parent) = dest.parent() {
         std::fs::create_dir_all(parent).context("create themes dir")?;
     }
-    std::fs::write(&dest, &body)
-        .with_context(|| format!("write theme to {}", dest.display()))?;
+    std::fs::write(&dest, &body).with_context(|| format!("write theme to {}", dest.display()))?;
 
     info!("installed theme '{}' to {}", name, dest.display());
     Ok(dest)
@@ -216,12 +248,13 @@ pub fn install_intro(name: &str, url: &str, force: bool) -> Result<PathBuf> {
         .with_context(|| format!("failed to download intro '{name}' from {url}"))?;
 
     if let Err(e) = toml::from_str::<toml::Value>(&body) {
-        return Err(LynxError::Theme(format!("downloaded intro '{name}' is invalid TOML: {e}")).into());
+        return Err(
+            LynxError::Theme(format!("downloaded intro '{name}' is invalid TOML: {e}")).into(),
+        );
     }
 
     std::fs::create_dir_all(&intros_dir).context("create intros dir")?;
-    std::fs::write(&dest, &body)
-        .with_context(|| format!("write intro to {}", dest.display()))?;
+    std::fs::write(&dest, &body).with_context(|| format!("write intro to {}", dest.display()))?;
 
     info!("installed intro '{}' to {}", name, dest.display());
     Ok(dest)
@@ -232,7 +265,11 @@ fn download_text(url: &str) -> Result<String> {
         .call()
         .with_context(|| format!("GET {url}"))?;
     if resp.status() >= 400 {
-        return Err(LynxError::Registry(format!("server returned status {} for {url}", resp.status())).into());
+        return Err(LynxError::Registry(format!(
+            "server returned status {} for {url}",
+            resp.status()
+        ))
+        .into());
     }
     resp.into_string().context("read response body")
 }

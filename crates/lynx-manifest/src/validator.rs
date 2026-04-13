@@ -8,6 +8,7 @@ use lynx_core::error::{LynxError, Result};
 pub fn validate(manifest: &PluginManifest) -> Result<()> {
     check_schema_version(manifest)?;
     check_no_wildcard_exports(manifest)?;
+    check_shell_identifiers(manifest)?;
     check_binary_deps(manifest)?;
     Ok(())
 }
@@ -47,6 +48,87 @@ fn check_binary_deps(manifest: &PluginManifest) -> Result<()> {
         }
     }
     Ok(())
+}
+
+fn check_shell_identifiers(manifest: &PluginManifest) -> Result<()> {
+    ensure_plugin_name("plugin.name", &manifest.plugin.name)?;
+    for bin in &manifest.deps.binaries {
+        ensure_command_name("deps.binaries", bin)?;
+    }
+    for hook in &manifest.load.hooks {
+        ensure_hook_name("load.hooks", hook)?;
+    }
+    for widget in &manifest.shell.widgets {
+        ensure_widget_name("shell.widgets", widget)?;
+    }
+    for keybinding in &manifest.shell.keybindings {
+        ensure_widget_name("shell.keybindings.widget", &keybinding.widget)?;
+    }
+    Ok(())
+}
+
+fn ensure_plugin_name(field: &str, value: &str) -> Result<()> {
+    if !is_plugin_name(value) {
+        return Err(LynxError::Manifest(format!(
+            "invalid {field} value '{value}' — expected [A-Za-z0-9_-]+"
+        )));
+    }
+    Ok(())
+}
+
+fn ensure_command_name(field: &str, value: &str) -> Result<()> {
+    if !is_command_name(value) {
+        return Err(LynxError::Manifest(format!(
+            "invalid {field} value '{value}' — expected [A-Za-z0-9_.+-]+"
+        )));
+    }
+    Ok(())
+}
+
+fn ensure_hook_name(field: &str, value: &str) -> Result<()> {
+    if !is_hook_name(value) {
+        return Err(LynxError::Manifest(format!(
+            "invalid {field} value '{value}' — expected [A-Za-z0-9_]+"
+        )));
+    }
+    Ok(())
+}
+
+fn ensure_widget_name(field: &str, value: &str) -> Result<()> {
+    if !is_widget_name(value) {
+        return Err(LynxError::Manifest(format!(
+            "invalid {field} value '{value}' — expected [A-Za-z0-9_-]+"
+        )));
+    }
+    Ok(())
+}
+
+fn is_plugin_name(value: &str) -> bool {
+    !value.is_empty()
+        && value
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '-')
+}
+
+fn is_command_name(value: &str) -> bool {
+    !value.is_empty()
+        && value.chars().all(|ch| {
+            ch.is_ascii_alphanumeric() || ch == '_' || ch == '-' || ch == '.' || ch == '+'
+        })
+}
+
+fn is_hook_name(value: &str) -> bool {
+    !value.is_empty()
+        && value
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
+}
+
+fn is_widget_name(value: &str) -> bool {
+    !value.is_empty()
+        && value
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '-')
 }
 
 fn which(bin: &str) -> Option<std::path::PathBuf> {
@@ -103,5 +185,48 @@ mod tests {
         m.schema_version = 99;
         let err = validate(&m).unwrap_err();
         assert!(err.to_string().contains("schema_version"));
+    }
+
+    #[test]
+    fn invalid_plugin_name_rejected() {
+        let mut m = base_manifest();
+        m.plugin.name = "bad$name".into();
+        let err = validate(&m).unwrap_err();
+        assert!(err.to_string().contains("plugin.name"));
+    }
+
+    #[test]
+    fn invalid_binary_identifier_rejected() {
+        let mut m = base_manifest();
+        m.deps.binaries = vec!["git;rm".into()];
+        let err = validate(&m).unwrap_err();
+        assert!(err.to_string().contains("deps.binaries"));
+    }
+
+    #[test]
+    fn invalid_hook_identifier_rejected() {
+        let mut m = base_manifest();
+        m.load.hooks = vec!["precmd$".into()];
+        let err = validate(&m).unwrap_err();
+        assert!(err.to_string().contains("load.hooks"));
+    }
+
+    #[test]
+    fn invalid_widget_identifier_rejected() {
+        let mut m = base_manifest();
+        m.shell.widgets = vec!["widget()".into()];
+        let err = validate(&m).unwrap_err();
+        assert!(err.to_string().contains("shell.widgets"));
+    }
+
+    #[test]
+    fn invalid_keybinding_widget_identifier_rejected() {
+        let mut m = base_manifest();
+        m.shell.keybindings = vec![KeyBinding {
+            key: "^R".into(),
+            widget: "bad widget".into(),
+        }];
+        let err = validate(&m).unwrap_err();
+        assert!(err.to_string().contains("shell.keybindings.widget"));
     }
 }

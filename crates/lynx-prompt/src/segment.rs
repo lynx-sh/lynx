@@ -145,7 +145,10 @@ mod tests {
 
     #[test]
     fn bracket_template_like_starship() {
-        let out = apply_format("[$branch]($style)", &[("branch", "main"), ("style", "bold")]);
+        let out = apply_format(
+            "[$branch]($style)",
+            &[("branch", "main"), ("style", "bold")],
+        );
         assert_eq!(out, "[main](bold)");
     }
 

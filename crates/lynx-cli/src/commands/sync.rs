@@ -2,11 +2,10 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use anyhow::{Context as _, Result};
-use lynx_core::error::LynxError;
 use clap::{Args, Subcommand};
+use lynx_core::error::LynxError;
 
 use lynx_config::snapshot::mutate_config_transaction;
-use lynx_core::brand;
 
 #[derive(Args)]
 #[command(arg_required_else_help = true)]
@@ -36,17 +35,16 @@ pub fn run(args: SyncArgs) -> Result<()> {
         SyncCommand::Push => cmd_push(),
         SyncCommand::Pull => cmd_pull(),
         SyncCommand::Status => cmd_status(),
-        SyncCommand::Other(args) => {
-            Err(LynxError::unknown_command(args.first().map(|s| s.as_str()).unwrap_or(""), "sync").into())
-        }
+        SyncCommand::Other(args) => Err(LynxError::unknown_command(
+            super::unknown_subcmd_name(&args),
+            "sync",
+        )
+        .into()),
     }
 }
 
 fn config_dir() -> PathBuf {
-    let home = std::env::var_os("HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("."));
-    home.join(brand::CONFIG_DIR)
+    lynx_core::paths::lynx_dir()
 }
 
 fn cmd_init(remote: &str) -> Result<()> {
@@ -148,7 +146,10 @@ fn cmd_status() -> Result<()> {
 
 fn ensure_git_repo(dir: &Path) -> Result<()> {
     if !dir.join(".git").exists() {
-        return Err(LynxError::Config("config dir is not a git repo — run: lx sync init <remote>".into()).into());
+        return Err(LynxError::Config(
+            "config dir is not a git repo — run: lx sync init <remote>".into(),
+        )
+        .into());
     }
     Ok(())
 }
@@ -189,8 +190,14 @@ mod tests {
     #[test]
     fn timestamp_returns_numeric_string() {
         let ts = timestamp();
-        assert!(ts.parse::<u64>().is_ok(), "timestamp should be numeric: {ts}");
-        assert!(ts.len() >= 10, "timestamp should be at least 10 digits: {ts}");
+        assert!(
+            ts.parse::<u64>().is_ok(),
+            "timestamp should be numeric: {ts}"
+        );
+        assert!(
+            ts.len() >= 10,
+            "timestamp should be at least 10 digits: {ts}"
+        );
     }
 
     #[test]
@@ -210,9 +217,8 @@ mod tests {
     }
 
     #[test]
-    fn config_dir_contains_brand_config_dir() {
-        let dir = config_dir();
-        assert!(dir.to_string_lossy().contains(brand::CONFIG_DIR));
+    fn config_dir_matches_lynx_dir() {
+        assert_eq!(config_dir(), lynx_core::paths::lynx_dir());
     }
 
     #[tokio::test]

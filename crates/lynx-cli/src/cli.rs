@@ -79,4 +79,12 @@ pub enum Command {
     Jobs(crate::commands::jobs::JobsArgs),
     /// Execute a workflow
     Run(crate::commands::run::RunArgs),
+    /// Interactive first-run setup wizard — pick theme, plugins, shell integration
+    Onboard(crate::commands::onboard::OnboardArgs),
+    /// Manage user-defined aliases
+    Alias(crate::commands::alias::AliasArgs),
+    /// Manage user-defined PATH entries
+    Path(crate::commands::path::PathArgs),
+    /// Generate shell tab-completion scripts
+    Completions(crate::commands::completions::CompletionsArgs),
 }

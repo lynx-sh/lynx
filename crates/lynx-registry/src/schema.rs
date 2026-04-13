@@ -52,8 +52,7 @@ pub struct InstallMethods {
 }
 
 /// A package entry in the registry index.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct RegistryEntry {
     /// Package name.
     pub name: String,
@@ -91,7 +90,6 @@ pub struct RegistryEntry {
     /// All available versions, newest-first.
     pub versions: Vec<PluginVersion>,
 }
-
 
 impl RegistryEntry {
     /// Resolve a specific version, or the latest if `version` is None.
@@ -137,7 +135,11 @@ pub struct RegistryIndex {
 impl RegistryIndex {
     /// Build a name→index HashMap for O(1) lookups.
     pub fn name_index(&self) -> std::collections::HashMap<&str, usize> {
-        self.plugins.iter().enumerate().map(|(i, e)| (e.name.as_str(), i)).collect()
+        self.plugins
+            .iter()
+            .enumerate()
+            .map(|(i, e)| (e.name.as_str(), i))
+            .collect()
     }
 
     /// Look up a plugin by exact name.

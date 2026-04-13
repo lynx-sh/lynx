@@ -1,6 +1,6 @@
 use anyhow::Result;
-use lynx_core::error::LynxError;
 use clap::Args;
+use lynx_core::error::LynxError;
 
 use lynx_config::snapshot::{list, restore};
 
@@ -58,7 +58,7 @@ mod tests {
     async fn rollback_empty_snapshots_returns_error() {
         // With a temp home, there should be no snapshots — this should error.
         let home = lynx_test_utils::temp_home();
-        std::env::set_var("LYNX_CONFIG_DIR", home.path().join("lynx"));
+        std::env::set_var(lynx_core::env_vars::LYNX_DIR, home.path().join("lynx"));
         let args = RollbackArgs { last: false };
         // This may or may not error depending on whether list() finds snapshots.
         // At minimum it should not panic.

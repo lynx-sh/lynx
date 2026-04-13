@@ -28,6 +28,7 @@ lynx-shell    = { path = "../lynx-shell" }
 lynx-registry = { path = "../lynx-registry" }
 lynx-tui      = { path = "../lynx-tui" }
 clap.workspace = true
+clap_complete.workspace = true
 owo-colors.workspace = true
 serde_json.workspace = true
 toml.workspace = true
@@ -38,6 +39,8 @@ tracing-subscriber.workspace = true
 which = "6"
 lynx-intro = { version = "0.1.0", path = "../lynx-intro" }
 ureq.workspace = true
+sha2.workspace = true
+hex.workspace = true
 zip = { version = "2", default-features = false, features = ["deflate"] }
 
 [dev-dependencies]

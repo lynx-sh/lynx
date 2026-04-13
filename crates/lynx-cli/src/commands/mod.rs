@@ -1,40 +1,50 @@
+pub mod alias;
+pub mod audit;
+pub mod completions;
 pub mod benchmark;
-pub mod help;
-pub mod dashboard;
-pub mod intro;
-pub mod diag;
+pub mod browse;
 pub mod config;
 pub mod context;
+pub mod cron;
 pub mod daemon;
+pub mod dashboard;
+pub mod diag;
 pub mod doctor;
-pub mod git;
-pub mod kubectl_state;
-pub mod refresh_state;
 pub mod event;
 pub mod examples;
+pub mod git;
+pub mod help;
 pub mod init;
+pub mod install;
+pub mod intro;
 pub mod jobs;
-pub mod setup;
+pub mod kubectl_state;
 pub mod migrate;
+pub mod nerd_font;
+pub mod onboard;
+pub mod path;
 pub mod plugin;
 pub mod prompt;
+pub mod refresh_state;
 pub mod rollback;
 pub mod run;
+pub mod setup;
 pub mod sync;
-pub mod audit;
-pub mod browse;
-pub mod install;
 pub mod tap;
-pub mod cron;
-pub mod nerd_font;
 pub mod theme;
 mod theme_convert;
 pub mod uninstall;
 pub mod update;
 
 use crate::cli::{Cli, Command};
-use anyhow::{Result};
+use anyhow::Result;
 use lynx_core::error::LynxError;
+
+/// Extract the subcommand name from an external-subcommand args vec.
+/// Returns the first element as `&str`, or `""` if the vec is empty.
+pub(crate) fn unknown_subcmd_name(args: &[String]) -> &str {
+    args.first().map(|s| s.as_str()).unwrap_or("")
+}
 
 /// Load TUI colors from the active theme. Falls back to defaults.
 pub(crate) fn tui_colors() -> lynx_tui::TuiColors {
@@ -47,37 +57,44 @@ pub(crate) fn tui_colors() -> lynx_tui::TuiColors {
     }
 }
 
-/// Open a file in VS Code (blocking until the window/tab is closed).
-/// Errors with a clear install message if `code` is not in PATH.
-pub(crate) fn open_in_vscode(path: &std::path::Path) -> Result<()> {
-    let status = std::process::Command::new("code")
-        .arg("--wait")
-        .arg(path)
-        .status()
-        .map_err(|_| anyhow::Error::from(lynx_core::error::LynxError::Shell(
-            "VS Code is required to edit this file — install from https://code.visualstudio.com and ensure `code` is in PATH".into()
-        )))?;
+/// Open a file in the user's preferred editor (blocking until the editor exits).
+///
+/// Respects `$VISUAL` first, then `$EDITOR`, falling back to `code` (VS Code).
+/// Passes `--wait` only for GUI editors (`code`, `cursor`) that need it.
+pub(crate) fn open_in_editor(path: &std::path::Path) -> Result<()> {
+    let editor = std::env::var("VISUAL")
+        .or_else(|_| std::env::var("EDITOR"))
+        .unwrap_or_else(|_| "code".to_string());
+
+    let editor_bin = std::path::Path::new(&editor)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or(&editor)
+        .to_string();
+
+    let needs_wait = editor_bin == "code" || editor_bin == "cursor";
+
+    let mut cmd = std::process::Command::new(&editor);
+    if needs_wait {
+        cmd.arg("--wait");
+    }
+    cmd.arg(path);
+
+    let status = cmd.status().map_err(|_| {
+        anyhow::Error::from(LynxError::Shell(
+            format!(
+                "No editor found — set VISUAL or EDITOR env var, or install VS Code (tried: {editor})"
+            )
+        ))
+    })?;
 
     if !status.success() {
-        return Err(LynxError::Shell("VS Code exited with an error — file may not have been saved".into()).into());
+        return Err(LynxError::Shell(
+            format!("Editor `{editor}` exited with an error — file may not have been saved"),
+        )
+        .into());
     }
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn tui_colors_returns_default_without_config() {
-        // In test environment, config may not exist — should fallback gracefully.
-        let colors = tui_colors();
-        // Just ensure it doesn't panic and returns something.
-        let _ = colors;
-    }
-
-    // Note: open_in_vscode is not unit-testable without mocking Command.
-    // It spawns VS Code with --wait which blocks. Tested via integration tests.
 }
 
 pub async fn dispatch(cli: Cli) -> Result<()> {
@@ -113,5 +130,25 @@ pub async fn dispatch(cli: Cli) -> Result<()> {
         Command::Dashboard(args) => dashboard::run(args).await,
         Command::Jobs(args) => jobs::run(args),
         Command::Run(args) => run::run(args).await,
+        Command::Onboard(args) => onboard::run(args),
+        Command::Alias(args) => alias::run(args),
+        Command::Path(args) => path::run(args),
+        Command::Completions(args) => completions::run(args).map(|_| ()),
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tui_colors_returns_default_without_config() {
+        // In test environment, config may not exist — should fallback gracefully.
+        let colors = tui_colors();
+        // Just ensure it doesn't panic and returns something.
+        let _ = colors;
+    }
+
+    // Note: open_in_editor is not unit-testable without mocking Command.
+    // It spawns VS Code with --wait which blocks. Tested via integration tests.
 }

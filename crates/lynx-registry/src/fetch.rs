@@ -1,5 +1,5 @@
 use std::io::Read;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 use anyhow::{Context, Result};
 use lynx_core::error::LynxError;
@@ -64,7 +64,8 @@ pub fn fetch_plugin(name: &str, opts: &FetchOptions) -> Result<PathBuf> {
         return Err(LynxError::Registry(format!(
             "checksum mismatch for '{name}' v{}: expected {}, got {actual}",
             pv.version, pv.checksum_sha256
-        )).into());
+        ))
+        .into());
     }
     debug!("checksum verified for {name} v{}", pv.version);
 
@@ -152,7 +153,11 @@ fn download_file(url: &str, dest: &Path) -> Result<()> {
         .call()
         .with_context(|| format!("GET {url}"))?;
     if resp.status() >= 400 {
-        return Err(LynxError::Registry(format!("server returned status {} for {url}", resp.status())).into());
+        return Err(LynxError::Registry(format!(
+            "server returned status {} for {url}",
+            resp.status()
+        ))
+        .into());
     }
     let mut reader = resp.into_reader();
     let mut file =
@@ -180,18 +185,44 @@ fn extract_tar_gz(archive: &Path, dest: &Path) -> Result<()> {
         .with_context(|| format!("open archive {}", archive.display()))?;
     let gz = flate2::read::GzDecoder::new(file);
     let mut tar = tar::Archive::new(gz);
+    let dest_canon = std::fs::canonicalize(dest)
+        .with_context(|| format!("canonicalize destination {}", dest.display()))?;
     // Strip the top-level directory from the archive (common convention).
     for entry in tar.entries().context("read tar entries")? {
         let mut entry = entry.context("read tar entry")?;
-        let entry_path = entry.path().context("entry path")?;
-        // Skip the top-level component (e.g. "git-1.0.0/").
-        let stripped = entry_path.components().skip(1).collect::<PathBuf>();
+        let entry_type = entry.header().entry_type();
+        if !(entry_type.is_file() || entry_type.is_dir()) {
+            return Err(LynxError::Registry(format!(
+                "archive contains unsupported entry type {entry_type:?}"
+            ))
+            .into());
+        }
+        let entry_path = entry.path().context("entry path")?.into_owned();
+        let stripped = sanitize_archive_path(&entry_path)?;
         if stripped.as_os_str().is_empty() {
             continue;
         }
         let out_path = dest.join(&stripped);
-        if let Some(parent) = out_path.parent() {
-            std::fs::create_dir_all(parent).context("create extract dir")?;
+        if entry_type.is_dir() {
+            std::fs::create_dir_all(&out_path)
+                .with_context(|| format!("create extract dir for {}", stripped.display()))?;
+            continue;
+        }
+        let parent = out_path.parent().ok_or_else(|| {
+            LynxError::Registry(format!(
+                "archive entry has no parent directory: {}",
+                stripped.display()
+            ))
+        })?;
+        std::fs::create_dir_all(parent).context("create extract dir")?;
+        let parent_canon = std::fs::canonicalize(parent)
+            .with_context(|| format!("canonicalize parent {}", parent.display()))?;
+        if !parent_canon.starts_with(&dest_canon) {
+            return Err(LynxError::Registry(format!(
+                "archive entry escapes install dir via parent: {}",
+                stripped.display()
+            ))
+            .into());
         }
         entry
             .unpack(&out_path)
@@ -200,13 +231,42 @@ fn extract_tar_gz(archive: &Path, dest: &Path) -> Result<()> {
     Ok(())
 }
 
+fn sanitize_archive_path(entry_path: &Path) -> Result<PathBuf> {
+    if entry_path.is_absolute() {
+        return Err(LynxError::Registry(format!(
+            "archive entry must not be absolute: {}",
+            entry_path.display()
+        ))
+        .into());
+    }
+
+    // Strip the top-level component (e.g. "git-1.0.0/").
+    let mut stripped = PathBuf::new();
+    for component in entry_path.components().skip(1) {
+        match component {
+            Component::Normal(part) => stripped.push(part),
+            Component::CurDir => {}
+            Component::ParentDir | Component::RootDir | Component::Prefix(_) => {
+                return Err(LynxError::Registry(format!(
+                    "archive entry contains unsafe path components: {}",
+                    entry_path.display()
+                ))
+                .into());
+            }
+        }
+    }
+
+    Ok(stripped)
+}
+
 fn validate_plugin_dir(dir: &Path, name: &str) -> Result<()> {
     let manifest_path = dir.join(lynx_core::brand::PLUGIN_MANIFEST);
     if !manifest_path.exists() {
         return Err(LynxError::Plugin(format!(
             "extracted plugin '{name}' is missing plugin.toml at {}",
             manifest_path.display()
-        )).into());
+        ))
+        .into());
     }
     let content = std::fs::read_to_string(&manifest_path).context("read extracted plugin.toml")?;
     let manifest: lynx_manifest::schema::PluginManifest = toml::from_str(&content)
@@ -215,7 +275,8 @@ fn validate_plugin_dir(dir: &Path, name: &str) -> Result<()> {
         return Err(LynxError::Plugin(format!(
             "plugin '{name}' plugin.toml declares name '{}' — must match",
             manifest.plugin.name
-        )).into());
+        ))
+        .into());
     }
     Ok(())
 }
@@ -232,7 +293,11 @@ pub fn checksum_file(path: &Path) -> Result<String> {
 /// Hash input includes relative file paths and file bytes; path order is sorted.
 pub fn checksum_plugin_dir(dir: &Path) -> Result<String> {
     if !dir.exists() {
-        return Err(LynxError::Plugin(format!("plugin directory does not exist: {}", dir.display())).into());
+        return Err(LynxError::Plugin(format!(
+            "plugin directory does not exist: {}",
+            dir.display()
+        ))
+        .into());
     }
 
     let mut files = Vec::new();
@@ -289,6 +354,30 @@ fn collect_files_sorted(root: &Path, current: &Path, out: &mut Vec<String>) -> R
 #[cfg(test)]
 mod tests {
     use super::*;
+    use flate2::write::GzEncoder;
+    use flate2::Compression;
+    use std::io::Cursor;
+    use tar::{Builder, Header};
+
+    fn make_archive(entries: &[(&str, &[u8])]) -> tempfile::NamedTempFile {
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        let file = std::fs::File::create(tmp.path()).unwrap();
+        let encoder = GzEncoder::new(file, Compression::default());
+        let mut tar = Builder::new(encoder);
+
+        for (path, content) in entries {
+            let mut header = Header::new_gnu();
+            header.set_path(path).unwrap();
+            header.set_size(content.len() as u64);
+            header.set_mode(0o644);
+            header.set_cksum();
+            tar.append(&header, Cursor::new(*content)).unwrap();
+        }
+
+        let encoder = tar.into_inner().unwrap();
+        encoder.finish().unwrap();
+        tmp
+    }
 
     #[test]
     fn checksum_file_consistent() {
@@ -407,5 +496,49 @@ disabled_in = []
         )
         .unwrap();
         assert!(validate_plugin_dir(dir.path(), "myplugin").is_ok());
+    }
+
+    #[test]
+    fn extract_tar_gz_rejects_parent_traversal() {
+        let err = sanitize_archive_path(Path::new("pkg/../../escape.txt")).unwrap_err();
+        assert!(err.to_string().contains("unsafe path components"));
+    }
+
+    #[test]
+    fn extract_tar_gz_rejects_absolute_paths() {
+        let err = sanitize_archive_path(Path::new("/etc/passwd")).unwrap_err();
+        assert!(err.to_string().contains("must not be absolute"));
+    }
+
+    #[test]
+    fn extract_tar_gz_rejects_symlink_entries() {
+        let archive = tempfile::NamedTempFile::new().unwrap();
+        let file = std::fs::File::create(archive.path()).unwrap();
+        let encoder = GzEncoder::new(file, Compression::default());
+        let mut tar = Builder::new(encoder);
+        let mut header = Header::new_gnu();
+        header.set_entry_type(tar::EntryType::Symlink);
+        header.set_path("pkg/link").unwrap();
+        header.set_link_name("../../escape").unwrap();
+        header.set_size(0);
+        header.set_mode(0o777);
+        header.set_cksum();
+        tar.append(&header, std::io::empty()).unwrap();
+        let encoder = tar.into_inner().unwrap();
+        encoder.finish().unwrap();
+
+        let dest = tempfile::tempdir().unwrap();
+        let err = extract_tar_gz(archive.path(), dest.path()).unwrap_err();
+        assert!(err.to_string().contains("unsupported entry type"));
+    }
+
+    #[test]
+    fn extract_tar_gz_allows_normal_files() {
+        let archive =
+            make_archive(&[("pkg/plugin.toml", b"[plugin]\nname=\"x\"\nversion=\"1\"\n")]);
+        let dest = tempfile::tempdir().unwrap();
+
+        extract_tar_gz(archive.path(), dest.path()).unwrap();
+        assert!(dest.path().join("plugin.toml").exists());
     }
 }

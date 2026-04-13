@@ -1,10 +1,10 @@
 use anyhow::{Context, Result};
-use lynx_core::error::LynxError;
 use clap::{Args, Subcommand};
+use lynx_core::error::LynxError;
 use lynx_task::{
-    parse_tasks_file, read_last_run, read_tasks_file, write_tasks_file,
+    parse_tasks_file, read_last_run, read_tasks_file,
     schema::{OnFail, Task},
-    validate_task,
+    validate_task, write_tasks_file,
 };
 use std::io::{BufRead, BufReader};
 
@@ -104,9 +104,11 @@ pub async fn run(args: CronArgs) -> Result<()> {
                 command: Some("cron".into()),
             })
         }
-        CronCommand::Other(args) => {
-            Err(LynxError::unknown_command(args.first().map(|s| s.as_str()).unwrap_or(""), "cron").into())
-        }
+        CronCommand::Other(args) => Err(LynxError::unknown_command(
+            super::unknown_subcmd_name(&args),
+            "cron",
+        )
+        .into()),
     }
 }
 
@@ -158,7 +160,12 @@ fn cmd_add(
         "notify" => OnFail::Notify,
         "ignore" => OnFail::Ignore,
         "log" | "" => OnFail::Log,
-        other => return Err(LynxError::Task(format!("unknown on_fail value '{other}': use log, notify, or ignore")).into()),
+        other => {
+            return Err(LynxError::Task(format!(
+                "unknown on_fail value '{other}': use log, notify, or ignore"
+            ))
+            .into())
+        }
     };
 
     let task = Task {
@@ -180,7 +187,10 @@ fn cmd_add(
     let mut file = parse_tasks_file(&content)?;
 
     if file.tasks.iter().any(|t| t.name == name) {
-        return Err(LynxError::Task(format!("task '{name}' already exists — use 'lx cron remove {name}' first")).into());
+        return Err(LynxError::Task(format!(
+            "task '{name}' already exists — use 'lx cron remove {name}' first"
+        ))
+        .into());
     }
 
     file.tasks.push(task);
@@ -200,9 +210,15 @@ struct CronListEntry {
 }
 
 impl lynx_tui::ListItem for CronListEntry {
-    fn title(&self) -> &str { &self.name }
+    fn title(&self) -> &str {
+        &self.name
+    }
     fn subtitle(&self) -> String {
-        format!("{} {}", self.cron, if self.enabled { "" } else { "(disabled)" })
+        format!(
+            "{} {}",
+            self.cron,
+            if self.enabled { "" } else { "(disabled)" }
+        )
     }
     fn detail(&self) -> String {
         format!(
@@ -210,7 +226,9 @@ impl lynx_tui::ListItem for CronListEntry {
             self.cron, self.enabled, self.last_run, self.exit_code
         )
     }
-    fn is_active(&self) -> bool { self.enabled }
+    fn is_active(&self) -> bool {
+        self.enabled
+    }
 }
 
 fn cmd_list() -> Result<()> {
@@ -224,16 +242,20 @@ fn cmd_list() -> Result<()> {
     }
 
     let log_dir = task_logs_dir();
-    let entries: Vec<CronListEntry> = file.tasks.iter().map(|task| {
-        let (last_run, exit_code) = read_last_run(&log_dir, &task.name);
-        CronListEntry {
-            name: task.name.clone(),
-            cron: task.cron.clone(),
-            enabled: task.enabled,
-            last_run,
-            exit_code,
-        }
-    }).collect();
+    let entries: Vec<CronListEntry> = file
+        .tasks
+        .iter()
+        .map(|task| {
+            let (last_run, exit_code) = read_last_run(&log_dir, &task.name);
+            CronListEntry {
+                name: task.name.clone(),
+                cron: task.cron.clone(),
+                enabled: task.enabled,
+                last_run,
+                exit_code,
+            }
+        })
+        .collect();
 
     lynx_tui::show(&entries, "Cron Tasks", &super::tui_colors())?;
     Ok(())
@@ -365,7 +387,12 @@ fn cmd_remove(name: String) -> Result<()> {
     file.tasks.retain(|t| t.name != name);
 
     if file.tasks.len() == before {
-        return Err(LynxError::NotFound { item_type: "Task".into(), name: name.clone(), hint: "run `lx cron list` to see available tasks".into() }.into());
+        return Err(LynxError::NotFound {
+            item_type: "Task".into(),
+            name: name.clone(),
+            hint: "run `lx cron list` to see available tasks".into(),
+        }
+        .into());
     }
 
     write_tasks_file(&path, &file)?;

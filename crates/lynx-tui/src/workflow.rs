@@ -9,7 +9,10 @@ use std::sync::mpsc;
 use std::time::Duration;
 
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind, KeyModifiers, MouseEventKind},
+    event::{
+        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind, KeyModifiers,
+        MouseEventKind,
+    },
     terminal::{self, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
@@ -28,9 +31,17 @@ pub enum WorkflowEvent {
     /// A step has started executing.
     StepStarted { name: String },
     /// A line of output from a step.
-    StepOutput { name: String, line: String, is_stderr: bool },
+    StepOutput {
+        name: String,
+        line: String,
+        is_stderr: bool,
+    },
     /// A step has finished.
-    StepFinished { name: String, status: StepStepStatus, duration_ms: u64 },
+    StepFinished {
+        name: String,
+        status: StepStepStatus,
+        duration_ms: u64,
+    },
     /// The entire workflow is done.
     Done { success: bool, duration_ms: u64 },
 }
@@ -44,6 +55,19 @@ pub enum WorkflowStepStatus {
     Failed,
     Skipped,
     TimedOut,
+}
+
+impl WorkflowStepStatus {
+    /// Unicode icon representing this status.
+    pub fn icon(&self) -> &'static str {
+        match self {
+            WorkflowStepStatus::Passed => "\u{2713}",   // ✓
+            WorkflowStepStatus::Failed => "\u{2717}",   // ✗
+            WorkflowStepStatus::Skipped => "\u{2014}",  // —
+            WorkflowStepStatus::TimedOut => "\u{23f0}", // ⏰
+            WorkflowStepStatus::Pending | WorkflowStepStatus::Running => "",
+        }
+    }
 }
 
 // Keep a short alias for the enum used in events.
@@ -148,7 +172,11 @@ impl TuiState {
                     self.scroll_to_bottom();
                 }
             }
-            WorkflowEvent::StepOutput { name, line, is_stderr } => {
+            WorkflowEvent::StepOutput {
+                name,
+                line,
+                is_stderr,
+            } => {
                 self.output_lines.push(OutputLine {
                     step_name: name,
                     text: line,
@@ -159,15 +187,13 @@ impl TuiState {
                     self.scroll_to_bottom();
                 }
             }
-            WorkflowEvent::StepFinished { name, status, duration_ms } => {
+            WorkflowEvent::StepFinished {
+                name,
+                status,
+                duration_ms,
+            } => {
                 // Add a completion marker in the output.
-                let icon = match status {
-                    WorkflowStepStatus::Passed => "\u{2713}",
-                    WorkflowStepStatus::Failed => "\u{2717}",
-                    WorkflowStepStatus::Skipped => "\u{2014}",
-                    WorkflowStepStatus::TimedOut => "\u{23f0}",
-                    _ => "\u{25cb}",
-                };
+                let icon = if status.icon().is_empty() { "\u{25cb}" } else { status.icon() };
                 self.output_lines.push(OutputLine {
                     step_name: name.clone(),
                     text: format!("{icon} finished ({duration_ms}ms)"),
@@ -181,7 +207,10 @@ impl TuiState {
                     self.scroll_to_bottom();
                 }
             }
-            WorkflowEvent::Done { success, duration_ms } => {
+            WorkflowEvent::Done {
+                success,
+                duration_ms,
+            } => {
                 self.done = true;
                 self.success = Some(success);
                 self.total_duration_ms = Some(duration_ms);
@@ -198,14 +227,9 @@ impl TuiState {
                     is_stderr: false,
                 });
                 for s in &self.steps {
-                    let icon = match s.status {
-                        WorkflowStepStatus::Passed => "\u{2713}",
-                        WorkflowStepStatus::Failed => "\u{2717}",
-                        WorkflowStepStatus::Skipped => "\u{2014}",
-                        WorkflowStepStatus::TimedOut => "\u{23f0}",
-                        _ => "\u{25cb}",
-                    };
-                    let dur = s.duration_ms
+                    let icon = if s.status.icon().is_empty() { "\u{25cb}" } else { s.status.icon() };
+                    let dur = s
+                        .duration_ms
                         .map(|ms| format!(" ({ms}ms)"))
                         .unwrap_or_default();
                     self.output_lines.push(OutputLine {
@@ -230,20 +254,29 @@ impl TuiState {
 
     fn visible_output_count(&self) -> usize {
         match &self.filter_step {
-            Some(name) => self.output_lines.iter().filter(|l| &l.step_name == name).count(),
+            Some(name) => self
+                .output_lines
+                .iter()
+                .filter(|l| &l.step_name == name)
+                .count(),
             None => self.output_lines.len(),
         }
     }
 
     fn visible_output(&self) -> Vec<&OutputLine> {
         match &self.filter_step {
-            Some(name) => self.output_lines.iter().filter(|l| &l.step_name == name).collect(),
+            Some(name) => self
+                .output_lines
+                .iter()
+                .filter(|l| &l.step_name == name)
+                .collect(),
             None => self.output_lines.iter().collect(),
         }
     }
 
     fn max_scroll(&self) -> usize {
-        self.visible_output_count().saturating_sub(self.output_inner_height)
+        self.visible_output_count()
+            .saturating_sub(self.output_inner_height)
     }
 
     fn scroll_to_bottom(&mut self) {
@@ -299,18 +332,13 @@ pub fn run_workflow_tui(
     }
 }
 
-/// Check if we should use the workflow TUI (same logic as list TUI).
+/// Check if we should use the workflow TUI.
+///
+/// Delegates to the shared gate — see `crate::gate::tui_enabled` for full check list.
+/// Loads `[tui] enabled` from config (best-effort) to honour the user's opt-out flag.
 pub fn should_use_tui() -> bool {
-    use crossterm::tty::IsTty;
-    if !io::stdout().is_tty() {
-        return false;
-    }
-    if let Ok(ctx) = std::env::var("LYNX_CONTEXT") {
-        if ctx == "agent" {
-            return false;
-        }
-    }
-    true
+    let config_tui = lynx_config::load().ok().map(|c| c.tui.enabled);
+    crate::gate::tui_enabled(config_tui)
 }
 
 // ── Event loop ─────────────────────────────────────────────────────────────
@@ -414,13 +442,11 @@ fn event_loop(
                         _ => {}
                     }
                 }
-                Event::Mouse(mouse) => {
-                    match mouse.kind {
-                        MouseEventKind::ScrollUp => state.scroll_up(3),
-                        MouseEventKind::ScrollDown => state.scroll_down(3),
-                        _ => {}
-                    }
-                }
+                Event::Mouse(mouse) => match mouse.kind {
+                    MouseEventKind::ScrollUp => state.scroll_up(3),
+                    MouseEventKind::ScrollDown => state.scroll_down(3),
+                    _ => {}
+                },
                 _ => {}
             }
         }
@@ -429,12 +455,7 @@ fn event_loop(
 
 // ── Rendering ──────────────────────────────────────────────────────────────
 
-fn render(
-    frame: &mut Frame,
-    workflow_name: &str,
-    colors: &TuiColors,
-    state: &mut TuiState,
-) {
+fn render(frame: &mut Frame, workflow_name: &str, colors: &TuiColors, state: &mut TuiState) {
     let area = frame.area();
 
     // Layout: top (main content) + bottom (status bar).
@@ -469,13 +490,17 @@ fn render_steps(
             let is_selected = state.list_state.selected() == Some(i);
             let is_filtered = state.filter_step.as_ref() == Some(&step.name);
 
-            let (icon, icon_color) = match step.status {
-                WorkflowStepStatus::Pending => ("\u{25cb}", colors.muted),   // ○
-                WorkflowStepStatus::Running => ("\u{25cf}", colors.accent),  // ●
-                WorkflowStepStatus::Passed => ("\u{2713}", colors.success),  // ✓
-                WorkflowStepStatus::Failed => ("\u{2717}", colors.error),    // ✗
-                WorkflowStepStatus::Skipped => ("\u{2014}", colors.muted),   // —
-                WorkflowStepStatus::TimedOut => ("\u{23f0}", colors.warning), // ⏰
+            let icon_color = match step.status {
+                WorkflowStepStatus::Pending | WorkflowStepStatus::Skipped => colors.muted,
+                WorkflowStepStatus::Running => colors.accent,
+                WorkflowStepStatus::Passed => colors.success,
+                WorkflowStepStatus::Failed => colors.error,
+                WorkflowStepStatus::TimedOut => colors.warning,
+            };
+            let icon = match step.status {
+                WorkflowStepStatus::Pending => "\u{25cb}", // ○
+                WorkflowStepStatus::Running => "\u{25cf}", // ●
+                _ => step.status.icon(),
             };
 
             let duration = step
@@ -518,10 +543,19 @@ fn render_steps(
         })
         .collect();
 
-    let completed = state.steps.iter().filter(|s| {
-        matches!(s.status, WorkflowStepStatus::Passed | WorkflowStepStatus::Failed
-            | WorkflowStepStatus::Skipped | WorkflowStepStatus::TimedOut)
-    }).count();
+    let completed = state
+        .steps
+        .iter()
+        .filter(|s| {
+            matches!(
+                s.status,
+                WorkflowStepStatus::Passed
+                    | WorkflowStepStatus::Failed
+                    | WorkflowStepStatus::Skipped
+                    | WorkflowStepStatus::TimedOut
+            )
+        })
+        .count();
 
     let title = format!(" {workflow_name} ({completed}/{}) ", state.steps.len());
 
@@ -539,12 +573,7 @@ fn render_steps(
     frame.render_stateful_widget(list, area, &mut state.list_state);
 }
 
-fn render_output(
-    frame: &mut Frame,
-    area: Rect,
-    colors: &TuiColors,
-    state: &mut TuiState,
-) {
+fn render_output(frame: &mut Frame, area: Rect, colors: &TuiColors, state: &mut TuiState) {
     // Update inner height for scroll calculations (before borrowing state).
     let inner_height = area.height.saturating_sub(2) as usize;
     state.output_inner_height = inner_height;
@@ -615,17 +644,18 @@ fn render_output(
     frame.render_widget(paragraph, area);
 }
 
-fn render_status_bar(
-    frame: &mut Frame,
-    area: Rect,
-    colors: &TuiColors,
-    state: &TuiState,
-) {
+fn render_status_bar(frame: &mut Frame, area: Rect, colors: &TuiColors, state: &TuiState) {
     let keys = if state.done {
         let status = if state.success.unwrap_or(false) {
-            Span::styled(" \u{2713} Done ", Style::default().fg(colors.success).bold())
+            Span::styled(
+                " \u{2713} Done ",
+                Style::default().fg(colors.success).bold(),
+            )
         } else {
-            Span::styled(" \u{2717} Failed ", Style::default().fg(colors.error).bold())
+            Span::styled(
+                " \u{2717} Failed ",
+                Style::default().fg(colors.error).bold(),
+            )
         };
 
         let dur = state

@@ -64,7 +64,7 @@ git-1.2.0/
 ```
 
 The installer strips the top-level component — contents land directly in
-`~/.local/share/lynx/plugins/<name>/`.
+`~/.config/lynx/plugins/<name>/`.
 
 ---
 

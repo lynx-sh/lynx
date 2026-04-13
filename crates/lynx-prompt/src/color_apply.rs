@@ -90,11 +90,24 @@ pub fn colorize(text: &str, color: &SegmentColor) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lynx_theme::terminal::override_capability;
+    use lynx_theme::terminal::{clear_capability_override, override_capability};
+
+    struct CapabilityGuard;
+
+    impl Drop for CapabilityGuard {
+        fn drop(&mut self) {
+            clear_capability_override();
+        }
+    }
+
+    fn set_capability(cap: TermCapability) -> CapabilityGuard {
+        override_capability(cap);
+        CapabilityGuard
+    }
 
     #[test]
     fn segment_with_fg_and_bg_emits_both_codes() {
-        override_capability(TermCapability::TrueColor);
+        let _cap = set_capability(TermCapability::TrueColor);
 
         let color = SegmentColor {
             fg: Some("white".to_string()),
@@ -102,14 +115,20 @@ mod tests {
             bold: false,
         };
         let result = apply_color_zsh("test", &color, TermCapability::TrueColor);
-        assert!(result.contains("38;"), "expected fg (38;) code in: {result:?}");
-        assert!(result.contains("48;"), "expected bg (48;) code in: {result:?}");
+        assert!(
+            result.contains("38;"),
+            "expected fg (38;) code in: {result:?}"
+        );
+        assert!(
+            result.contains("48;"),
+            "expected bg (48;) code in: {result:?}"
+        );
         assert!(result.contains("\x1b[0m"), "expected reset in: {result:?}");
     }
 
     #[test]
     fn colorize_emits_bg_when_set() {
-        override_capability(TermCapability::TrueColor);
+        let _cap = set_capability(TermCapability::TrueColor);
 
         let color = SegmentColor {
             fg: Some("white".to_string()),
@@ -117,7 +136,13 @@ mod tests {
             bold: false,
         };
         let result = colorize("test", &color);
-        assert!(result.contains("38;"), "expected fg code in colorize: {result:?}");
-        assert!(result.contains("48;"), "expected bg code in colorize: {result:?}");
+        assert!(
+            result.contains("38;"),
+            "expected fg code in colorize: {result:?}"
+        );
+        assert!(
+            result.contains("48;"),
+            "expected bg code in colorize: {result:?}"
+        );
     }
 }

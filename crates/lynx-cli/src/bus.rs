@@ -19,8 +19,7 @@ pub fn build_active_bus(context: &Context, plugins_dir: &Path) -> Arc<EventBus> 
 
     let mut registry = lifecycle::declare(plugins_dir);
 
-    let manifests: Vec<PluginManifest> =
-        registry.all().map(|e| e.manifest.clone()).collect();
+    let manifests: Vec<PluginManifest> = registry.all().map(|e| e.manifest.clone()).collect();
 
     let load_order = match lynx_depgraph::depgraph::resolve(&manifests) {
         Ok(o) => o,
@@ -40,9 +39,11 @@ pub fn build_active_bus(context: &Context, plugins_dir: &Path) -> Arc<EventBus> 
 
     for entry in registry.all() {
         if matches!(entry.state, PluginState::Resolved) {
-            if let Err(e) =
-                lifecycle::activate(&entry.manifest.plugin.name, &entry.manifest, Arc::clone(&bus))
-            {
+            if let Err(e) = lifecycle::activate(
+                &entry.manifest.plugin.name,
+                &entry.manifest,
+                Arc::clone(&bus),
+            ) {
                 tracing::warn!(plugin = %entry.manifest.plugin.name, "activate failed: {e}");
             }
         }

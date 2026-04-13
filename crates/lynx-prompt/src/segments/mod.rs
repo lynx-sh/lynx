@@ -1,53 +1,65 @@
-pub(crate) mod git_common;
 pub mod aws_profile;
 pub mod background_jobs;
 pub mod battery;
-pub mod custom;
-pub mod docker;
-pub mod gcp;
-pub mod golang_version;
-pub mod lang_version;
-pub mod node_version;
-pub mod ruby_version;
-pub mod rust_version;
 pub mod cmd_duration;
 pub mod conda_env;
 pub mod context_badge;
+pub mod custom;
 pub mod dir;
+pub mod docker;
 pub mod exit_code;
+pub mod gcp;
 pub mod git;
 pub mod git_action;
 pub mod git_ahead_behind;
+pub(crate) mod git_common;
 pub mod git_sha;
 pub mod git_stash;
 pub mod git_time_since_commit;
+pub mod golang_version;
 pub mod hist_number;
 pub mod hostname;
 pub mod kubectl;
+pub mod lang_version;
 pub mod newline;
+pub mod node_version;
 pub mod os;
 pub mod prompt_char;
+pub mod ruby_version;
+pub mod rust_version;
 pub mod shell;
-pub mod text;
 pub mod ssh_indicator;
 pub mod tasks;
 pub mod terraform;
+pub mod text;
 pub mod time_segment;
 pub mod username;
 pub mod venv;
 pub mod vi_mode;
 
+pub(super) fn cached_version<'a>(
+    ctx: &'a crate::segment::RenderContext,
+    cache_key: &str,
+) -> Option<&'a str> {
+    let version = ctx.cache.get(cache_key)?.get("version")?.as_str()?;
+    if version.is_empty() {
+        None
+    } else {
+        Some(version)
+    }
+}
+
 pub use aws_profile::AwsProfileSegment;
 pub use background_jobs::BackgroundJobsSegment;
 pub use battery::BatterySegment;
-pub use custom::CustomSegment;
-pub use docker::DockerSegment;
-pub use gcp::GcpSegment;
 pub use cmd_duration::CmdDurationSegment;
 pub use conda_env::CondaEnvSegment;
 pub use context_badge::ContextBadgeSegment;
+pub use custom::CustomSegment;
 pub use dir::DirSegment;
+pub use docker::DockerSegment;
 pub use exit_code::ExitCodeSegment;
+pub use gcp::GcpSegment;
 pub use git::{GitBranchSegment, GitStatusSegment};
 pub use git_action::GitActionSegment;
 pub use git_ahead_behind::GitAheadBehindSegment;
@@ -61,10 +73,10 @@ pub use newline::NewlineSegment;
 pub use os::OsSegment;
 pub use prompt_char::PromptCharSegment;
 pub use shell::ShellSegment;
-pub use text::TextSegment;
 pub use ssh_indicator::SshIndicatorSegment;
 pub use tasks::TaskStatusSegment;
 pub use terraform::TerraformSegment;
+pub use text::TextSegment;
 pub use time_segment::TimeSegment;
 pub use username::UsernameSegment;
 pub use venv::VenvSegment;

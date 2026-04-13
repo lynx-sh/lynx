@@ -8,7 +8,9 @@ use tracing::{error, info};
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt()
-        .with_env_filter(std::env::var(lynx_core::env_vars::LYNX_LOG).unwrap_or_else(|_| "info".into()))
+        .with_env_filter(
+            std::env::var(lynx_core::env_vars::LYNX_LOG).unwrap_or_else(|_| "info".into()),
+        )
         .init();
 
     info!("lynx-daemon starting");

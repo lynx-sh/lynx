@@ -24,6 +24,12 @@ Fast, Rust-powered zsh shell framework. Context-aware, plugin-isolated, theme-dr
 | [Ecosystem](ecosystem.md) | Everyone | Taps, package types, trust tiers, `lx install`, community taps |
 | [Registry Index Spec](registry-index-spec.md) | Registry maintainers | Index TOML format for taps and the official registry |
 
+## Configuration & Sync
+
+| Document | Audience | What it covers |
+|---|---|---|
+| [Config & Sync](config-and-sync.md) | Users | `lx config` subcommands, settable keys, `lx sync` git-backed sync |
+
 ## Workflow Engine
 
 | Document | Audience | What it covers |

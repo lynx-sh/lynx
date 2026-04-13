@@ -45,7 +45,9 @@ pub fn render_preview<T: ListItem>(
         .title(" Preview ")
         .title_style(Style::default().fg(colors.muted));
 
-    let paragraph = Paragraph::new(content).block(block).wrap(Wrap { trim: false });
+    let paragraph = Paragraph::new(content)
+        .block(block)
+        .wrap(Wrap { trim: false });
     frame.render_widget(paragraph, area);
 }
 

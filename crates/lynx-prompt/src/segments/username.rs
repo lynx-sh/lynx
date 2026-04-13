@@ -24,11 +24,7 @@ impl Segment for UsernameSegment {
             return None;
         }
         // Show as bold-red when running as root (UID=0).
-        let uid_zero = ctx
-            .env
-            .get("UID")
-            .map(|v| v == "0")
-            .unwrap_or(false);
+        let uid_zero = ctx.env.get("UID").map(|v| v == "0").unwrap_or(false);
         let text = if uid_zero {
             format!("\x1b[1;31m{user}\x1b[0m")
         } else {
@@ -46,7 +42,10 @@ mod tests {
     use std::collections::HashMap;
 
     fn ctx_with_env(pairs: &[(&str, &str)]) -> RenderContext {
-        let env = pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect();
+        let env = pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
         RenderContext {
             cwd: "/".into(),
             shell_context: lynx_core::types::Context::Interactive,
@@ -67,7 +66,11 @@ mod tests {
     fn root_renders_bold_red() {
         let ctx = ctx_with_env(&[("USER", "root"), ("UID", "0")]);
         let r = UsernameSegment.render(&empty_config(), &ctx).unwrap();
-        assert!(r.text.contains("\x1b[1;31m"), "expected bold-red ANSI: {}", r.text);
+        assert!(
+            r.text.contains("\x1b[1;31m"),
+            "expected bold-red ANSI: {}",
+            r.text
+        );
         assert!(r.text.contains("root"));
     }
 

@@ -3,6 +3,15 @@
 //! Always reference these constants instead of spelling variable names inline.
 //! This prevents typos, makes grep-based audits reliable, and gives AI agents
 //! one authoritative place to look up any env var name.
+//!
+//! # Allowlist ownership
+//!
+//! `scripts/check-env-vars.sh` (run in CI via `scripts/verify-guardrails.sh`) denies
+//! any quoted `"LYNX_*"` string literals or direct `env::var("LYNX_*")` calls outside
+//! **this file**. This file is the sole allowlisted source.
+//!
+//! To add a new env var: add a `pub const` here with a doc comment, then reference it
+//! everywhere else via the constant. Never spell the string inline in other crates.
 
 // ── Lynx runtime env vars ────────────────────────────────────────────────────
 
@@ -54,6 +63,11 @@ pub const LYNX_LOG: &str = "LYNX_LOG";
 /// Set to `"1"` to suppress plugin loading failures and start in degraded mode.
 pub const LYNX_SAFE_MODE: &str = "LYNX_SAFE_MODE";
 
+/// Set to `"1"` to disable all interactive TUI output globally.
+/// When set, all commands fall back to plain terminal output regardless of TTY state.
+/// Useful for scripts, CI pipelines, or users who prefer plain output.
+pub const LYNX_NO_TUI: &str = "LYNX_NO_TUI";
+
 /// Set to `"1"` by `lx benchmark` to gate benchmark-only codepaths.
 pub const LYNX_BENCHMARK_MODE: &str = "LYNX_BENCHMARK_MODE";
 
@@ -65,6 +79,15 @@ pub const LYNX_BG_JOBS: &str = "LYNX_BG_JOBS";
 
 /// Current vi-mode indicator (e.g. `"insert"`, `"normal"`). Set by the vi-mode plugin.
 pub const LYNX_VI_MODE: &str = "LYNX_VI_MODE";
+
+/// Root user marker exported by `lx refresh-state` for prompt symbol logic.
+pub const LYNX_USER_IS_ROOT: &str = "LYNX_USER_IS_ROOT";
+
+/// Shell history line number exported by shell hooks.
+pub const LYNX_HIST_NUMBER: &str = "LYNX_HIST_NUMBER";
+
+/// Current UNIX timestamp in seconds for time-based prompt segments.
+pub const LYNX_NOW_SECS: &str = "LYNX_NOW_SECS";
 
 // ── Agent detection env vars ─────────────────────────────────────────────────
 
@@ -99,17 +122,42 @@ pub fn plugin_guard_var(plugin_name: &str) -> String {
     )
 }
 
+/// Returns the canonical plugin state-cache variable name for a plugin.
+///
+/// Pattern: `LYNX_CACHE_{NAME_UPPERCASE_UNDERSCORED}_STATE`
+///
+/// Used by community plugin `state.gather` output checks and refresh-state tests.
+pub fn cache_state_var(plugin_name: &str) -> String {
+    format!(
+        "LYNX_CACHE_{}_STATE",
+        plugin_name.to_uppercase().replace('-', "_")
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn plugin_guard_var_normalizes_hyphens() {
-        assert_eq!(plugin_guard_var("my-plugin"), "LYNX_PLUGIN_MY_PLUGIN_LOADED");
+        assert_eq!(
+            plugin_guard_var("my-plugin"),
+            "LYNX_PLUGIN_MY_PLUGIN_LOADED"
+        );
     }
 
     #[test]
     fn plugin_guard_var_uppercase() {
         assert_eq!(plugin_guard_var("git"), "LYNX_PLUGIN_GIT_LOADED");
+    }
+
+    #[test]
+    fn cache_state_var_normalizes_hyphens() {
+        assert_eq!(cache_state_var("my-plugin"), "LYNX_CACHE_MY_PLUGIN_STATE");
+    }
+
+    #[test]
+    fn cache_state_var_uppercase() {
+        assert_eq!(cache_state_var("git"), "LYNX_CACHE_GIT_STATE");
     }
 }

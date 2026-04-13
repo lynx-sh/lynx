@@ -36,15 +36,23 @@ and file listings are all derived from the same palette.
 2. [Theme File Structure](#theme-file-structure)
 3. [Palette System](#palette-system)
 4. [Segment Layout](#segment-layout)
+   - [Continuation prompt (PROMPT2)](#continuation-prompt-prompt2)
+   - [Debug prompt (PROMPT4)](#debug-prompt-prompt4)
 5. [Universal Visibility](#universal-visibility)
+   - [Condition-based visibility](#condition-based-visibility-show_when--hide_when)
+   - [Folder-based visibility](#folder-based-visibility-include_folders--exclude_folders)
+   - [Conditional colors](#conditional-colors-color_when)
+   - [Per-segment separators](#per-segment-separators-leading_char--trailing_char)
+   - [Cache TTL](#cache-ttl-cache_ttl_ms)
 6. [Segment Format Strings](#segment-format-strings)
 7. [Custom Template Segments](#custom-template-segments)
 8. [Segment Reference](#segment-reference)
 9. [File Listing Colors](#file-listing-colors)
 10. [Color Formats](#color-formats)
-11. [Worked Example: Powerline-Style Theme](#worked-example-powerline-style-theme)
-12. [Testing Your Theme](#testing-your-theme)
-13. [Adding a Custom Segment in Rust](#adding-a-custom-segment-in-rust)
+11. [Separators](#separators)
+12. [Worked Example: Powerline-Style Theme](#worked-example-powerline-style-theme)
+13. [Testing Your Theme](#testing-your-theme)
+14. [Adding a Custom Segment in Rust](#adding-a-custom-segment-in-rust)
 
 ---
 
@@ -191,6 +199,61 @@ order = ["dir", "git_branch", "git_status"]
   silently omitted — no gap in the prompt
 - The same segment cannot appear in both `left` and `right` (use it once)
 
+Additional layout slots:
+
+| Slot | Shell variable | Description |
+|---|---|---|
+| `[segments.top]` | `PROMPT` (line 1) | Content above the input line (multi-line prompts) |
+| `[segments.top_right]` | `PROMPT` (line 1, right-aligned) | Right side of the top line; requires `top` to be non-empty |
+| `[segments.continuation]` | `PROMPT2` | Shown when input continues across lines (e.g. unclosed quote) |
+| `[segments.spacing]` | — | `true` to insert a blank line before the prompt |
+| `[segments.filler]` | — | Repeating character between `top` and `top_right` |
+
+### Continuation prompt (`PROMPT2`)
+
+The continuation prompt has two modes:
+
+**Segment mode** — evaluates existing segments (same as `left`/`right`):
+
+```toml
+[segments.continuation]
+order = ["prompt_char"]
+```
+
+**Template mode** — renders a fixed string with optional color. When `template`
+is set, `order` is ignored:
+
+```toml
+[segments.continuation]
+template = "… "
+fg = "#6272a4"
+```
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `order` | array | `[]` | Segment names to evaluate (segment mode) |
+| `template` | string | none | Fixed text to render (takes priority over `order`) |
+| `fg` | color | none | Foreground color for the template |
+| `bg` | color | none | Background color for the template |
+
+### Debug prompt (`PROMPT4`)
+
+Shown for each line traced when `set -x` (xtrace) is active. When absent, zsh
+uses its default `+ ` prefix. Unlike `continuation`, this is template-only —
+no segment evaluation.
+
+```toml
+[debug_prompt]
+template = "+ "
+fg = "#565f89"
+```
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `template` | string | *(required)* | Text prefix for each traced line |
+| `fg` | color | none | Foreground color |
+| `bg` | color | none | Background color |
+
 ---
 
 ## Universal Visibility
@@ -244,10 +307,80 @@ hide_when = { env_set = "CI" }              # hidden in CI environments
 | `in_git_repo` | `true` / `false` | git cache present (`true`) or absent (`false`) |
 | `cwd_matches` | `string` (glob) | current directory matches pattern (`~` expanded) |
 | `exit_code_nonzero` | `true` / `false` | last exit code non-zero (`true`) or zero (`false`) |
+| `cache_is_true` | `string` | named field in the segment's cache entry is boolean `true` |
 
 **Priority:** `show_in` / `hide_in` (context gate) is evaluated first. If the
 segment passes the context gate, `show_when` is checked next (takes priority
 over `hide_when`). Conditions are pure — no I/O, no subprocess calls.
+
+### Folder-based visibility (`include_folders` / `exclude_folders`)
+
+Show or hide a segment based on the current working directory. Both fields
+accept an array of glob patterns; `~` is expanded from the `HOME` env var.
+
+```toml
+[segment.venv]
+include_folders = ["~/projects/**", "~/work/**"]  # only in these trees
+
+[segment.dir]
+exclude_folders = ["/tmp/**", "/private/tmp/**"]  # never in tmp
+```
+
+- `include_folders` — segment only visible when cwd matches at least one pattern
+- `exclude_folders` — segment hidden when cwd matches any pattern
+- When both are set, `include_folders` takes precedence and `exclude_folders` is ignored
+- Applied after `show_in`/`hide_in` and `show_when`/`hide_when`
+
+### Conditional colors (`color_when`)
+
+Override a segment's color when a condition is met. `color_when` is an array of
+`[[segment.<name>.color_when]]` blocks; the first matching condition wins.
+Unset fields fall through to the base `color`.
+
+```toml
+[segment.git_branch]
+color = { fg = "yellow" }                        # base color
+
+[[segment.git_branch.color_when]]
+condition = { cache_is_true = "staged" }
+fg = "green"                                     # staged → green
+
+[[segment.git_branch.color_when]]
+condition = { cache_is_true = "modified" }
+fg = "red"                                       # dirty → red
+```
+
+All condition types from `show_when` are supported. Partial overrides work —
+set only `fg`, `bg`, or `bold`, and the rest falls through from the base color.
+
+### Per-segment separators (`leading_char` / `trailing_char`)
+
+Override the separator glyphs for a specific segment, independent of the global
+`[separators]` config. Useful for individual powerline caps or box-drawing
+decorators.
+
+```toml
+[segment.dir]
+leading_char  = "\ue0b6"   # left rounded cap before dir
+trailing_char = "\ue0b4"   # right chevron after dir
+```
+
+- `leading_char` — rendered immediately before the segment's content
+- `trailing_char` — rendered after the segment's content, replacing the normal gap separator between this segment and the next
+
+### Cache TTL (`cache_ttl_ms`)
+
+Control how long a segment's computed output is cached before the evaluator
+re-runs it. Useful for expensive segments when you want to trade freshness for
+speed.
+
+```toml
+[segment.git_status]
+cache_ttl_ms = 5000   # re-evaluate at most every 5 seconds
+```
+
+When absent, segments are re-evaluated on every prompt render. The evaluator
+uses the segment's declared `cache_key` to store and retrieve the cached value.
 
 ---
 
@@ -794,6 +927,155 @@ Show language version from the corresponding plugin cache.
 |---|---|---|---|
 | `icon` | string | none | Prefix icon |
 | `color` | color | none | Text color |
+
+---
+
+### `ruby_version` — Ruby Version
+
+Shows the Ruby version from `.ruby-version` or Bundler. Hidden when no Ruby
+plugin cache is present.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `color` | color | none | Text color |
+
+Default output: `💎 3.3.0`
+
+---
+
+### `battery` — Battery Level
+
+Shows battery percentage and charge state. Hidden when battery percentage is
+above `min_pct` or when no battery is detected (desktops).
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `min_pct` | integer | `100` | Only show when battery is at or below this percentage |
+| `charging_icon` | string | `` (nf-fa-bolt) | Icon when plugged in and charging |
+| `discharging_icon` | string | `` (nf-fa-battery_half) | Icon when on battery |
+| `full_icon` | string | `` (nf-fa-battery_full) | Icon when fully charged |
+| `color` | color | none | Text color |
+
+```toml
+[segment.battery]
+min_pct = 30             # only show when ≤30%
+charging_icon   = "⚡"
+discharging_icon = "🔋"
+color = { fg = "#f36943" }
+```
+
+On macOS, battery state is read from a `BATTERY_STATE` plugin cache entry. On
+Linux, `/sys/class/power_supply/BAT0/` is read directly (no subprocess).
+
+---
+
+### `docker` — Docker Context
+
+Shows the active Docker context. Hidden when context is `"default"` or
+`DOCKER_CONTEXT` is unset. Reads from env — no subprocess.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `icon` | string | `` (nf-linux-docker) | Prefix icon |
+| `color` | color | none | Text color |
+
+Default output: ` remote-prod`
+
+---
+
+### `gcp` — Google Cloud Project
+
+Shows the active GCP project. Hidden when unset. Reads `CLOUDSDK_CORE_PROJECT`
+first, falls back to `GCLOUD_PROJECT` — no subprocess.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `icon` | string | `` (nf-md-google_cloud) | Prefix icon |
+| `color` | color | none | Text color |
+
+Default output: ` my-project-id`
+
+---
+
+### `git_stash` — Git Stash Count
+
+Shows number of stash entries. Hidden when stash count is zero or outside a git
+repo.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `symbol` | string | `"⚑"` | Prefix symbol |
+| `color` | color | none | Text color |
+
+Default output: `⚑ 3`
+
+---
+
+### `os` — OS Icon
+
+Shows a Nerd Font icon for the current OS. Always visible — the OS doesn't
+change mid-session.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `icon` | string | auto-detected | Override the icon |
+| `color` | color | none | Text color |
+
+Auto-detected icons: macOS ``, Linux ``, Windows ``, FreeBSD ``, other ``.
+
+---
+
+### `terraform` — Terraform Workspace
+
+Shows the active Terraform workspace. Hidden when outside a Terraform project
+(no `.terraform/environment` file) or when the workspace is `"default"`. Reads
+from `.terraform/environment` — no subprocess.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `icon` | string | `` (nf-fa-tree) | Prefix icon |
+| `color` | color | none | Text color |
+
+Default output: ` staging`
+
+---
+
+### `shell` — Shell Name
+
+Shows the shell name. Lynx is zsh-only, so this always renders `"zsh"` unless
+overridden.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `name` | string | `"zsh"` | Override the shell name |
+| `icon` | string | none | Prefix icon |
+| `color` | color | none | Text color |
+
+```toml
+[segment.shell]
+icon = "\uf120"   # terminal icon
+```
+
+---
+
+### `text` — Static Text
+
+Renders arbitrary static text. Useful for box-drawing characters, labels, or
+separator glyphs. Hidden when `content` is empty or not set.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `content` | string | *(required)* | The text to render |
+| `color` | color | none | Text color |
+
+```toml
+[segment.text]
+content = "╭─"
+color   = { fg = "#21c7c7" }
+```
+
+Use multiple `custom_*` segments if you need different static text in different
+positions (e.g. `custom_box_open` / `custom_box_close`).
 
 ---
 

@@ -33,11 +33,11 @@ impl Segment for OsSegment {
 
 fn detect_os_icon() -> &'static str {
     match std::env::consts::OS {
-        "macos" => "\u{e711}",  // nf-md-apple
-        "linux" => "\u{e712}",  // nf-md-linux
+        "macos" => "\u{e711}",   // nf-md-apple
+        "linux" => "\u{e712}",   // nf-md-linux
         "windows" => "\u{e70f}", // nf-md-windows
         "freebsd" => "\u{f30c}", // nf-linux-freebsd
-        _ => "\u{f108}",        // nf-fa-desktop (fallback)
+        _ => "\u{f108}",         // nf-fa-desktop (fallback)
     }
 }
 

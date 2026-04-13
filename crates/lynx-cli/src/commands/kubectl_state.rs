@@ -42,7 +42,11 @@ fn kubectl(args: &[&str]) -> Option<String> {
         .ok()?;
     if out.status.success() {
         let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
-        if s.is_empty() { None } else { Some(s) }
+        if s.is_empty() {
+            None
+        } else {
+            Some(s)
+        }
     } else {
         None
     }
@@ -51,26 +55,34 @@ fn kubectl(args: &[&str]) -> Option<String> {
 pub(crate) fn gather_kubectl_state() -> KubectlState {
     // Bail fast if kubectl is not on PATH
     if lynx_core::paths::find_binary("kubectl").is_none() {
-        return KubectlState { context: None, namespace: None };
+        return KubectlState {
+            context: None,
+            namespace: None,
+        };
     }
 
     // Bail if no kubeconfig exists
-    let home = std::env::var("HOME").unwrap_or_default();
     let kubeconfig_env = std::env::var("KUBECONFIG").ok();
-    let default_kube = format!("{home}/.kube/config");
+    let default_kube = lynx_core::paths::home().join(".kube/config");
     let has_config = kubeconfig_env
         .as_deref()
         .map(|p| std::path::Path::new(p).exists())
-        .unwrap_or_else(|| std::path::Path::new(&default_kube).exists());
+        .unwrap_or_else(|| default_kube.exists());
 
     if !has_config {
-        return KubectlState { context: None, namespace: None };
+        return KubectlState {
+            context: None,
+            namespace: None,
+        };
     }
 
     let context = kubectl(&["config", "current-context"]);
     let namespace = kubectl(&[
-        "config", "view", "--minify",
-        "--output", "jsonpath={..namespace}",
+        "config",
+        "view",
+        "--minify",
+        "--output",
+        "jsonpath={..namespace}",
     ])
     .or_else(|| Some("default".to_string()));
 
@@ -79,7 +91,10 @@ pub(crate) fn gather_kubectl_state() -> KubectlState {
 
 pub(crate) fn render_zsh(state: &KubectlState) -> String {
     match &state.context {
-        None => "_lynx_kubectl_state=()\nexport LYNX_CACHE_KUBECTL_STATE=''\n".to_string(),
+        None => format!(
+            "_lynx_kubectl_state=()\nexport {}=''\n",
+            lynx_core::env_vars::LYNX_CACHE_KUBECTL_STATE
+        ),
         Some(ctx) => {
             let ns = state.namespace.as_deref().unwrap_or("default");
             let ctx_esc = ctx.replace('\'', "'\\''");
@@ -88,7 +103,8 @@ pub(crate) fn render_zsh(state: &KubectlState) -> String {
             let ns_json = ns.replace('\\', "\\\\").replace('"', "\\\"");
             let json = format!(r#"{{"context":"{ctx_json}","namespace":"{ns_json}"}}"#);
             format!(
-                "_lynx_kubectl_state=(context '{ctx_esc}' namespace '{ns_esc}')\nexport LYNX_CACHE_KUBECTL_STATE='{json}'\n"
+                "_lynx_kubectl_state=(context '{ctx_esc}' namespace '{ns_esc}')\nexport {cache_var}='{json}'\n",
+                cache_var = lynx_core::env_vars::LYNX_CACHE_KUBECTL_STATE,
             )
         }
     }
@@ -100,10 +116,16 @@ mod tests {
 
     #[test]
     fn render_clears_when_no_context() {
-        let state = KubectlState { context: None, namespace: None };
+        let state = KubectlState {
+            context: None,
+            namespace: None,
+        };
         let out = render_zsh(&state);
         assert!(out.contains("_lynx_kubectl_state=()"));
-        assert!(out.contains("export LYNX_CACHE_KUBECTL_STATE=''"));
+        assert!(out.contains(&format!(
+            "export {}=''",
+            lynx_core::env_vars::LYNX_CACHE_KUBECTL_STATE
+        )));
     }
 
     #[test]
@@ -137,7 +159,10 @@ mod tests {
             namespace: Some("api".into()),
         };
         let out = render_zsh(&state);
-        assert!(out.contains("export LYNX_CACHE_KUBECTL_STATE='"));
+        assert!(out.contains(&format!(
+            "export {}='",
+            lynx_core::env_vars::LYNX_CACHE_KUBECTL_STATE
+        )));
         assert!(out.contains(r#""context":"my-cluster""#));
     }
 }

@@ -186,10 +186,14 @@ mod tests {
         fn new(tmp: &tempfile::TempDir) -> Self {
             let lock = env_lock().lock().expect("env lock");
             let saved_home = std::env::var_os("HOME");
-            let saved_lynx_dir = std::env::var("LYNX_DIR").ok();
+            let saved_lynx_dir = std::env::var(lynx_core::env_vars::LYNX_DIR).ok();
             std::env::set_var("HOME", tmp.path());
-            std::env::remove_var("LYNX_DIR"); // force lynx_dir() to derive from HOME
-            Self { _lock: lock, saved_home, saved_lynx_dir }
+            std::env::remove_var(lynx_core::env_vars::LYNX_DIR); // force lynx_dir() to derive from HOME
+            Self {
+                _lock: lock,
+                saved_home,
+                saved_lynx_dir,
+            }
         }
     }
 
@@ -200,8 +204,8 @@ mod tests {
                 None => std::env::remove_var("HOME"),
             }
             match &self.saved_lynx_dir {
-                Some(v) => std::env::set_var("LYNX_DIR", v),
-                None => std::env::remove_var("LYNX_DIR"),
+                Some(v) => std::env::set_var(lynx_core::env_vars::LYNX_DIR, v),
+                None => std::env::remove_var(lynx_core::env_vars::LYNX_DIR),
             }
         }
     }

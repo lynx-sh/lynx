@@ -8,8 +8,10 @@ use anyhow::Result;
 use lynx_events::types::{Event, PLUGIN_LOADED};
 use lynx_manifest::schema::PluginManifest;
 use lynx_plugin::{exec::generate_exec_script, lifecycle};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
+
+use super::path::resolve_plugin_dir;
 
 /// Emit zsh that activates the plugin's exported symbols and sets its load guard.
 ///
@@ -42,17 +44,22 @@ pub(super) fn cmd_unload(name: &str) -> Result<()> {
 }
 
 fn generate_exec_script_for_plugin(name: &str) -> Result<String> {
-    let resolved_dir = resolve_plugin_dir(name)
-        .ok_or_else(|| anyhow::Error::from(lynx_core::error::LynxError::NotFound {
+    let resolved_dir = resolve_plugin_dir(name).ok_or_else(|| {
+        anyhow::Error::from(lynx_core::error::LynxError::NotFound {
             item_type: "Plugin".into(),
             name: name.to_string(),
             hint: "run `lx doctor` to diagnose".into(),
-        }))?;
+        })
+    })?;
 
-    let manifest = read_plugin_manifest(&resolved_dir)?
-        .ok_or_else(|| anyhow::Error::from(lynx_core::error::LynxError::Manifest(format!("plugin '{name}' has no plugin.toml"))))?;
+    let manifest = read_plugin_manifest(&resolved_dir)?.ok_or_else(|| {
+        anyhow::Error::from(lynx_core::error::LynxError::Manifest(format!(
+            "plugin '{name}' has no plugin.toml"
+        )))
+    })?;
 
-    generate_exec_script(&manifest, &resolved_dir).map_err(|e| anyhow::Error::from(lynx_core::error::LynxError::Plugin(e.to_string())))
+    generate_exec_script(&manifest, &resolved_dir)
+        .map_err(|e| anyhow::Error::from(lynx_core::error::LynxError::Plugin(e.to_string())))
 }
 
 fn generate_unload_script_for_plugin(name: &str) -> Result<String> {
@@ -64,31 +71,14 @@ fn generate_unload_script_for_plugin(name: &str) -> Result<String> {
     Ok(build_unload_script(name, manifest.as_ref()))
 }
 
-/// Resolve the plugin directory for the given name.
-///
-/// Checks the installed plugins dir first, then the in-repo plugins/ directory
-/// (used during development and tests).
-fn resolve_plugin_dir(name: &str) -> Option<PathBuf> {
-    let installed = lynx_core::paths::installed_plugins_dir().join(name);
-    if installed.exists() {
-        return Some(installed);
-    }
-
-    let repo = PathBuf::from("plugins").join(name);
-    if repo.exists() {
-        return Some(repo);
-    }
-
-    None
-}
-
 pub(super) fn read_plugin_manifest(plugin_dir: &Path) -> Result<Option<PluginManifest>> {
     let manifest_path = plugin_dir.join(lynx_core::brand::PLUGIN_MANIFEST);
     if !manifest_path.exists() {
         return Ok(None);
     }
     let content = std::fs::read_to_string(&manifest_path)?;
-    let manifest = lynx_manifest::parse(&content).map_err(|e| anyhow::Error::from(lynx_core::error::LynxError::Manifest(e.to_string())))?;
+    let manifest = lynx_manifest::parse(&content)
+        .map_err(|e| anyhow::Error::from(lynx_core::error::LynxError::Manifest(e.to_string())))?;
     Ok(Some(manifest))
 }
 
@@ -105,9 +95,7 @@ fn build_unload_script(name: &str, manifest: Option<&PluginManifest>) -> String 
         }
         for hook in &manifest.load.hooks {
             let fn_name = format!("_{}_plugin_{}", name.replace('-', "_"), hook);
-            out.push_str(&format!(
-                "add-zsh-hook -d {hook} {fn_name} 2>/dev/null\n"
-            ));
+            out.push_str(&format!("add-zsh-hook -d {hook} {fn_name} 2>/dev/null\n"));
         }
     }
 
@@ -118,13 +106,7 @@ fn build_unload_script(name: &str, manifest: Option<&PluginManifest>) -> String 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lynx_test_utils::{fixture_plugin, temp_home};
-    use std::sync::{Mutex, OnceLock};
-
-    fn env_lock() -> &'static Mutex<()> {
-        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-        LOCK.get_or_init(|| Mutex::new(()))
-    }
+    use lynx_test_utils::{env_lock, fixture_plugin, temp_home};
 
     struct EnvGuard {
         old_lynx_dir: Option<String>,
@@ -159,13 +141,19 @@ mod tests {
         assert!(script.contains("unalias gst 2>/dev/null"));
         // git plugin no longer self-registers hooks — lx refresh-state handles precmd
         assert!(!script.contains("add-zsh-hook"));
-        assert!(script.contains("unset LYNX_PLUGIN_GIT_LOADED"));
+        assert!(script.contains(&format!(
+            "unset {}",
+            lynx_core::env_vars::plugin_guard_var("git")
+        )));
     }
 
     #[test]
     fn build_unload_script_without_manifest_only_unsets_guard() {
         let script = build_unload_script("missing-plugin", None);
-        assert!(script.contains("unset LYNX_PLUGIN_MISSING_PLUGIN_LOADED"));
+        assert!(script.contains(&format!(
+            "unset {}",
+            lynx_core::env_vars::plugin_guard_var("missing-plugin")
+        )));
         assert!(!script.contains("unfunction"));
         assert!(!script.contains("unalias"));
     }
@@ -202,7 +190,7 @@ mod tests {
         let script = generate_exec_script_for_plugin("git").expect("exec script");
         // git plugin no longer self-registers hooks — lx refresh-state handles precmd
         assert!(!script.contains("add-zsh-hook"));
-        assert!(script.contains("LYNX_PLUGIN_GIT_LOADED"));
+        assert!(script.contains(&lynx_core::env_vars::plugin_guard_var("git")));
     }
 
     #[test]

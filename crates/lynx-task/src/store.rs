@@ -178,9 +178,13 @@ mod tests {
         std::fs::write(
             tmp.path().join("task1.jsonl"),
             format!("{}\n", serde_json::to_string(&entry).unwrap()),
-        ).unwrap();
+        )
+        .unwrap();
         let (time, exit) = read_last_run(tmp.path(), "task1");
-        assert!(time.contains("s ago"), "expected relative time, got: {time}");
+        assert!(
+            time.contains("s ago"),
+            "expected relative time, got: {time}"
+        );
         assert_eq!(exit, "0");
     }
 
@@ -194,7 +198,8 @@ mod tests {
         std::fs::write(
             tmp.path().join("slow.jsonl"),
             format!("{}\n", serde_json::to_string(&entry).unwrap()),
-        ).unwrap();
+        )
+        .unwrap();
         let (_time, exit) = read_last_run(tmp.path(), "slow");
         assert_eq!(exit, "timeout");
     }

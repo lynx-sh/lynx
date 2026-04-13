@@ -53,7 +53,8 @@ pub fn parse(content: &str) -> OmzTheme {
 
     // Detect two-line prompts — check both parsed PROMPT and raw content.
     if let Some(ref p) = prompt_str {
-        theme.two_line = p.contains("╭") || p.contains("╰") || p.contains("\\n") || p.contains("$'\\n'");
+        theme.two_line =
+            p.contains("╭") || p.contains("╰") || p.contains("\\n") || p.contains("$'\\n'");
     }
     if !theme.two_line {
         theme.two_line = content.contains("╭") || content.contains("╰");
@@ -72,10 +73,9 @@ pub fn parse(content: &str) -> OmzTheme {
     }
 
     // Check for ZSH_THEME_* customization.
-    if content.contains("ZSH_THEME_")
-        && theme.tier == Tier::Simple {
-            theme.tier = Tier::Customized;
-        }
+    if content.contains("ZSH_THEME_") && theme.tier == Tier::Simple {
+        theme.tier = Tier::Customized;
+    }
 
     theme
 }
@@ -86,9 +86,7 @@ fn extract_assignment(content: &str, var: &str) -> Option<String> {
     let mut result = String::new();
 
     // Match VAR= and VAR+= lines.
-    let re = Regex::new(&format!(
-        r#"(?m)^{var}\s*\+?=\s*\$?['"](.+?)['"]"#
-    )).ok()?;
+    let re = Regex::new(&format!(r#"(?m)^{var}\s*\+?=\s*\$?['"](.+?)['"]"#)).ok()?;
 
     for caps in re.captures_iter(content) {
         result.push_str(&caps[1]);
@@ -96,15 +94,17 @@ fn extract_assignment(content: &str, var: &str) -> Option<String> {
 
     if result.is_empty() {
         // Try multi-line (dot matches newline).
-        let re2 = Regex::new(&format!(
-            r#"(?ms)^{var}\s*\+?=\s*\$?['"](.+?)['"\n]"#
-        )).ok()?;
+        let re2 = Regex::new(&format!(r#"(?ms)^{var}\s*\+?=\s*\$?['"](.+?)['"\n]"#)).ok()?;
         for caps in re2.captures_iter(content) {
             result.push_str(&caps[1]);
         }
     }
 
-    if result.is_empty() { None } else { Some(result) }
+    if result.is_empty() {
+        None
+    } else {
+        Some(result)
+    }
 }
 
 /// Map OMZ prompt tokens and function calls to Lynx segment names.
@@ -142,7 +142,12 @@ fn extract_segments(prompt: &str) -> Vec<String> {
     }
 
     // %D{...} time format.
-    if Regex::new(r"%D\{").ok().map(|r| r.is_match(prompt)).unwrap_or(false) && seen.insert("time") {
+    if Regex::new(r"%D\{")
+        .ok()
+        .map(|r| r.is_match(prompt))
+        .unwrap_or(false)
+        && seen.insert("time")
+    {
         segs.push("time".to_string());
     }
 
@@ -206,9 +211,7 @@ fn identify_next_segment(text: &str) -> Option<String> {
 
 /// Best-effort segment extraction for agnoster-style themes.
 fn parse_agnoster_segments(content: &str, theme: &mut OmzTheme) {
-    let common = [
-        "dir", "git_branch", "git_status", "venv", "prompt_char",
-    ];
+    let common = ["dir", "git_branch", "git_status", "venv", "prompt_char"];
     // Look for prompt_segment calls to determine order.
     if content.contains("prompt_dir") || content.contains("prompt_context") {
         for seg in &common {
@@ -251,19 +254,47 @@ ZSH_THEME_GIT_PROMPT_CLEAN="%{$fg[blue]%})"
     #[test]
     fn parse_robbyrussell() {
         let theme = parse(ROBBYRUSSELL);
-        assert!(theme.left.contains(&"dir".to_string()), "expected dir: {:?}", theme.left);
-        assert!(theme.left.contains(&"git_branch".to_string()), "expected git_branch: {:?}", theme.left);
+        assert!(
+            theme.left.contains(&"dir".to_string()),
+            "expected dir: {:?}",
+            theme.left
+        );
+        assert!(
+            theme.left.contains(&"git_branch".to_string()),
+            "expected git_branch: {:?}",
+            theme.left
+        );
         assert_eq!(theme.tier, Tier::Customized);
     }
 
     #[test]
     fn parse_candy() {
         let theme = parse(CANDY);
-        assert!(theme.left.contains(&"username".to_string()), "expected username: {:?}", theme.left);
-        assert!(theme.left.contains(&"hostname".to_string()), "expected hostname: {:?}", theme.left);
-        assert!(theme.left.contains(&"time".to_string()), "expected time: {:?}", theme.left);
-        assert!(theme.left.contains(&"dir".to_string()), "expected dir: {:?}", theme.left);
-        assert!(theme.left.contains(&"git_branch".to_string()), "expected git_branch: {:?}", theme.left);
+        assert!(
+            theme.left.contains(&"username".to_string()),
+            "expected username: {:?}",
+            theme.left
+        );
+        assert!(
+            theme.left.contains(&"hostname".to_string()),
+            "expected hostname: {:?}",
+            theme.left
+        );
+        assert!(
+            theme.left.contains(&"time".to_string()),
+            "expected time: {:?}",
+            theme.left
+        );
+        assert!(
+            theme.left.contains(&"dir".to_string()),
+            "expected dir: {:?}",
+            theme.left
+        );
+        assert!(
+            theme.left.contains(&"git_branch".to_string()),
+            "expected git_branch: {:?}",
+            theme.left
+        );
     }
 
     #[test]

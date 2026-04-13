@@ -1,8 +1,9 @@
-use lynx_core::error::LynxError;
 use anyhow::Result;
 use clap::{Args, Subcommand};
+use lynx_core::error::LynxError;
 
 use lynx_config::{load, snapshot::mutate_config_transaction};
+use lynx_core::env_vars;
 use lynx_core::types::Context;
 use lynx_events::types::{Event, SHELL_CONTEXT_CHANGED};
 use lynx_shell::context::{detect_context_outcome, DetectionMethod};
@@ -32,7 +33,11 @@ pub async fn run(args: ContextArgs) -> Result<()> {
             if args.len() == 1 {
                 cmd_set(&args[0]).await
             } else {
-                Err(LynxError::unknown_command(args.first().map(|s| s.as_str()).unwrap_or(""), "context").into())
+                Err(LynxError::unknown_command(
+                    super::unknown_subcmd_name(&args),
+                    "context",
+                )
+                .into())
             }
         }
     }
@@ -52,7 +57,7 @@ async fn cmd_set(name: &str) -> Result<()> {
     bus.emit(Event::new(SHELL_CONTEXT_CHANGED, data)).await;
 
     // Print the eval-bridge export statement for the shell to evaluate.
-    println!("export LYNX_CONTEXT={name}");
+    println!("export {}={name}", env_vars::LYNX_CONTEXT);
     println!("context switched to '{name}'");
     Ok(())
 }
@@ -60,40 +65,30 @@ async fn cmd_set(name: &str) -> Result<()> {
 fn cmd_status() -> Result<()> {
     let cfg = load()?;
     let outcome = detect_context_outcome();
-    let detected = context_str(&outcome.context).to_string();
+    let detected = outcome.context.as_str().to_string();
     let method = match outcome.method {
-        DetectionMethod::Override => "manual override (LYNX_CONTEXT)".to_string(),
+        DetectionMethod::Override => format!("manual override ({})", env_vars::LYNX_CONTEXT),
         DetectionMethod::AgentEnv(var) => format!("auto-detected agent ({var})"),
         DetectionMethod::MinimalEnv(var) => format!("auto-detected minimal ({var})"),
         DetectionMethod::DefaultInteractive => "auto-detected interactive (default)".to_string(),
     };
 
-    println!("Context:   {}", context_str(&cfg.active_context));
+    println!("Context:   {}", cfg.active_context.as_str());
     println!("Detected:  {detected} ({method})");
-    println!("Stored:    {}", context_str(&cfg.active_context));
+    println!("Stored:    {}", cfg.active_context.as_str());
 
     Ok(())
 }
 
-fn context_str(ctx: &Context) -> &'static str {
-    match ctx {
-        Context::Interactive => "interactive",
-        Context::Agent => "agent",
-        Context::Minimal => "minimal",
-    }
-}
-
 fn parse_context(s: &str) -> anyhow::Result<Context> {
-    match s {
-        "interactive" => Ok(Context::Interactive),
-        "agent" => Ok(Context::Agent),
-        "minimal" => Ok(Context::Minimal),
-        other => Err(LynxError::NotFound {
+    Context::parse(s).ok_or_else(|| {
+        LynxError::NotFound {
             item_type: "Context".into(),
-            name: other.to_string(),
+            name: s.to_string(),
             hint: "valid contexts: interactive, agent, minimal".into(),
-        }.into()),
-    }
+        }
+        .into()
+    })
 }
 
 #[cfg(test)]
@@ -102,7 +97,10 @@ mod tests {
 
     #[test]
     fn parse_context_interactive() {
-        assert!(matches!(parse_context("interactive").unwrap(), Context::Interactive));
+        assert!(matches!(
+            parse_context("interactive").unwrap(),
+            Context::Interactive
+        ));
     }
 
     #[test]
@@ -112,15 +110,24 @@ mod tests {
 
     #[test]
     fn parse_context_minimal() {
-        assert!(matches!(parse_context("minimal").unwrap(), Context::Minimal));
+        assert!(matches!(
+            parse_context("minimal").unwrap(),
+            Context::Minimal
+        ));
     }
 
     #[test]
     fn parse_context_invalid_returns_not_found() {
         let err = parse_context("bogus").unwrap_err();
         let msg = err.to_string();
-        assert!(msg.contains("bogus"), "error should contain the invalid name: {msg}");
-        assert!(msg.contains("Context"), "error should mention item type: {msg}");
+        assert!(
+            msg.contains("bogus"),
+            "error should contain the invalid name: {msg}"
+        );
+        assert!(
+            msg.contains("Context"),
+            "error should mention item type: {msg}"
+        );
     }
 
     #[test]
@@ -136,10 +143,10 @@ mod tests {
     }
 
     #[test]
-    fn context_str_round_trips() {
-        assert_eq!(context_str(&Context::Interactive), "interactive");
-        assert_eq!(context_str(&Context::Agent), "agent");
-        assert_eq!(context_str(&Context::Minimal), "minimal");
+    fn context_as_str_round_trips() {
+        assert_eq!(Context::Interactive.as_str(), "interactive");
+        assert_eq!(Context::Agent.as_str(), "agent");
+        assert_eq!(Context::Minimal.as_str(), "minimal");
     }
 
     #[test]

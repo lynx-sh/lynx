@@ -5,11 +5,12 @@
 //   registry_ops.rs — search, info, update, checksum, index-validate
 //   shell_glue.rs   — exec and unload (eval-bridge script generation)
 
-use anyhow::{Result};
-use lynx_core::error::LynxError;
+use anyhow::Result;
 use clap::{Args, Subcommand};
 use lynx_config::{load as load_config, snapshot::mutate_config_transaction};
+use lynx_core::error::LynxError;
 
+mod path;
 mod registry_ops;
 mod scaffold;
 mod shell_glue;
@@ -127,11 +128,12 @@ pub async fn run(args: PluginArgs) -> Result<()> {
             crate::commands::examples::run(crate::commands::examples::ExamplesArgs {
                 command: Some("plugin".into()),
             })
-            
         }
-        PluginCommand::Other(args) => {
-            Err(LynxError::unknown_command(args.first().map(|s| s.as_str()).unwrap_or(""), "plugin").into())
-        }
+        PluginCommand::Other(args) => Err(LynxError::unknown_command(
+            super::unknown_subcmd_name(&args),
+            "plugin",
+        )
+        .into()),
     }
 }
 
@@ -140,10 +142,9 @@ async fn cmd_add(path: &str) -> Result<()> {
     // Check installed dir and in-repo plugins/ first (bundled plugins) before hitting registry.
     if !path.contains('/') && !path.contains('\\') {
         let name = path;
-        let installed = lynx_core::paths::installed_plugins_dir().join(name);
-        let in_repo = std::path::PathBuf::from("plugins").join(name);
-        if installed.join(lynx_core::brand::PLUGIN_MANIFEST).exists()
-            || in_repo.join(lynx_core::brand::PLUGIN_MANIFEST).exists()
+        if path::resolve_plugin_dir(name)
+            .map(|dir| dir.join(lynx_core::brand::PLUGIN_MANIFEST).exists())
+            .unwrap_or(false)
         {
             return cmd_enable(name);
         }
@@ -154,12 +155,16 @@ async fn cmd_add(path: &str) -> Result<()> {
     let manifest_path = plugin_path.join(lynx_core::brand::PLUGIN_MANIFEST);
 
     if !manifest_path.exists() {
-        return Err(LynxError::Manifest(format!("no plugin.toml found at {}", manifest_path.display())).into());
+        return Err(LynxError::Manifest(format!(
+            "no plugin.toml found at {}",
+            manifest_path.display()
+        ))
+        .into());
     }
 
     let content = std::fs::read_to_string(&manifest_path)?;
-    let manifest =
-        lynx_manifest::parse_and_validate(&content).map_err(|e| anyhow::Error::from(lynx_core::error::LynxError::Manifest(e.to_string())))?;
+    let manifest = lynx_manifest::parse_and_validate(&content)
+        .map_err(|e| anyhow::Error::from(lynx_core::error::LynxError::Manifest(e.to_string())))?;
 
     let name = manifest.plugin.name;
     let config = load_config()?;

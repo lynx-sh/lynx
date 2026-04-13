@@ -23,7 +23,8 @@ pub fn apply_patch(content: &str, dot_path: &str, value: &str) -> Result<String>
     }
 
     set_scalar_at_path(&mut root, &parts, value)?;
-    toml::to_string_pretty(&root).map_err(|e| anyhow::Error::from(LynxError::Theme(format!("TOML serialise error: {e}"))))
+    toml::to_string_pretty(&root)
+        .map_err(|e| anyhow::Error::from(LynxError::Theme(format!("TOML serialise error: {e}"))))
 }
 
 fn set_scalar_at_path(node: &mut toml::Value, parts: &[&str], value: &str) -> Result<()> {
@@ -34,7 +35,9 @@ fn set_scalar_at_path(node: &mut toml::Value, parts: &[&str], value: &str) -> Re
                 t.insert(key.to_string(), toml::Value::String(value.to_string()));
                 Ok(())
             }
-            _ => Err(LynxError::Theme(format!("cannot set key '{key}' on a non-table value")).into()),
+            _ => {
+                Err(LynxError::Theme(format!("cannot set key '{key}' on a non-table value")).into())
+            }
         }
     } else {
         match node {
@@ -44,7 +47,9 @@ fn set_scalar_at_path(node: &mut toml::Value, parts: &[&str], value: &str) -> Re
                     .or_insert_with(|| toml::Value::Table(toml::map::Map::new()));
                 set_scalar_at_path(child, &parts[1..], value)
             }
-            _ => Err(LynxError::Theme(format!("path traverses a non-table value at '{key}'")).into()),
+            _ => {
+                Err(LynxError::Theme(format!("path traverses a non-table value at '{key}'")).into())
+            }
         }
     }
 }
@@ -76,7 +81,8 @@ pub fn apply_array_op(content: &str, dot_path: &str, op: ArrayOp) -> Result<Stri
     }
 
     apply_op_at_path(&mut root, &parts, op)?;
-    toml::to_string_pretty(&root).map_err(|e| anyhow::Error::from(LynxError::Theme(format!("TOML serialise error: {e}"))))
+    toml::to_string_pretty(&root)
+        .map_err(|e| anyhow::Error::from(LynxError::Theme(format!("TOML serialise error: {e}"))))
 }
 
 fn apply_op_at_path(node: &mut toml::Value, parts: &[&str], op: ArrayOp) -> Result<()> {
@@ -84,9 +90,9 @@ fn apply_op_at_path(node: &mut toml::Value, parts: &[&str], op: ArrayOp) -> Resu
     if parts.len() == 1 {
         match node {
             toml::Value::Table(t) => {
-                let arr = t
-                    .get_mut(key)
-                    .ok_or_else(|| anyhow::Error::from(LynxError::Theme(format!("path '{key}' not found in TOML"))))?;
+                let arr = t.get_mut(key).ok_or_else(|| {
+                    anyhow::Error::from(LynxError::Theme(format!("path '{key}' not found in TOML")))
+                })?;
                 apply_op_to_array(arr, op)
             }
             _ => Err(LynxError::Theme(format!("cannot index non-table at '{key}'")).into()),
@@ -94,9 +100,11 @@ fn apply_op_at_path(node: &mut toml::Value, parts: &[&str], op: ArrayOp) -> Resu
     } else {
         match node {
             toml::Value::Table(t) => {
-                let child = t
-                    .get_mut(key)
-                    .ok_or_else(|| anyhow::Error::from(LynxError::Theme(format!("path segment '{key}' not found in TOML"))))?;
+                let child = t.get_mut(key).ok_or_else(|| {
+                    anyhow::Error::from(LynxError::Theme(format!(
+                        "path segment '{key}' not found in TOML"
+                    )))
+                })?;
                 apply_op_at_path(child, &parts[1..], op)
             }
             _ => Err(LynxError::Theme(format!("path traverses non-table at '{key}'")).into()),
@@ -167,7 +175,9 @@ impl std::str::FromStr for Side {
         match s.to_ascii_lowercase().as_str() {
             "left" => Ok(Side::Left),
             "right" => Ok(Side::Right),
-            other => Err(LynxError::Theme(format!("expected 'left' or 'right', got '{other}'")).into()),
+            other => {
+                Err(LynxError::Theme(format!("expected 'left' or 'right', got '{other}'")).into())
+            }
         }
     }
 }
@@ -201,7 +211,12 @@ pub fn segment_remove(content: &str, name: &str) -> Result<String> {
 
 /// Move a segment to `target` side (removes from the other side first).
 /// If `after` is given, inserts after that segment; otherwise appends.
-pub fn segment_move(content: &str, name: &str, target: Side, after: Option<&str>) -> Result<String> {
+pub fn segment_move(
+    content: &str,
+    name: &str,
+    target: Side,
+    after: Option<&str>,
+) -> Result<String> {
     // Remove from the other side (no-op if absent).
     let removed = apply_array_op(
         content,
@@ -268,9 +283,12 @@ color = { fg = "$accent" }
 
     #[test]
     fn array_append_new() {
-        let result =
-            apply_array_op(BASE_TOML, "segments.left.order", ArrayOp::Append("venv".into()))
-                .unwrap();
+        let result = apply_array_op(
+            BASE_TOML,
+            "segments.left.order",
+            ArrayOp::Append("venv".into()),
+        )
+        .unwrap();
         let v: toml::Value = toml::from_str(&result).unwrap();
         let arr: Vec<&str> = v["segments"]["left"]["order"]
             .as_array()
@@ -283,9 +301,12 @@ color = { fg = "$accent" }
 
     #[test]
     fn array_append_no_duplicate() {
-        let result =
-            apply_array_op(BASE_TOML, "segments.left.order", ArrayOp::Append("dir".into()))
-                .unwrap();
+        let result = apply_array_op(
+            BASE_TOML,
+            "segments.left.order",
+            ArrayOp::Append("dir".into()),
+        )
+        .unwrap();
         let v: toml::Value = toml::from_str(&result).unwrap();
         let arr = v["segments"]["left"]["order"].as_array().unwrap();
         assert_eq!(arr.iter().filter(|x| x.as_str() == Some("dir")).count(), 1);

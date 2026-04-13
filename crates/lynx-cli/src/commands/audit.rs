@@ -38,7 +38,10 @@ impl lynx_tui::ListItem for AuditEntry {
     }
 
     fn subtitle(&self) -> String {
-        format!("{} · {} fn, {} alias · {}", self.source, self.fn_count, self.alias_count, self.context)
+        format!(
+            "{} · {} fn, {} alias · {}",
+            self.source, self.fn_count, self.alias_count, self.context
+        )
     }
 
     fn detail(&self) -> String {
@@ -250,16 +253,29 @@ mod tests {
     #[test]
     fn audit_entry_subtitle_shows_counts() {
         use lynx_tui::ListItem;
-        let entry = make_entry("git", "bundled", vec!["a".into(), "b".into()], vec!["g".into()]);
+        let entry = make_entry(
+            "git",
+            "bundled",
+            vec!["a".into(), "b".into()],
+            vec!["g".into()],
+        );
         let sub = entry.subtitle();
         assert!(sub.contains("2 fn"), "subtitle should show fn count: {sub}");
-        assert!(sub.contains("1 alias"), "subtitle should show alias count: {sub}");
+        assert!(
+            sub.contains("1 alias"),
+            "subtitle should show alias count: {sub}"
+        );
     }
 
     #[test]
     fn audit_entry_detail_includes_all_fields() {
         use lynx_tui::ListItem;
-        let entry = make_entry("git", "bundled", vec!["git_status".into()], vec!["gs".into()]);
+        let entry = make_entry(
+            "git",
+            "bundled",
+            vec!["git_status".into()],
+            vec!["gs".into()],
+        );
         let detail = entry.detail();
         assert!(detail.contains("Name:"));
         assert!(detail.contains("Version:"));

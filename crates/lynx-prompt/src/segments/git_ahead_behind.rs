@@ -41,8 +41,16 @@ impl Segment for GitAheadBehindSegment {
         let ahead_sym = cfg.ahead_symbol.unwrap_or_else(|| "↑".to_string());
         let behind_sym = cfg.behind_symbol.unwrap_or_else(|| "↓".to_string());
 
-        let ahead_str = if ahead > 0 { format!("{ahead_sym}{ahead}") } else { String::new() };
-        let behind_str = if behind > 0 { format!("{behind_sym}{behind}") } else { String::new() };
+        let ahead_str = if ahead > 0 {
+            format!("{ahead_sym}{ahead}")
+        } else {
+            String::new()
+        };
+        let behind_str = if behind > 0 {
+            format!("{behind_sym}{behind}")
+        } else {
+            String::new()
+        };
 
         let text = match cfg.format.as_deref() {
             Some(tmpl) => {
@@ -52,8 +60,12 @@ impl Segment for GitAheadBehindSegment {
             }
             None => {
                 let mut parts: Vec<&str> = Vec::new();
-                if !ahead_str.is_empty() { parts.push(&ahead_str); }
-                if !behind_str.is_empty() { parts.push(&behind_str); }
+                if !ahead_str.is_empty() {
+                    parts.push(&ahead_str);
+                }
+                if !behind_str.is_empty() {
+                    parts.push(&behind_str);
+                }
                 parts.join(" ")
             }
         };
@@ -117,8 +129,11 @@ mod tests {
 
     #[test]
     fn custom_symbols() {
-        let cfg: toml::Value = toml::from_str(r#"ahead_symbol = "⇡"
-behind_symbol = "⇣""#).unwrap();
+        let cfg: toml::Value = toml::from_str(
+            r#"ahead_symbol = "⇡"
+behind_symbol = "⇣""#,
+        )
+        .unwrap();
         let ctx = ctx_with_counts(3, 1);
         let r = GitAheadBehindSegment.render(&cfg, &ctx).unwrap();
         assert_eq!(r.text, "⇡3 ⇣1");

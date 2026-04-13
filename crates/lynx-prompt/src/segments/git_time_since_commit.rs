@@ -35,7 +35,7 @@ impl Segment for GitTimeSinceCommitSegment {
         let commit_ts = git_state_u64(ctx, "commit_ts")?;
         let now_secs = ctx
             .env
-            .get("LYNX_NOW_SECS")
+            .get(lynx_core::env_vars::LYNX_NOW_SECS)
             .and_then(|s| s.parse::<u64>().ok())
             .unwrap_or(0);
 
@@ -66,10 +66,7 @@ impl Segment for GitTimeSinceCommitSegment {
             },
         );
 
-        Some(
-            RenderedSegment::new(&colored_text)
-                .with_cache_key("git_time_since_commit"),
-        )
+        Some(RenderedSegment::new(&colored_text).with_cache_key("git_time_since_commit"))
     }
 }
 
@@ -109,7 +106,10 @@ mod tests {
             serde_json::json!({"branch": "main", "commit_ts": commit_ts}),
         );
         let mut env = HashMap::new();
-        env.insert("LYNX_NOW_SECS".to_string(), now_secs.to_string());
+        env.insert(
+            lynx_core::env_vars::LYNX_NOW_SECS.to_string(),
+            now_secs.to_string(),
+        );
         RenderContext {
             cwd: "/repo".into(),
             shell_context: lynx_core::types::Context::Interactive,
@@ -128,7 +128,9 @@ mod tests {
             cache: HashMap::new(),
             env: HashMap::new(),
         };
-        assert!(GitTimeSinceCommitSegment.render(&empty_config(), &ctx).is_none());
+        assert!(GitTimeSinceCommitSegment
+            .render(&empty_config(), &ctx)
+            .is_none());
     }
 
     #[test]
@@ -145,50 +147,82 @@ mod tests {
             cache,
             env: HashMap::new(),
         };
-        assert!(GitTimeSinceCommitSegment.render(&empty_config(), &ctx).is_none());
+        assert!(GitTimeSinceCommitSegment
+            .render(&empty_config(), &ctx)
+            .is_none());
     }
 
     #[test]
     fn fresh_5_minutes() {
         override_capability(TermCapability::TrueColor);
         let ctx = ctx_with_ts(1000, 1300); // 300s = 5m
-        let seg = GitTimeSinceCommitSegment.render(&empty_config(), &ctx).unwrap();
+        let seg = GitTimeSinceCommitSegment
+            .render(&empty_config(), &ctx)
+            .unwrap();
         assert!(seg.text.contains("5m"), "expected '5m' in: {:?}", seg.text);
         // fresh = green, named_to_rgb("green") = (158,206,106) → 38;2;158;206;106
-        assert!(seg.text.contains("38;2;158;206;106"), "expected green color in: {:?}", seg.text);
+        assert!(
+            seg.text.contains("38;2;158;206;106"),
+            "expected green color in: {:?}",
+            seg.text
+        );
     }
 
     #[test]
     fn warn_20_minutes() {
         override_capability(TermCapability::TrueColor);
         let ctx = ctx_with_ts(1000, 2200); // 1200s = 20m
-        let seg = GitTimeSinceCommitSegment.render(&empty_config(), &ctx).unwrap();
-        assert!(seg.text.contains("20m"), "expected '20m' in: {:?}", seg.text);
+        let seg = GitTimeSinceCommitSegment
+            .render(&empty_config(), &ctx)
+            .unwrap();
+        assert!(
+            seg.text.contains("20m"),
+            "expected '20m' in: {:?}",
+            seg.text
+        );
         // warn = yellow, named_to_rgb("yellow") = (224,175,104)
-        assert!(seg.text.contains("38;2;224;175;104"), "expected yellow color in: {:?}", seg.text);
+        assert!(
+            seg.text.contains("38;2;224;175;104"),
+            "expected yellow color in: {:?}",
+            seg.text
+        );
     }
 
     #[test]
     fn old_2_hours() {
         override_capability(TermCapability::TrueColor);
         let ctx = ctx_with_ts(1000, 8200); // 7200s = 2h
-        let seg = GitTimeSinceCommitSegment.render(&empty_config(), &ctx).unwrap();
-        assert!(seg.text.contains("2h0m"), "expected '2h0m' in: {:?}", seg.text);
+        let seg = GitTimeSinceCommitSegment
+            .render(&empty_config(), &ctx)
+            .unwrap();
+        assert!(
+            seg.text.contains("2h0m"),
+            "expected '2h0m' in: {:?}",
+            seg.text
+        );
         // old = red, named_to_rgb("red") = (247,118,142)
-        assert!(seg.text.contains("38;2;247;118;142"), "expected red color in: {:?}", seg.text);
+        assert!(
+            seg.text.contains("38;2;247;118;142"),
+            "expected red color in: {:?}",
+            seg.text
+        );
     }
 
     #[test]
     fn days_format() {
         let ctx = ctx_with_ts(1000, 1000 + 86400 * 3 + 3600); // 3d+1h
-        let seg = GitTimeSinceCommitSegment.render(&empty_config(), &ctx).unwrap();
+        let seg = GitTimeSinceCommitSegment
+            .render(&empty_config(), &ctx)
+            .unwrap();
         assert!(seg.text.contains("3d"), "expected '3d' in: {:?}", seg.text);
     }
 
     #[test]
     fn cache_key_is_correct() {
         let ctx = ctx_with_ts(1000, 1300);
-        let seg = GitTimeSinceCommitSegment.render(&empty_config(), &ctx).unwrap();
+        let seg = GitTimeSinceCommitSegment
+            .render(&empty_config(), &ctx)
+            .unwrap();
         assert_eq!(seg.cache_key.as_deref(), Some("git_time_since_commit"));
     }
 

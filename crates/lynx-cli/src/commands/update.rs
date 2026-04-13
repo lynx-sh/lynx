@@ -1,9 +1,10 @@
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use anyhow::{Result};
-use lynx_core::error::LynxError;
+use anyhow::{Context, Result};
 use clap::Args;
+use lynx_core::error::LynxError;
+use sha2::{Digest, Sha256};
 
 use lynx_core::brand;
 
@@ -87,31 +88,96 @@ fn do_update(version: &str, yes: bool) -> Result<()> {
         std::fs::set_permissions(&tmp, perms)?;
     }
 
-    std::fs::rename(&tmp, &current_bin)
-        .map_err(|e| anyhow::Error::from(lynx_core::error::LynxError::Io {
+    std::fs::rename(&tmp, &current_bin).map_err(|e| {
+        anyhow::Error::from(lynx_core::error::LynxError::Io {
             message: format!("failed to replace binary: {e}"),
             path: current_bin.clone(),
             fix: "check file permissions or try running with sudo".into(),
-        }))?;
+        })
+    })?;
 
     println!("Updated to {version}. Restart your shell or run: exec lx");
     Ok(())
 }
 
 fn fetch_latest_version() -> Result<String> {
-    // In a real implementation this calls the GitHub releases API.
-    // For now return current version to avoid network calls in tests.
-    // Real: GET https://api.github.com/repos/lynx-sh/lynx/releases/latest
-    Ok(brand::VERSION.to_string())
+    let api_url = format!(
+        "https://api.github.com/repos/{}/releases/latest",
+        brand::REPO.trim_start_matches("https://github.com/")
+    );
+    let response = ureq::get(&api_url)
+        .set("User-Agent", &format!("lx/{}", brand::VERSION))
+        .set("Accept", "application/vnd.github+json")
+        .call()
+        .map_err(|e| {
+            LynxError::Shell(format!(
+                "failed to reach GitHub releases API: {e} — check your internet connection"
+            ))
+        })?;
+    let body: serde_json::Value = serde_json::from_reader(response.into_reader())
+        .context("invalid JSON from GitHub releases API")?;
+    let tag = body
+        .get("tag_name")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| {
+            LynxError::Shell(
+                "unexpected GitHub API response: missing tag_name — try again later".into(),
+            )
+        })?;
+    Ok(tag.to_string())
 }
 
-fn download(_url: &str) -> Result<Vec<u8>> {
-    // Real: HTTP GET the binary URL.
-    Err(LynxError::Shell("download not implemented — build from source or use the install script".into()).into())
+fn download(url: &str) -> Result<Vec<u8>> {
+    let response = ureq::get(url)
+        .set("User-Agent", &format!("lx/{}", brand::VERSION))
+        .call()
+        .map_err(|e| {
+            LynxError::Shell(format!(
+                "download failed: {e} — check your internet connection or download manually from {}",
+                brand::REPO
+            ))
+        })?;
+    let mut bytes = Vec::new();
+    std::io::Read::read_to_end(&mut response.into_reader(), &mut bytes)
+        .context("failed to read download body")?;
+    Ok(bytes)
 }
 
-fn verify_checksum(_bytes: &[u8], _version: &str) -> Result<()> {
-    // Real: fetch .sha256 and compare.
+fn verify_checksum(bytes: &[u8], version: &str) -> Result<()> {
+    let platform = detect_platform();
+    let checksum_url = format!(
+        "{}/releases/download/{version}/lx-{platform}.sha256",
+        brand::REPO
+    );
+    let response = ureq::get(&checksum_url)
+        .set("User-Agent", &format!("lx/{}", brand::VERSION))
+        .call()
+        .map_err(|e| {
+            LynxError::Shell(format!(
+                "failed to fetch checksum file: {e} — cannot verify download integrity"
+            ))
+        })?;
+    let checksum_text = response
+        .into_string()
+        .context("failed to read checksum response")?;
+    // Checksum files are "<hex>  filename" or just "<hex>"
+    let expected = checksum_text
+        .split_whitespace()
+        .next()
+        .ok_or_else(|| LynxError::Shell("checksum file was empty or malformed".into()))?
+        .to_lowercase();
+
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    let actual = hex::encode(hasher.finalize());
+
+    if actual != expected {
+        return Err(LynxError::Shell(format!(
+            "checksum mismatch — download may be corrupt\n  expected: {expected}\n  got:      {actual}\nRun `lx update` again or download manually from {}",
+            brand::REPO
+        ))
+        .into());
+    }
     Ok(())
 }
 
@@ -155,10 +221,7 @@ impl CachedVersion {
 }
 
 fn cache_path() -> PathBuf {
-    let home = std::env::var_os("HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("."));
-    home.join(brand::CONFIG_DIR).join(".update-check")
+    lynx_core::paths::update_check_file()
 }
 
 fn read_cached_version() -> Option<CachedVersion> {
@@ -202,5 +265,35 @@ mod tests {
     #[test]
     fn platform_string_nonempty() {
         assert!(!detect_platform().is_empty());
+    }
+
+    #[test]
+    fn checksum_hex_is_consistent_for_same_input() {
+        let bytes = b"test payload";
+        let digest1 = {
+            let mut h = Sha256::new();
+            h.update(bytes);
+            hex::encode(h.finalize())
+        };
+        let digest2 = {
+            let mut h = Sha256::new();
+            h.update(bytes);
+            hex::encode(h.finalize())
+        };
+        assert_eq!(digest1, digest2);
+        assert_eq!(digest1.len(), 64);
+    }
+
+    #[test]
+    fn checksum_hex_differs_for_different_inputs() {
+        let mut h1 = Sha256::new();
+        h1.update(b"payload-a");
+        let d1 = hex::encode(h1.finalize());
+
+        let mut h2 = Sha256::new();
+        h2.update(b"payload-b");
+        let d2 = hex::encode(h2.finalize());
+
+        assert_ne!(d1, d2);
     }
 }

@@ -40,9 +40,7 @@ impl LaunchdBackend {
     }
 
     fn plist_content(&self) -> String {
-        let log_dir = paths::logs_dir()
-            .to_string_lossy()
-            .into_owned();
+        let log_dir = paths::logs_dir().to_string_lossy().into_owned();
 
         format!(
             r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -109,7 +107,8 @@ impl ServiceBackend for LaunchdBackend {
             return Err(lynx_core::error::LynxError::Daemon(format!(
                 "launchctl load failed: {}",
                 String::from_utf8_lossy(&out.stderr)
-            )).into());
+            ))
+            .into());
         }
 
         Ok(())
@@ -137,7 +136,8 @@ impl ServiceBackend for LaunchdBackend {
             return Err(lynx_core::error::LynxError::Daemon(format!(
                 "launchctl start failed: {}",
                 String::from_utf8_lossy(&out.stderr)
-            )).into());
+            ))
+            .into());
         }
         Ok(())
     }
@@ -152,7 +152,8 @@ impl ServiceBackend for LaunchdBackend {
             return Err(lynx_core::error::LynxError::Daemon(format!(
                 "launchctl stop failed: {}",
                 String::from_utf8_lossy(&out.stderr)
-            )).into());
+            ))
+            .into());
         }
         Ok(())
     }

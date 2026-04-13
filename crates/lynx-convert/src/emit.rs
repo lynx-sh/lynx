@@ -19,15 +19,19 @@ pub fn omp_to_lynx_toml(theme: &ConvertedTheme, name: &str) -> String {
     // Meta.
     out.push_str("[meta]\n");
     out.push_str(&format!("name = \"{name}\"\n"));
-    out.push_str(&format!("description = \"Converted from Oh-My-Posh {name} theme\"\n"));
+    out.push_str(&format!(
+        "description = \"Converted from Oh-My-Posh {name} theme\"\n"
+    ));
     out.push_str("author = \"auto-converted\"\n\n");
 
     // Palette — build from all unique colors, generate semantic names.
     let mut palette: Vec<(String, String)> = Vec::new();
-    let mut color_to_var: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    let mut color_to_var: std::collections::HashMap<String, String> =
+        std::collections::HashMap::new();
 
     let all_segments: Vec<&crate::omp::ConvertedSegment> = theme
-        .top.iter()
+        .top
+        .iter()
         .chain(theme.top_right.iter())
         .chain(theme.left.iter())
         .collect();
@@ -35,7 +39,15 @@ pub fn omp_to_lynx_toml(theme: &ConvertedTheme, name: &str) -> String {
     for seg in &all_segments {
         for hex in [&seg.fg, &seg.bg].into_iter().flatten() {
             if hex.starts_with('#') && !color_to_var.contains_key(hex) {
-                let var_name = format!("{}_{}", seg.name, if Some(hex) == seg.fg.as_ref() { "fg" } else { "bg" });
+                let var_name = format!(
+                    "{}_{}",
+                    seg.name,
+                    if Some(hex) == seg.fg.as_ref() {
+                        "fg"
+                    } else {
+                        "bg"
+                    }
+                );
                 // Deduplicate: if this var name exists, append a counter.
                 let unique_name = if palette.iter().any(|(k, _)| k == &var_name) {
                     format!("{}_{}", var_name, palette.len())
@@ -105,7 +117,10 @@ pub fn omp_to_lynx_toml(theme: &ConvertedTheme, name: &str) -> String {
         out.push_str("[transient]\n");
         out.push_str(&format!("template = \"{}\"\n", escape_toml(&t.template)));
         if let Some(ref fg) = t.fg {
-            let var = color_to_var.get(fg).map(|v| format!("${v}")).unwrap_or_else(|| fg.clone());
+            let var = color_to_var
+                .get(fg)
+                .map(|v| format!("${v}"))
+                .unwrap_or_else(|| fg.clone());
             out.push_str(&format!("fg = \"{var}\"\n"));
         }
         out.push('\n');
@@ -117,8 +132,16 @@ pub fn omp_to_lynx_toml(theme: &ConvertedTheme, name: &str) -> String {
         let mut fields = Vec::new();
 
         // Color — use palette vars per D-015.
-        let fg_ref = seg.fg.as_ref().and_then(|h| color_to_var.get(h)).map(|v| format!("${v}"));
-        let bg_ref = seg.bg.as_ref().and_then(|h| color_to_var.get(h)).map(|v| format!("${v}"));
+        let fg_ref = seg
+            .fg
+            .as_ref()
+            .and_then(|h| color_to_var.get(h))
+            .map(|v| format!("${v}"));
+        let bg_ref = seg
+            .bg
+            .as_ref()
+            .and_then(|h| color_to_var.get(h))
+            .map(|v| format!("${v}"));
         let fg_val = fg_ref.or_else(|| seg.fg.clone());
         let bg_val = bg_ref.or_else(|| seg.bg.clone());
 
@@ -188,7 +211,9 @@ pub fn to_lynx_toml(theme: &OmzTheme, name: &str) -> String {
     ));
 
     if theme.tier == Tier::Agnoster {
-        out.push_str("# NOTE: agnoster-style theme — segment order approximated, colors manually tuned\n");
+        out.push_str(
+            "# NOTE: agnoster-style theme — segment order approximated, colors manually tuned\n",
+        );
     }
 
     for note in &theme.notes {
@@ -199,7 +224,9 @@ pub fn to_lynx_toml(theme: &OmzTheme, name: &str) -> String {
     // Meta section.
     out.push_str("[meta]\n");
     out.push_str(&format!("name = \"{name}\"\n"));
-    out.push_str(&format!("description = \"Converted from OMZ {name} theme\"\n"));
+    out.push_str(&format!(
+        "description = \"Converted from OMZ {name} theme\"\n"
+    ));
     out.push_str("author = \"auto-converted\"\n\n");
 
     // Layout section.
@@ -207,17 +234,29 @@ pub fn to_lynx_toml(theme: &OmzTheme, name: &str) -> String {
     if !theme.left.is_empty() {
         out.push_str(&format!(
             "left = [{}]\n",
-            theme.left.iter().map(|s| format!("\"{s}\"")).collect::<Vec<_>>().join(", ")
+            theme
+                .left
+                .iter()
+                .map(|s| format!("\"{s}\""))
+                .collect::<Vec<_>>()
+                .join(", ")
         ));
     }
     if !theme.right.is_empty() {
         out.push_str(&format!(
             "right = [{}]\n",
-            theme.right.iter().map(|s| format!("\"{s}\"")).collect::<Vec<_>>().join(", ")
+            theme
+                .right
+                .iter()
+                .map(|s| format!("\"{s}\""))
+                .collect::<Vec<_>>()
+                .join(", ")
         ));
     }
     if theme.two_line {
-        out.push_str("# Original theme was two-line — configure top/top_right for two-line layout\n");
+        out.push_str(
+            "# Original theme was two-line — configure top/top_right for two-line layout\n",
+        );
     }
     out.push('\n');
 
@@ -252,7 +291,12 @@ mod tests {
         let toml_str = to_lynx_toml(&theme, "test");
         // Should be valid TOML.
         let parsed: Result<toml::Value, _> = toml::from_str(&toml_str);
-        assert!(parsed.is_ok(), "invalid TOML: {}\n{}", parsed.unwrap_err(), toml_str);
+        assert!(
+            parsed.is_ok(),
+            "invalid TOML: {}\n{}",
+            parsed.unwrap_err(),
+            toml_str
+        );
     }
 
     #[test]
@@ -312,7 +356,11 @@ mod tests {
         let theme = crate::omp::parse(json).unwrap();
         let toml_str = omp_to_lynx_toml(&theme, "complex_test");
         let parsed: Result<toml::Value, _> = toml::from_str(&toml_str);
-        assert!(parsed.is_ok(), "invalid TOML:\n{toml_str}\nerror: {}", parsed.unwrap_err());
+        assert!(
+            parsed.is_ok(),
+            "invalid TOML:\n{toml_str}\nerror: {}",
+            parsed.unwrap_err()
+        );
         // Verify unique segment names
         assert!(toml_str.contains("[segment.lang_version_node]"));
         assert!(toml_str.contains("[segment.lang_version_python]"));
@@ -352,7 +400,11 @@ mod tests {
         let theme = crate::omp::parse(json).unwrap();
         let toml_str = omp_to_lynx_toml(&theme, "bubbles_test");
         let parsed: Result<toml::Value, _> = toml::from_str(&toml_str);
-        assert!(parsed.is_ok(), "invalid TOML:\n{toml_str}\nerror: {}", parsed.unwrap_err());
+        assert!(
+            parsed.is_ok(),
+            "invalid TOML:\n{toml_str}\nerror: {}",
+            parsed.unwrap_err()
+        );
         assert!(toml_str.contains("[segment.lang_version_python]"));
         assert!(toml_str.contains("[segment.lang_version_node]"));
     }

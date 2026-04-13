@@ -4,8 +4,6 @@ use anyhow::{Context, Result};
 use lynx_core::error::LynxError;
 use tracing::debug;
 
-use lynx_core::brand;
-
 use crate::lock::LockFile;
 use crate::schema::RegistryIndex;
 
@@ -15,27 +13,17 @@ pub const DEFAULT_INDEX_URL: &str =
 
 /// Path to the local cached index: `~/.config/lynx/registry/index.toml`.
 pub fn index_cache_path() -> PathBuf {
-    config_base().join("registry").join("index.toml")
+    lynx_core::paths::registry_cache_dir().join("index.toml")
 }
 
 /// Path to lynx.lock: `~/.config/lynx/lynx.lock`.
 pub fn lock_path() -> PathBuf {
-    config_base().join("lynx.lock")
+    lynx_core::paths::lynx_lock_path()
 }
 
-/// Path to the installed plugins dir: `~/.local/share/lynx/plugins/`.
+/// Path to the installed plugins dir: `~/.config/lynx/plugins/`.
 pub fn plugins_install_dir() -> PathBuf {
-    let home = std::env::var_os("HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("."));
-    home.join(".local/share/lynx/plugins")
-}
-
-fn config_base() -> PathBuf {
-    let home = std::env::var_os("HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("."));
-    home.join(brand::CONFIG_DIR)
+    lynx_core::paths::installed_plugins_dir()
 }
 
 // ── Index I/O ─────────────────────────────────────────────────────────────────
@@ -65,7 +53,11 @@ pub fn fetch_and_cache_index(url: &str) -> Result<RegistryIndex> {
         .call()
         .with_context(|| format!("HTTP GET failed for {url}"))?;
     if resp.status() >= 400 {
-        return Err(lynx_core::error::LynxError::Registry(format!("registry index returned status {} from {url}", resp.status())).into());
+        return Err(lynx_core::error::LynxError::Registry(format!(
+            "registry index returned status {} from {url}",
+            resp.status()
+        ))
+        .into());
     }
     let body = resp
         .into_string()
@@ -140,20 +132,24 @@ pub fn save_lock_to(lock: &LockFile, path: &Path) -> Result<()> {
 pub fn validate_index(idx: &RegistryIndex) -> Result<()> {
     for entry in &idx.plugins {
         if entry.versions.is_empty() {
-            return Err(LynxError::Registry(format!("plugin '{}' has no versions", entry.name)).into());
+            return Err(
+                LynxError::Registry(format!("plugin '{}' has no versions", entry.name)).into(),
+            );
         }
         if entry.resolve_version(None).is_none() {
             return Err(LynxError::Registry(format!(
                 "plugin '{}' latest_version '{}' not found in versions list",
                 entry.name, entry.latest_version
-            )).into());
+            ))
+            .into());
         }
         for v in &entry.versions {
             if v.checksum_sha256.is_empty() {
                 return Err(LynxError::Registry(format!(
                     "plugin '{}' version '{}' has empty checksum_sha256",
                     entry.name, v.version
-                )).into());
+                ))
+                .into());
             }
         }
     }

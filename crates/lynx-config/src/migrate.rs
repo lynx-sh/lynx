@@ -9,7 +9,7 @@ type MigrationFn = fn(&mut LynxConfig) -> Result<()>;
 
 /// Migrations indexed by the version they migrate FROM.
 /// Entry [0] migrates v0 → v1, entry [1] migrates v1 → v2, etc.
-const VERSION_MIGRATIONS: &[MigrationFn] = &[migrate_v0_to_v1];
+const VERSION_MIGRATIONS: &[MigrationFn] = &[migrate_v0_to_v1, migrate_v1_to_v2];
 
 /// Migrate a config to the current schema version, applying all pending
 /// migrations in order. Each migration logs what it changed. Idempotent.
@@ -42,6 +42,13 @@ fn migrate_v0_to_v1(config: &mut LynxConfig) -> Result<()> {
         info!("migration v0→v1: active_theme was empty, setting to 'default'");
         config.active_theme = "default".to_string();
     }
+    Ok(())
+}
+
+/// v1 → v2: aliases and paths fields added; serde defaults handle forward compat.
+/// Migration is a no-op — just advances schema_version.
+fn migrate_v1_to_v2(_config: &mut LynxConfig) -> Result<()> {
+    info!("migration v1→v2: aliases and paths fields added (serde defaults apply)");
     Ok(())
 }
 

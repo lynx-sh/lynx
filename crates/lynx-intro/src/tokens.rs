@@ -15,8 +15,14 @@ pub fn build_token_map(env: &HashMap<String, String>) -> HashMap<String, String>
     let mut map = HashMap::new();
 
     // --- Identity ---
-    map.insert("username".into(), env.get("USER").cloned().unwrap_or_default());
-    map.insert("hostname".into(), env.get("HOSTNAME").cloned().unwrap_or_default());
+    map.insert(
+        "username".into(),
+        env.get("USER").cloned().unwrap_or_default(),
+    );
+    map.insert(
+        "hostname".into(),
+        env.get("HOSTNAME").cloned().unwrap_or_default(),
+    );
     map.insert(
         "shell".into(),
         env.get("SHELL")
@@ -112,9 +118,21 @@ mod tests {
     fn all_expected_tokens_present() {
         let map = build_token_map(&mock_env());
         let required = [
-            "username", "hostname", "shell", "os", "datetime", "date", "time",
-            "uptime", "cpu_model", "cpu_cores", "cpu_usage", "mem_used",
-            "mem_total", "mem_pct", "lynx_version",
+            "username",
+            "hostname",
+            "shell",
+            "os",
+            "datetime",
+            "date",
+            "time",
+            "uptime",
+            "cpu_model",
+            "cpu_cores",
+            "cpu_usage",
+            "mem_used",
+            "mem_total",
+            "mem_pct",
+            "lynx_version",
         ];
         for key in &required {
             assert!(map.contains_key(*key), "missing token: {}", key);

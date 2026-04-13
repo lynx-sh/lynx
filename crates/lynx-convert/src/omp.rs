@@ -121,8 +121,8 @@ struct OmpTransient {
 
 /// Parse an OMP JSON theme string into a `ConvertedTheme`.
 pub fn parse(json: &str) -> Result<ConvertedTheme, String> {
-    let omp: OmpTheme = serde_json::from_str(json)
-        .map_err(|e| format!("OMP JSON parse error: {e}"))?;
+    let omp: OmpTheme =
+        serde_json::from_str(json).map_err(|e| format!("OMP JSON parse error: {e}"))?;
 
     if omp.version > 0 && omp.version < 2 {
         return Err("OMP v1 themes are not supported — upgrade to v2+ first".to_string());
@@ -142,7 +142,12 @@ pub fn parse(json: &str) -> Result<ConvertedTheme, String> {
         if block.block_type == "rprompt" {
             // Right prompt — map to top_right (OMP right prompts appear on same line).
             for seg in &block.segments {
-                theme.top_right.push(convert_segment(seg, &mut theme.palette, &mut palette_counter, &mut theme.notes));
+                theme.top_right.push(convert_segment(
+                    seg,
+                    &mut theme.palette,
+                    &mut palette_counter,
+                    &mut theme.notes,
+                ));
             }
             continue;
         }
@@ -161,12 +166,22 @@ pub fn parse(json: &str) -> Result<ConvertedTheme, String> {
             match block.alignment.as_str() {
                 "right" => {
                     for seg in &block.segments {
-                        theme.top_right.push(convert_segment(seg, &mut theme.palette, &mut palette_counter, &mut theme.notes));
+                        theme.top_right.push(convert_segment(
+                            seg,
+                            &mut theme.palette,
+                            &mut palette_counter,
+                            &mut theme.notes,
+                        ));
                     }
                 }
                 _ => {
                     for seg in &block.segments {
-                        theme.top.push(convert_segment(seg, &mut theme.palette, &mut palette_counter, &mut theme.notes));
+                        theme.top.push(convert_segment(
+                            seg,
+                            &mut theme.palette,
+                            &mut palette_counter,
+                            &mut theme.notes,
+                        ));
                     }
                 }
             }
@@ -174,20 +189,35 @@ pub fn parse(json: &str) -> Result<ConvertedTheme, String> {
             // Newline block — this is the input line (second line).
             theme.two_line = true;
             for seg in &block.segments {
-                theme.left.push(convert_segment(seg, &mut theme.palette, &mut palette_counter, &mut theme.notes));
+                theme.left.push(convert_segment(
+                    seg,
+                    &mut theme.palette,
+                    &mut palette_counter,
+                    &mut theme.notes,
+                ));
             }
         } else {
             // Subsequent blocks without newline — right-aligned on first line.
             match block.alignment.as_str() {
                 "right" => {
                     for seg in &block.segments {
-                        theme.top_right.push(convert_segment(seg, &mut theme.palette, &mut palette_counter, &mut theme.notes));
+                        theme.top_right.push(convert_segment(
+                            seg,
+                            &mut theme.palette,
+                            &mut palette_counter,
+                            &mut theme.notes,
+                        ));
                     }
                 }
                 _ => {
                     // Additional left block — append to top.
                     for seg in &block.segments {
-                        theme.top.push(convert_segment(seg, &mut theme.palette, &mut palette_counter, &mut theme.notes));
+                        theme.top.push(convert_segment(
+                            seg,
+                            &mut theme.palette,
+                            &mut palette_counter,
+                            &mut theme.notes,
+                        ));
                     }
                 }
             }
@@ -250,16 +280,27 @@ fn convert_segment(
             non_empty(&strip_omp_tags(&seg.leading_diamond)),
             non_empty(&strip_omp_tags(&seg.trailing_diamond)),
         ),
-        "powerline" => (
-            None,
-            non_empty(&strip_omp_tags(&seg.powerline_symbol)),
-        ),
+        "powerline" => (None, non_empty(&strip_omp_tags(&seg.powerline_symbol))),
         _ => (None, None),
     };
 
     // Register colors in palette with semantic names.
-    let fg = resolve_omp_color(&seg.foreground, palette, counter, &seg.seg_type, "fg", notes);
-    let bg = resolve_omp_color(&seg.background, palette, counter, &seg.seg_type, "bg", notes);
+    let fg = resolve_omp_color(
+        &seg.foreground,
+        palette,
+        counter,
+        &seg.seg_type,
+        "fg",
+        notes,
+    );
+    let bg = resolve_omp_color(
+        &seg.background,
+        palette,
+        counter,
+        &seg.seg_type,
+        "bg",
+        notes,
+    );
 
     ConvertedSegment {
         name,
@@ -305,8 +346,7 @@ fn resolve_omp_color(
 
     // Special OMP keywords — can't map these, add a note.
     match color {
-        "transparent" | "parentBackground" | "parentForeground" |
-        "background" | "foreground" => {
+        "transparent" | "parentBackground" | "parentForeground" | "background" | "foreground" => {
             let note = format!(
                 "{seg_type} segment uses '{color}' for {role} — needs manual color assignment"
             );
@@ -526,7 +566,11 @@ fn is_omp_color_tag(tag: &str) -> bool {
 }
 
 fn non_empty(s: &str) -> Option<String> {
-    if s.is_empty() { None } else { Some(s.to_string()) }
+    if s.is_empty() {
+        None
+    } else {
+        Some(s.to_string())
+    }
 }
 
 #[cfg(test)]
@@ -685,7 +729,15 @@ mod tests {
         }"##;
         let theme = parse(json).unwrap();
         let names: Vec<&str> = theme.left.iter().map(|s| s.name.as_str()).collect();
-        assert_eq!(names, vec!["lang_version_node", "lang_version_python", "lang_version_go", "lang_version_rust"]);
+        assert_eq!(
+            names,
+            vec![
+                "lang_version_node",
+                "lang_version_python",
+                "lang_version_go",
+                "lang_version_rust"
+            ]
+        );
     }
 
     #[test]
@@ -749,11 +801,25 @@ mod tests {
         let theme = parse(json).unwrap();
         let toml_str = crate::emit::omp_to_lynx_toml(&theme, "test_multi");
         let parsed: Result<toml::Value, _> = toml::from_str(&toml_str);
-        assert!(parsed.is_ok(), "invalid TOML: {}\n{}", parsed.unwrap_err(), toml_str);
+        assert!(
+            parsed.is_ok(),
+            "invalid TOML: {}\n{}",
+            parsed.unwrap_err(),
+            toml_str
+        );
         // Verify segment sections exist with unique names
-        assert!(toml_str.contains("[segment.lang_version_node]"), "missing node section:\n{toml_str}");
-        assert!(toml_str.contains("[segment.lang_version_python]"), "missing python section:\n{toml_str}");
-        assert!(toml_str.contains("[segment.lang_version_go]"), "missing go section:\n{toml_str}");
+        assert!(
+            toml_str.contains("[segment.lang_version_node]"),
+            "missing node section:\n{toml_str}"
+        );
+        assert!(
+            toml_str.contains("[segment.lang_version_python]"),
+            "missing python section:\n{toml_str}"
+        );
+        assert!(
+            toml_str.contains("[segment.lang_version_go]"),
+            "missing go section:\n{toml_str}"
+        );
     }
 
     #[test]

@@ -19,9 +19,15 @@ pub fn resolve_params(
             default.clone()
         } else if def.required {
             return Err(LynxError::Workflow(format!(
-                "missing required parameter: '{}'{}", def.name,
-                if !def.description.is_empty() { format!(" — {}", def.description) } else { String::new() }
-            )).into());
+                "missing required parameter: '{}'{}",
+                def.name,
+                if !def.description.is_empty() {
+                    format!(" — {}", def.description)
+                } else {
+                    String::new()
+                }
+            ))
+            .into());
         } else {
             continue;
         };
@@ -29,23 +35,30 @@ pub fn resolve_params(
         if !def.choices.is_empty() && !def.choices.contains(&value) {
             return Err(LynxError::Workflow(format!(
                 "parameter '{}': '{}' is not a valid choice (expected one of: {})",
-                def.name, value, def.choices.join(", ")
-            )).into());
+                def.name,
+                value,
+                def.choices.join(", ")
+            ))
+            .into());
         }
 
         match def.param_type {
             ParamType::Int => {
                 if value.parse::<i64>().is_err() {
                     return Err(LynxError::Workflow(format!(
-                        "parameter '{}': '{}' is not a valid integer", def.name, value
-                    )).into());
+                        "parameter '{}': '{}' is not a valid integer",
+                        def.name, value
+                    ))
+                    .into());
                 }
             }
             ParamType::Bool => {
                 if !matches!(value.as_str(), "true" | "false" | "1" | "0" | "yes" | "no") {
                     return Err(LynxError::Workflow(format!(
-                        "parameter '{}': '{}' is not a valid boolean (use true/false)", def.name, value
-                    )).into());
+                        "parameter '{}': '{}' is not a valid boolean (use true/false)",
+                        def.name, value
+                    ))
+                    .into());
                 }
             }
             ParamType::String => {}

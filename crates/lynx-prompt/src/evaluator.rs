@@ -79,9 +79,11 @@ fn is_visible(config: &toml::Value, seg: &dyn Segment, ctx: &RenderContext) -> b
 /// Pure — no I/O, no shell calls.
 fn eval_condition(cond: &SegmentCondition, ctx: &RenderContext) -> bool {
     match cond {
-        SegmentCondition::EnvSet { env_set } => {
-            ctx.env.get(env_set.as_str()).map(|v| !v.is_empty()).unwrap_or(false)
-        }
+        SegmentCondition::EnvSet { env_set } => ctx
+            .env
+            .get(env_set.as_str())
+            .map(|v| !v.is_empty())
+            .unwrap_or(false),
         SegmentCondition::EnvMatches { env_matches } => env_matches.iter().all(|(var, pattern)| {
             ctx.env
                 .get(var.as_str())
@@ -92,13 +94,11 @@ fn eval_condition(cond: &SegmentCondition, ctx: &RenderContext) -> bool {
             let has_git = ctx.cache.contains_key(crate::cache_keys::GIT_STATE);
             *in_git_repo == has_git
         }
-        SegmentCondition::CwdMatches { cwd_matches } => {
-            glob_match(cwd_matches, &ctx.cwd, &ctx.env)
-        }
+        SegmentCondition::CwdMatches { cwd_matches } => glob_match(cwd_matches, &ctx.cwd, &ctx.env),
         SegmentCondition::ExitCodeNonzero { exit_code_nonzero } => {
             let is_nonzero = ctx
                 .env
-                .get("LYNX_LAST_EXIT_CODE")
+                .get(lynx_core::env_vars::LYNX_LAST_EXIT_CODE)
                 .map(|v| v != "0" && !v.is_empty())
                 .unwrap_or(false);
             *exit_code_nonzero == is_nonzero
@@ -116,8 +116,10 @@ fn eval_condition(cond: &SegmentCondition, ctx: &RenderContext) -> bool {
     }
 }
 
-/// Match `value` against a glob `pattern` using `*` (any chars) and `?` (one char).
+/// Match `value` against a glob `pattern` using `*` (match any chars) and `?` (match one char).
 /// A leading `~/` in the pattern is expanded using the `HOME` env var.
+///
+/// Uses a hand-rolled iterative matcher — no regex compilation on every call.
 fn glob_match(pattern: &str, value: &str, env: &HashMap<String, String>) -> bool {
     let expanded: String = if let Some(rest) = pattern.strip_prefix("~/") {
         if let Some(home) = env.get("HOME") {
@@ -129,24 +131,40 @@ fn glob_match(pattern: &str, value: &str, env: &HashMap<String, String>) -> bool
         pattern.to_string()
     };
 
-    // Convert glob to regex.
-    let mut re = String::from("^");
-    for ch in expanded.chars() {
-        match ch {
-            '*' => re.push_str(".*"),
-            '?' => re.push('.'),
-            '.' | '+' | '(' | ')' | '[' | ']' | '{' | '}' | '^' | '$' | '|' | '\\' => {
-                re.push('\\');
-                re.push(ch);
-            }
-            _ => re.push(ch),
+    glob_match_str(&expanded, value)
+}
+
+/// Iterative glob matcher: `*` matches any sequence of chars, `?` matches exactly one.
+fn glob_match_str(pattern: &str, value: &str) -> bool {
+    let p: Vec<char> = pattern.chars().collect();
+    let v: Vec<char> = value.chars().collect();
+    let (mut pi, mut vi) = (0usize, 0usize);
+    let (mut star_pi, mut star_vi) = (usize::MAX, 0usize);
+
+    while vi < v.len() {
+        if pi < p.len() && (p[pi] == '?' || p[pi] == v[vi]) {
+            pi += 1;
+            vi += 1;
+        } else if pi < p.len() && p[pi] == '*' {
+            star_pi = pi;
+            star_vi = vi;
+            pi += 1;
+        } else if star_pi != usize::MAX {
+            // Backtrack: the star consumes one more character.
+            star_vi += 1;
+            vi = star_vi;
+            pi = star_pi + 1;
+        } else {
+            return false;
         }
     }
-    re.push('$');
 
-    regex::Regex::new(&re)
-        .map(|r| r.is_match(value))
-        .unwrap_or(false)
+    // Consume any trailing stars.
+    while pi < p.len() && p[pi] == '*' {
+        pi += 1;
+    }
+
+    pi == p.len()
 }
 
 /// Resolve the effective color for a segment, checking `color_when` conditional overrides
@@ -242,7 +260,12 @@ pub async fn evaluate_theme(
     let left = evaluate(segments, &theme.segments.left.order, &theme.segment, ctx);
     let right = evaluate(segments, &theme.segments.right.order, &theme.segment, ctx);
     let top = evaluate(segments, &theme.segments.top.order, &theme.segment, ctx);
-    let top_right = evaluate(segments, &theme.segments.top_right.order, &theme.segment, ctx);
+    let top_right = evaluate(
+        segments,
+        &theme.segments.top_right.order,
+        &theme.segment,
+        ctx,
+    );
     let continuation = evaluate(
         segments,
         &theme.segments.continuation.order,
@@ -371,7 +394,9 @@ mod tests {
 
     struct AlwaysSegment;
     impl Segment for AlwaysSegment {
-        fn name(&self) -> &'static str { "always" }
+        fn name(&self) -> &'static str {
+            "always"
+        }
         fn render(&self, _: &toml::Value, _: &RenderContext) -> Option<RenderedSegment> {
             Some(RenderedSegment::new("ok"))
         }
@@ -407,7 +432,8 @@ mod tests {
     #[test]
     fn show_when_env_matches_glob() {
         let mut ctx = ctx();
-        ctx.env.insert("VIRTUAL_ENV".into(), "/home/user/.venv/myproject".into());
+        ctx.env
+            .insert("VIRTUAL_ENV".into(), "/home/user/.venv/myproject".into());
         let cfg = cfg_from_toml(r#"show_when = { env_matches = { VIRTUAL_ENV = "*myproject*" } }"#);
         assert!(is_visible(&cfg, &AlwaysSegment, &ctx));
     }
@@ -415,7 +441,8 @@ mod tests {
     #[test]
     fn show_when_env_matches_glob_no_match() {
         let mut ctx = ctx();
-        ctx.env.insert("VIRTUAL_ENV".into(), "/home/user/.venv/other".into());
+        ctx.env
+            .insert("VIRTUAL_ENV".into(), "/home/user/.venv/other".into());
         let cfg = cfg_from_toml(r#"show_when = { env_matches = { VIRTUAL_ENV = "*myproject*" } }"#);
         assert!(!is_visible(&cfg, &AlwaysSegment, &ctx));
     }
@@ -474,7 +501,8 @@ mod tests {
     #[test]
     fn show_when_exit_code_nonzero_true() {
         let mut ctx = ctx();
-        ctx.env.insert("LYNX_LAST_EXIT_CODE".into(), "1".into());
+        ctx.env
+            .insert(lynx_core::env_vars::LYNX_LAST_EXIT_CODE.into(), "1".into());
         let cfg = cfg_from_toml(r#"show_when = { exit_code_nonzero = true }"#);
         assert!(is_visible(&cfg, &AlwaysSegment, &ctx));
     }
@@ -482,7 +510,8 @@ mod tests {
     #[test]
     fn show_when_exit_code_nonzero_false_on_zero() {
         let mut ctx = ctx();
-        ctx.env.insert("LYNX_LAST_EXIT_CODE".into(), "0".into());
+        ctx.env
+            .insert(lynx_core::env_vars::LYNX_LAST_EXIT_CODE.into(), "0".into());
         let cfg = cfg_from_toml(r#"show_when = { exit_code_nonzero = true }"#);
         assert!(!is_visible(&cfg, &AlwaysSegment, &ctx));
     }
