@@ -15,7 +15,7 @@ use crossterm::{
 };
 use ratatui::{
     prelude::*,
-    widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap},
+    widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
 };
 
 use crate::item::TuiColors;
@@ -610,7 +610,6 @@ fn render_output(
 
     let paragraph = Paragraph::new(lines)
         .block(block)
-        .wrap(Wrap { trim: false })
         .scroll((state.scroll_offset as u16, 0));
 
     frame.render_widget(paragraph, area);
