@@ -116,8 +116,10 @@ fn eval_condition(cond: &SegmentCondition, ctx: &RenderContext) -> bool {
     }
 }
 
-/// Match `value` against a glob `pattern` using `*` (any chars) and `?` (one char).
+/// Match `value` against a glob `pattern` using `*` (match any chars) and `?` (match one char).
 /// A leading `~/` in the pattern is expanded using the `HOME` env var.
+///
+/// Uses a hand-rolled iterative matcher — no regex compilation on every call.
 fn glob_match(pattern: &str, value: &str, env: &HashMap<String, String>) -> bool {
     let expanded: String = if let Some(rest) = pattern.strip_prefix("~/") {
         if let Some(home) = env.get("HOME") {
@@ -129,24 +131,40 @@ fn glob_match(pattern: &str, value: &str, env: &HashMap<String, String>) -> bool
         pattern.to_string()
     };
 
-    // Convert glob to regex.
-    let mut re = String::from("^");
-    for ch in expanded.chars() {
-        match ch {
-            '*' => re.push_str(".*"),
-            '?' => re.push('.'),
-            '.' | '+' | '(' | ')' | '[' | ']' | '{' | '}' | '^' | '$' | '|' | '\\' => {
-                re.push('\\');
-                re.push(ch);
-            }
-            _ => re.push(ch),
+    glob_match_str(&expanded, value)
+}
+
+/// Iterative glob matcher: `*` matches any sequence of chars, `?` matches exactly one.
+fn glob_match_str(pattern: &str, value: &str) -> bool {
+    let p: Vec<char> = pattern.chars().collect();
+    let v: Vec<char> = value.chars().collect();
+    let (mut pi, mut vi) = (0usize, 0usize);
+    let (mut star_pi, mut star_vi) = (usize::MAX, 0usize);
+
+    while vi < v.len() {
+        if pi < p.len() && (p[pi] == '?' || p[pi] == v[vi]) {
+            pi += 1;
+            vi += 1;
+        } else if pi < p.len() && p[pi] == '*' {
+            star_pi = pi;
+            star_vi = vi;
+            pi += 1;
+        } else if star_pi != usize::MAX {
+            // Backtrack: the star consumes one more character.
+            star_vi += 1;
+            vi = star_vi;
+            pi = star_pi + 1;
+        } else {
+            return false;
         }
     }
-    re.push('$');
 
-    regex::Regex::new(&re)
-        .map(|r| r.is_match(value))
-        .unwrap_or(false)
+    // Consume any trailing stars.
+    while pi < p.len() && p[pi] == '*' {
+        pi += 1;
+    }
+
+    pi == p.len()
 }
 
 /// Resolve the effective color for a segment, checking `color_when` conditional overrides
