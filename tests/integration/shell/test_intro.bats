@@ -34,9 +34,9 @@ teardown() {
 @test "lx intro on enables intro in config" {
   run lx intro on
   [ "$status" -eq 0 ]
-  local config
-  config=$(cat "$HOME/.config/lynx/config.toml")
-  [[ "$config" == *"enabled = true"* ]]
+  local intro_section
+  intro_section=$(awk '/^\[intro\]/{found=1} found && /^\[/{if(!/^\[intro\]/)found=0} found{print}' "$HOME/.config/lynx/config.toml")
+  [[ "$intro_section" == *"enabled = true"* ]]
 }
 
 @test "lx intro off disables intro in config" {
