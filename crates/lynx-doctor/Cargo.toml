@@ -8,6 +8,7 @@ authors.workspace = true
 [dependencies]
 lynx-core = { path = "../lynx-core" }
 lynx-config = { path = "../lynx-config" }
+lynx-manifest = { path = "../lynx-manifest" }
 lynx-theme = { path = "../lynx-theme" }
 toml.workspace = true
 which = "6"

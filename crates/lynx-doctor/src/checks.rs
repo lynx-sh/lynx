@@ -19,6 +19,8 @@ pub(crate) fn run_all() -> Vec<Check> {
         check_shell_integration(),
         check_active_theme_valid(),
         check_diag_log(),
+        check_user_alias_conflicts(),
+        check_user_path_invalid(),
     ]
 }
 
@@ -289,6 +291,123 @@ fn check_active_theme_valid() -> Check {
             detail: e.to_string(),
             fix: Some("lx theme set default".to_string()),
         },
+    }
+}
+
+/// Check for user aliases that shadow plugin-provided aliases by the same name.
+/// Informational only — user intent may be deliberate.
+fn check_user_alias_conflicts() -> Check {
+    let cfg = match load() {
+        Ok(c) => c,
+        Err(e) => {
+            return Check {
+                name: "UserAliasConflict",
+                status: Status::Warn,
+                detail: format!("could not load config: {e}"),
+                fix: Some("lx doctor".to_string()),
+            }
+        }
+    };
+
+    if cfg.aliases.is_empty() {
+        return Check {
+            name: "UserAliasConflict",
+            status: Status::Pass,
+            detail: "no user aliases defined".to_string(),
+            fix: None,
+        };
+    }
+
+    // Collect plugin alias names from installed plugins.
+    let plugin_dir = lynx_core::paths::installed_plugins_dir();
+    let mut plugin_names: std::collections::HashSet<String> = std::collections::HashSet::new();
+    if let Ok(entries) = std::fs::read_dir(&plugin_dir) {
+        for entry in entries.flatten() {
+            let manifest_path = entry.path().join(lynx_core::brand::PLUGIN_MANIFEST);
+            if let Ok(content) = std::fs::read_to_string(&manifest_path) {
+                if let Ok(manifest) = lynx_manifest::parse(&content) {
+                    for name in manifest.exports.aliases {
+                        plugin_names.insert(name);
+                    }
+                }
+            }
+        }
+    }
+
+    let conflicts: Vec<&str> = cfg
+        .aliases
+        .iter()
+        .filter(|a| plugin_names.contains(&a.name))
+        .map(|a| a.name.as_str())
+        .collect();
+
+    if conflicts.is_empty() {
+        Check {
+            name: "UserAliasConflict",
+            status: Status::Pass,
+            detail: format!("{} user alias(es), no plugin conflicts", cfg.aliases.len()),
+            fix: None,
+        }
+    } else {
+        Check {
+            name: "UserAliasConflict",
+            status: Status::Warn,
+            detail: format!(
+                "user alias(es) shadow plugin aliases: {} — user alias takes precedence",
+                conflicts.join(", ")
+            ),
+            fix: Some("lx alias list to review, or lx alias remove <name> to clear".to_string()),
+        }
+    }
+}
+
+/// Check that all user-defined PATH entries point to directories that exist on disk.
+fn check_user_path_invalid() -> Check {
+    let cfg = match load() {
+        Ok(c) => c,
+        Err(e) => {
+            return Check {
+                name: "UserPathInvalid",
+                status: Status::Warn,
+                detail: format!("could not load config: {e}"),
+                fix: Some("lx doctor".to_string()),
+            }
+        }
+    };
+
+    if cfg.paths.is_empty() {
+        return Check {
+            name: "UserPathInvalid",
+            status: Status::Pass,
+            detail: "no user paths defined".to_string(),
+            fix: None,
+        };
+    }
+
+    let invalid: Vec<&str> = cfg
+        .paths
+        .iter()
+        .filter(|p| !std::path::Path::new(&p.path).exists())
+        .map(|p| p.path.as_str())
+        .collect();
+
+    if invalid.is_empty() {
+        Check {
+            name: "UserPathInvalid",
+            status: Status::Pass,
+            detail: format!("all {} user path(s) exist on disk", cfg.paths.len()),
+            fix: None,
+        }
+    } else {
+        Check {
+            name: "UserPathInvalid",
+            status: Status::Warn,
+            detail: format!(
+                "path(s) not found on disk: {}",
+                invalid.join(", ")
+            ),
+            fix: Some("lx path list to review, lx path remove <path> to remove stale entries".to_string()),
+        }
     }
 }
 
