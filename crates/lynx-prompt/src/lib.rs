@@ -1,3 +1,4 @@
+mod assemble;
 pub mod cache;
 pub mod cache_keys;
 pub mod color_apply;
