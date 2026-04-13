@@ -93,9 +93,43 @@ pub fn render_prompt(
         format!("PROMPT={spacer}\"{top_line}\"$'\\n'\"{left_str}\"\nRPROMPT=\"{rprompt}\"\n")
     };
 
-    if !continuation.is_empty() {
+    // PROMPT2 — continuation prompt for multi-line input.
+    // Template mode takes priority; falls back to assembled segments.
+    let cont_cfg = &theme.segments.continuation;
+    if let Some(ref tmpl) = cont_cfg.template {
+        let cap = capability();
+        let text = if cap != TermCapability::None
+            && (cont_cfg.fg.is_some() || cont_cfg.bg.is_some())
+        {
+            let color = SegmentColor {
+                fg: cont_cfg.fg.clone(),
+                bg: cont_cfg.bg.clone(),
+                bold: false,
+            };
+            apply_color_zsh(tmpl, &color, cap)
+        } else {
+            tmpl.clone()
+        };
+        out.push_str(&format!("PROMPT2=\"{text}\"\n"));
+    } else if !continuation.is_empty() {
         let prompt2 = assemble(continuation, theme, sep, true, ctx);
         out.push_str(&format!("PROMPT2=\"{prompt2}\"\n"));
+    }
+
+    // PROMPT4 — debug/xtrace prompt for `set -x` output.
+    if let Some(ref dbg) = theme.debug_prompt {
+        let cap = capability();
+        let text = if cap != TermCapability::None && (dbg.fg.is_some() || dbg.bg.is_some()) {
+            let color = SegmentColor {
+                fg: dbg.fg.clone(),
+                bg: dbg.bg.clone(),
+                bold: false,
+            };
+            apply_color_zsh(&dbg.template, &color, cap)
+        } else {
+            dbg.template.clone()
+        };
+        out.push_str(&format!("PROMPT4=\"{text}\"\n"));
     }
 
     out
@@ -314,6 +348,81 @@ mod tests {
         assert!(
             out.contains("PROMPT="),
             "expected PROMPT assignment: {out:?}"
+        );
+    }
+
+    #[test]
+    fn continuation_template_emits_prompt2_without_segments() {
+        override_capability(TermCapability::None);
+        let mut theme = load_default();
+        theme.segments.continuation = lynx_theme::schema::ContinuationConfig {
+            order: vec![],
+            template: Some("… ".to_string()),
+            fg: None,
+            bg: None,
+        };
+        let out = render_prompt(&[], &[], &[], &[], &[], &theme, None, None);
+        assert!(
+            out.contains("PROMPT2=\"… \""),
+            "expected template in PROMPT2: {out:?}"
+        );
+    }
+
+    #[test]
+    fn continuation_template_takes_priority_over_segments() {
+        override_capability(TermCapability::None);
+        let mut theme = load_default();
+        theme.segments.continuation = lynx_theme::schema::ContinuationConfig {
+            order: vec![],
+            template: Some("> ".to_string()),
+            fg: None,
+            bg: None,
+        };
+        // segments slice is non-empty but template should win
+        let cont = vec![RenderedSegment::new("other").with_cache_key("x")];
+        let out = render_prompt(&[], &[], &[], &[], &cont, &theme, None, None);
+        assert!(
+            out.contains("PROMPT2=\"> \""),
+            "template should override segments: {out:?}"
+        );
+        assert!(
+            !out.contains("other"),
+            "segment content should not appear when template is set: {out:?}"
+        );
+    }
+
+    #[test]
+    fn continuation_segments_still_work_without_template() {
+        let theme = load_default();
+        let cont = vec![RenderedSegment::new("> ").with_cache_key("prompt_char")];
+        let out = render_prompt(&[], &[], &[], &[], &cont, &theme, None, None);
+        assert!(out.contains("PROMPT2="), "expected PROMPT2: {out:?}");
+    }
+
+    #[test]
+    fn debug_prompt_emits_prompt4() {
+        override_capability(TermCapability::None);
+        let mut theme = load_default();
+        theme.debug_prompt = Some(lynx_theme::schema::DebugPromptConfig {
+            template: "+ ".to_string(),
+            fg: None,
+            bg: None,
+        });
+        let out = render_prompt(&[], &[], &[], &[], &[], &theme, None, None);
+        assert!(
+            out.contains("PROMPT4=\"+ \""),
+            "expected PROMPT4 assignment: {out:?}"
+        );
+    }
+
+    #[test]
+    fn debug_prompt_absent_no_prompt4() {
+        let theme = load_default();
+        // No debug_prompt config — PROMPT4 must not appear.
+        let out = render_prompt(&[], &[], &[], &[], &[], &theme, None, None);
+        assert!(
+            !out.contains("PROMPT4"),
+            "PROMPT4 should not appear without debug_prompt config: {out:?}"
         );
     }
 }
