@@ -46,18 +46,16 @@ pub fn run_scheduler(tasks: Vec<ValidatedTask>, log_dir: PathBuf) -> SchedulerHa
 }
 
 async fn scheduler_loop(tasks: Vec<ValidatedTask>, log_dir: &Path) {
-    // Build one sleep-loop per task, all running concurrently.
-    let futures: Vec<_> = tasks
-        .into_iter()
-        .map(|vt| {
-            let log_dir = log_dir.to_path_buf();
-            tokio::spawn(async move {
-                task_loop(vt, log_dir).await;
-            })
-        })
-        .collect();
-
-    futures::future::join_all(futures).await;
+    let mut set = tokio::task::JoinSet::new();
+    for vt in tasks {
+        let log_dir = log_dir.to_path_buf();
+        set.spawn(async move { task_loop(vt, log_dir).await });
+    }
+    while let Some(res) = set.join_next().await {
+        if let Err(e) = res {
+            error!("task loop panicked: {e}");
+        }
+    }
 }
 
 async fn task_loop(vt: ValidatedTask, log_dir: PathBuf) {
@@ -271,23 +269,6 @@ async fn send_notification(task_name: &str, log: &TaskRunLog) {
     }
 }
 
-// ── futures dep for join_all ───────────────────────────────────────────────
-// We need futures::future::join_all.  Use tokio's select/join where possible,
-// but for the Vec case we need the futures crate.
-mod futures {
-    pub mod future {
-        pub async fn join_all<F>(futs: Vec<F>)
-        where
-            F: std::future::Future + Send + 'static,
-            F::Output: Send + 'static,
-        {
-            let handles: Vec<_> = futs.into_iter().map(|f| tokio::spawn(f)).collect();
-            for h in handles {
-                let _ = h.await;
-            }
-        }
-    }
-}
 
 #[cfg(test)]
 mod tests {
@@ -377,5 +358,25 @@ mod tests {
         let short = "a\nb\nc";
         let result = tail_lines(short.as_bytes(), 1000);
         assert_eq!(result, short);
+    }
+
+    #[tokio::test]
+    async fn scheduler_handle_drop_aborts_cleanly() {
+        // Verify that dropping the handle aborts the scheduler without panicking.
+        let tasks = vec![make_validated("sleep 60", None)];
+        let tmp = tempfile::tempdir().unwrap();
+        let handle = run_scheduler(tasks, tmp.path().to_path_buf());
+        // Yield briefly so the scheduler can start.
+        tokio::time::sleep(Duration::from_millis(10)).await;
+        drop(handle); // must not panic or block
+    }
+
+    #[tokio::test]
+    async fn scheduler_runs_zero_tasks_cleanly() {
+        // JoinSet with no tasks should complete immediately.
+        let tmp = tempfile::tempdir().unwrap();
+        let handle = run_scheduler(vec![], tmp.path().to_path_buf());
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        drop(handle);
     }
 }
