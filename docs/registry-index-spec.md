@@ -128,7 +128,7 @@ They mirror what `lx doctor` validates on a clean install.
 | Binary deps declared | All external tools listed in `deps.binaries` |
 | Shell files pass `zsh -n` | Syntax check on all `.zsh` files |
 | No hardcoded paths | No `/tmp`, `/home`, or `/Users` in shell files |
-| File size limit respected | No file over 500 lines |
+| Single responsibility | Each file owns one logical domain (see `pt decisions core`) |
 
 ---
 

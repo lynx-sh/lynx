@@ -82,7 +82,7 @@ lx uninstall eza                   # removes Lynx integration, keeps system bina
 - `lx uninstall` never removes system binaries — only Lynx integration
 - `lx audit` shows what each package exports, hooks, and accesses
 - Checksums verified for all archive downloads
-- Config mutations always snapshot first (D-007)
+- Config mutations always snapshot first (see `pt decisions config`)
 
 ## Repository Structure
 
