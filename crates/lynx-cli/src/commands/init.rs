@@ -1,5 +1,6 @@
 use anyhow::Result;
-use clap::Args;
+use clap::{Args, CommandFactory};
+use clap_complete::{generate, Shell};
 use lynx_config::load as load_config;
 use lynx_core::{brand, diag, env_vars, types::Context};
 use lynx_manifest::schema::PluginManifest;
@@ -99,6 +100,14 @@ pub fn run(args: InitArgs) -> Result<()> {
 
     let user_paths: Vec<String> = config.paths.iter().map(|p| p.path.clone()).collect();
 
+    // Generate zsh completions inline — always current, no stale file on disk.
+    let completions_zsh = {
+        let mut buf = Vec::new();
+        let mut cmd = crate::cli::Cli::command();
+        generate(Shell::Zsh, &mut cmd, "lx", &mut buf);
+        String::from_utf8(buf).unwrap_or_default()
+    };
+
     let script = generate_init_script(&InitParams {
         context: &context,
         lynx_dir: &lynx_dir,
@@ -113,6 +122,7 @@ pub fn run(args: InitArgs) -> Result<()> {
         user_aliases: &config.aliases,
         user_paths: &user_paths,
         editor: config.editor.as_deref(),
+        completions_zsh: Some(&completions_zsh),
     });
 
     print!("{script}");

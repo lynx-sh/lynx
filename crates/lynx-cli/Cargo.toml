@@ -28,6 +28,7 @@ lynx-shell    = { path = "../lynx-shell" }
 lynx-registry = { path = "../lynx-registry" }
 lynx-tui      = { path = "../lynx-tui" }
 clap.workspace = true
+clap_complete.workspace = true
 owo-colors.workspace = true
 serde_json.workspace = true
 toml.workspace = true
