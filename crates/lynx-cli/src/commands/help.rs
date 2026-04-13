@@ -183,8 +183,8 @@ const ENTRIES: &[HelpEntry] = &[
     // ── Automation ──
     HelpEntry {
         command: "run",
-        description: "Execute a workflow",
-        usage: "run <workflow> [--step <name>]",
+        description: "Execute a workflow — reusable multi-step task recipes defined in TOML",
+        usage: "run <workflow> [key=value ...] [--bg] [--dry-run] [--yes]",
         category: "automation",
     },
     HelpEntry {
