@@ -88,7 +88,11 @@ async fn do_update(version: &str, yes: bool) -> Result<()> {
     }
 
     std::fs::rename(&tmp, &current_bin)
-        .map_err(|e| anyhow::anyhow!("failed to replace binary: {e}"))?;
+        .map_err(|e| anyhow::Error::from(lynx_core::error::LynxError::Io {
+            message: format!("failed to replace binary: {e}"),
+            path: current_bin.clone(),
+            fix: "check file permissions or try running with sudo".into(),
+        }))?;
 
     println!("Updated to {version}. Restart your shell or run: exec lx");
     Ok(())

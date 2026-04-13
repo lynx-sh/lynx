@@ -159,7 +159,7 @@ async fn cmd_add(path: &str) -> Result<()> {
 
     let content = std::fs::read_to_string(&manifest_path)?;
     let manifest =
-        lynx_manifest::parse_and_validate(&content).map_err(|e| anyhow::anyhow!("{}", e))?;
+        lynx_manifest::parse_and_validate(&content).map_err(|e| anyhow::Error::from(lynx_core::error::LynxError::Manifest(e.to_string())))?;
 
     let name = manifest.plugin.name.clone();
     let config = load_config()?;

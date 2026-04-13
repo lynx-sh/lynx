@@ -34,7 +34,7 @@ async fn main() {
             // so users see the styled red error + hint, not clap's generic stderr.
             let args: Vec<String> = std::env::args().skip(1).collect();
             let cmd = args.first().map(|s| s.as_str()).unwrap_or("?");
-            Err(anyhow::anyhow!("unknown command '{cmd}' — run `lx` to see available commands"))
+            Err(lynx_core::error::LynxError::unknown_command(cmd, "").into())
         }
         Err(e) => {
             // All other clap errors (unknown flag, bad arg value, etc.) go to

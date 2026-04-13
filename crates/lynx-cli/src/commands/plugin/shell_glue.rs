@@ -43,12 +43,16 @@ pub(super) async fn cmd_unload(name: &str) -> Result<()> {
 
 fn generate_exec_script_for_plugin(name: &str) -> Result<String> {
     let resolved_dir = resolve_plugin_dir(name)
-        .ok_or_else(|| anyhow::anyhow!("plugin '{}' not found. Run: lx doctor", name))?;
+        .ok_or_else(|| anyhow::Error::from(lynx_core::error::LynxError::NotFound {
+            item_type: "Plugin".into(),
+            name: name.to_string(),
+            hint: "run `lx doctor` to diagnose".into(),
+        }))?;
 
     let manifest = read_plugin_manifest(&resolved_dir)?
-        .ok_or_else(|| anyhow::anyhow!("plugin '{}' has no plugin.toml", name))?;
+        .ok_or_else(|| anyhow::Error::from(lynx_core::error::LynxError::Manifest(format!("plugin '{name}' has no plugin.toml"))))?;
 
-    generate_exec_script(&manifest, &resolved_dir).map_err(|e| anyhow::anyhow!("{}", e))
+    generate_exec_script(&manifest, &resolved_dir).map_err(|e| anyhow::Error::from(lynx_core::error::LynxError::Plugin(e.to_string())))
 }
 
 fn generate_unload_script_for_plugin(name: &str) -> Result<String> {
@@ -84,7 +88,7 @@ pub(super) fn read_plugin_manifest(plugin_dir: &Path) -> Result<Option<PluginMan
         return Ok(None);
     }
     let content = std::fs::read_to_string(&manifest_path)?;
-    let manifest = lynx_manifest::parse(&content).map_err(|e| anyhow::anyhow!("{}", e))?;
+    let manifest = lynx_manifest::parse(&content).map_err(|e| anyhow::Error::from(lynx_core::error::LynxError::Manifest(e.to_string())))?;
     Ok(Some(manifest))
 }
 

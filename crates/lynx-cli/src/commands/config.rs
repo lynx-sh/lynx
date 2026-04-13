@@ -83,7 +83,7 @@ fn cmd_edit() -> Result<()> {
         Ok(_) => println!("config saved and validated"),
         Err(e) => {
             std::fs::write(&path, &snapshot_content)
-                .map_err(|_| anyhow::anyhow!("CRITICAL: failed to restore config snapshot"))?;
+                .map_err(|_| anyhow::Error::from(lynx_core::error::LynxError::Config("CRITICAL: failed to restore config snapshot".into())))?;
             return Err(LynxError::Config(format!("config validation failed — rolled back: {e}")).into());
         }
     }

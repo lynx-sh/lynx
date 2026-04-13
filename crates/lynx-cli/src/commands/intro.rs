@@ -317,7 +317,7 @@ fn cmd_preview(slug: Option<&str>) -> Result<()> {
     let cfg = load().context("failed to load config")?;
     let target = slug
         .or(cfg.intro.active.as_deref())
-        .ok_or_else(|| anyhow::anyhow!("no intro specified and no active intro set — use `lx intro set <slug>` first"))?;
+        .ok_or_else(|| anyhow::Error::from(lynx_core::error::LynxError::Config("no intro specified and no active intro set".into())))?;
 
     let intro = loader::load(target)
         .with_context(|| format!("failed to load intro '{target}'"))?;
@@ -355,7 +355,7 @@ fn cmd_logo(text: &str, font: &str, list_fonts: bool, append: bool) -> Result<()
 fn append_logo_to_active_intro(font: &str, text: &str) -> Result<()> {
     let cfg = load().context("failed to load config")?;
     let slug = cfg.intro.active.as_deref()
-        .ok_or_else(|| anyhow::anyhow!("no active intro — use `lx intro set <slug>` first"))?;
+        .ok_or_else(|| anyhow::Error::from(lynx_core::error::LynxError::Config("no active intro — use `lx intro set <slug>` first".into())))?;
 
     // Ensure it's in user dir (copy built-in if needed).
     let user_dir = user_intro_dir();
@@ -396,7 +396,11 @@ fn append_logo_to_active_intro(font: &str, text: &str) -> Result<()> {
 /// Copy a built-in intro to the user intro directory and return the path.
 fn copy_builtin_to_user(slug: &str) -> Result<std::path::PathBuf> {
     let intro = loader::load_builtin(slug)
-        .ok_or_else(|| anyhow::anyhow!("intro '{slug}' not found in built-ins"))?;
+        .ok_or_else(|| anyhow::Error::from(lynx_core::error::LynxError::NotFound {
+            item_type: "Intro".into(),
+            name: slug.to_string(),
+            hint: "run `lx intro list` to see available intros".into(),
+        }))?;
 
     let user_dir = user_intro_dir();
     std::fs::create_dir_all(&user_dir)

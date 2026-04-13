@@ -256,7 +256,7 @@ enabled = true
 fn home_dir() -> Result<PathBuf> {
     std::env::var_os("HOME")
         .map(PathBuf::from)
-        .ok_or_else(|| anyhow::anyhow!("$HOME not set"))
+        .ok_or_else(|| anyhow::Error::from(lynx_core::error::LynxError::Shell("$HOME not set".into())))
 }
 
 #[cfg(test)]

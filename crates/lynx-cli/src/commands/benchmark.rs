@@ -74,9 +74,9 @@ fn measure_startup() -> Result<Vec<(String, Duration)>> {
             tracing::warn!("benchmark: zsh exited with status {}", output.status);
         }
         Err(e) => {
-            return Err(anyhow::anyhow!(
-                "failed to spawn zsh for benchmark: {e}\n  Fix: ensure zsh is installed and in your PATH"
-            ));
+            return Err(lynx_core::error::LynxError::Shell(
+                format!("failed to spawn zsh for benchmark: {e}")
+            ).into());
         }
         _ => {}
     }

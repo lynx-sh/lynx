@@ -54,11 +54,9 @@ pub(crate) fn open_in_vscode(path: &std::path::Path) -> Result<()> {
         .arg("--wait")
         .arg(path)
         .status()
-        .map_err(|_| anyhow::anyhow!(
-            "VS Code is required to edit this file.\n\
-             Install it at https://code.visualstudio.com and make sure `code` is in your PATH.\n\
-             Then re-run this command."
-        ))?;
+        .map_err(|_| anyhow::Error::from(lynx_core::error::LynxError::Shell(
+            "VS Code is required to edit this file — install from https://code.visualstudio.com and ensure `code` is in PATH".into()
+        )))?;
 
     if !status.success() {
         return Err(LynxError::Shell("VS Code exited with an error — file may not have been saved".into()).into());
