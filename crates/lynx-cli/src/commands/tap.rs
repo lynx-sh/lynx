@@ -106,10 +106,8 @@ fn extract_tap_name(source: &str) -> String {
     let path_parts = &parts[1..];
 
     // GitHub: github.com/user/repo/... or raw.githubusercontent.com/user/repo/...
-    if host == "github.com" || host == "raw.githubusercontent.com" {
-        if path_parts.len() >= 2 {
-            return format!("{}/{}", path_parts[0], path_parts[1]);
-        }
+    if (host == "github.com" || host == "raw.githubusercontent.com") && path_parts.len() >= 2 {
+        return format!("{}/{}", path_parts[0], path_parts[1]);
     }
 
     // Fallback: host + last meaningful segment (strip file extension)

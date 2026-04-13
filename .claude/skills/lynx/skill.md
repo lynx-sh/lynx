@@ -51,6 +51,7 @@ Re-grep:                rg "____" crates/
 Remaining instances:    0 / N — if N > 0: filed as H-XXX
 Bug class investigated: "pattern X" — grepped Y, found N sites → filed / all fixed
 All tests pass:         cargo nextest run --all — PASS
+Clippy clean:           cargo clippy --all -- -D warnings — PASS (0 warnings)
 ```
 `pt fix H-XXX "cause" "fix" "scope: grepped X in crates/, N sites, all fixed"`
 
@@ -97,6 +98,7 @@ Public API added:   ____ / none
 Error paths:        LynxError::____ / none added
 Tests added:        test_name — verifies ____
 All tests pass:     cargo nextest run --all — PASS
+Clippy clean:       cargo clippy --all -- -D warnings — PASS (0 warnings)
 ```
 
 ---
@@ -116,6 +118,7 @@ mod.rs / lib.rs updated: yes
 use paths updated:      yes — files: ____
 Public API unchanged:   yes / list intentional changes
 All tests pass:         cargo nextest run --all — PASS
+Clippy clean:           cargo clippy --all -- -D warnings — PASS (0 warnings)
 ```
 Behavioral bugs found during refactor → `pt add`, fix separately. Never mix.
 
@@ -135,6 +138,7 @@ Behavioral bugs found during refactor → `pt add`, fix separately. Never mix.
 11. **TUI for all list output** (D-040) — any command that outputs a list which can grow must use `lynx_tui::InteractiveList`. Raw `println!` loops for list data are forbidden.
 12. **No duplicate logic** — before writing a function, grep for similar implementations. If it exists, reuse it. 4 copies of the same function = P2 issue.
 13. **No silent failures** — `let _ =` on a fallible operation is forbidden unless the failure is genuinely irrelevant (and commented why). At minimum, `tracing::warn!` the failure.
+14. **Zero clippy warnings** — `cargo clippy --all -- -D warnings` must pass before any commit. Warnings are not deferred. Baseline is always 0.
 
 ## Session Protocol
 ```bash
@@ -147,8 +151,8 @@ cargo nextest run -p lynx-<X>  # targeted tests during work
 # file issues as you find them — pt add
 
 # END
-cargo nextest run --all        # final full suite — once only
-cargo clippy --all             # zero warnings — fix any new ones
-git commit                     # commit before pt done
+cargo nextest run --all                    # final full suite — once only
+cargo clippy --all -- -D warnings          # MUST be clean — 0 warnings, no exceptions
+git commit                                 # commit before pt done
 pt done S-XXX success "what was done" "what next agent does first"
 ```

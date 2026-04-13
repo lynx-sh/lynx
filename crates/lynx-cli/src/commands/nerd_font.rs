@@ -93,15 +93,15 @@ fn toml_value_has_nerd_glyphs(value: &toml::Value) -> bool {
 pub fn find_installed_nerd_fonts() -> Vec<String> {
     let home = lynx_core::paths::home();
     let font_dirs: Vec<PathBuf> = {
-        let mut dirs = Vec::new();
-        dirs.push(home.join("Library/Fonts"));
-        dirs.push("/Library/Fonts".into());
-        dirs.push("/System/Library/Fonts".into());
-        dirs.push(home.join(".local/share/fonts"));
-        dirs.push(home.join(".fonts"));
-        dirs.push("/usr/share/fonts".into());
-        dirs.push("/usr/local/share/fonts".into());
-        dirs
+        vec![
+            home.join("Library/Fonts"),
+            "/Library/Fonts".into(),
+            "/System/Library/Fonts".into(),
+            home.join(".local/share/fonts"),
+            home.join(".fonts"),
+            "/usr/share/fonts".into(),
+            "/usr/local/share/fonts".into(),
+        ]
     };
 
     // Collect Nerd Font file paths first.
