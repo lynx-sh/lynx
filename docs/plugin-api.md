@@ -227,11 +227,43 @@ Events use a dotted or colon-namespaced topic string.
 
 ### Built-in topics emitted by Lynx core
 
+**Shell lifecycle**
+
 | Topic | When | Payload |
 |---|---|---|
 | `shell:chpwd` | Directory changed | New `$PWD` |
 | `shell:preexec` | Before each command | Command string |
 | `shell:precmd` | Before each prompt | *(none)* |
+| `shell:context-changed` | Context switches (e.g. agent mode activated) | New context string (`interactive` / `agent` / `minimal`) |
+
+**Config and theme**
+
+| Topic | When | Payload |
+|---|---|---|
+| `config:changed` | Lynx config file modified | *(none)* |
+| `theme:changed` | Active theme switched | New theme name |
+
+**Plugin lifecycle**
+
+| Topic | When | Payload |
+|---|---|---|
+| `plugin:loaded` | A plugin finishes loading | Plugin name |
+| `plugin:unloaded` | A plugin is removed/disabled | Plugin name |
+| `plugin:failed` | A plugin fails during load or activation | Plugin name |
+
+**Git**
+
+| Topic | When | Payload |
+|---|---|---|
+| `git:branch-changed` | Current branch changes (detected by state refresh) | New branch name |
+| `git:state-updated` | Git cache refreshed (any change to working tree state) | *(none)* |
+
+**Task scheduler**
+
+| Topic | When | Payload |
+|---|---|---|
+| `task:completed` | A scheduled task finishes successfully | Task name |
+| `task:failed` | A scheduled task exits non-zero | Task name |
 
 ### Plugin-emitted events
 
