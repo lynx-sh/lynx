@@ -161,12 +161,7 @@ fn git_branch_from_subprocess(dir: &str) -> Option<String> {
     }
 }
 
-fn git_state_obj(ctx: &RenderContext) -> Option<&serde_json::Map<String, serde_json::Value>> {
-    match ctx.cache.get(crate::cache_keys::GIT_STATE)? {
-        serde_json::Value::Object(obj) => Some(obj),
-        _ => None,
-    }
-}
+use super::git_common::git_state_obj;
 
 fn git_state_str<'a>(ctx: &'a RenderContext, key: &str) -> Option<&'a str> {
     git_state_obj(ctx)?.get(key)?.as_str()
