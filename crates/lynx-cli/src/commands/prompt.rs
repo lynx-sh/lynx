@@ -7,14 +7,6 @@ use lynx_prompt::{
     evaluator::evaluate_theme,
     renderer::{render_prompt, render_transient_prompt},
     segment::RenderContext,
-    AwsProfileSegment, BackgroundJobsSegment, BatterySegment, CmdDurationSegment, CondaEnvSegment,
-    ContextBadgeSegment, CustomSegment, DirSegment, DockerSegment, ExitCodeSegment, GcpSegment,
-    GitActionSegment, GitAheadBehindSegment, GitBranchSegment, GitShaSegment, GitStashSegment,
-    GitStatusSegment, GitTimeSinceCommitSegment, GolangVersionSegment, HistNumberSegment,
-    HostnameSegment, KubectlContextSegment, LangVersionSegment, NewlineSegment, NodeVersionSegment,
-    OsSegment, PromptCharSegment, RubyVersionSegment, RustVersionSegment, ShellSegment,
-    SshIndicatorSegment, TaskStatusSegment, TerraformSegment, TextSegment, TimeSegment,
-    UsernameSegment, VenvSegment, ViModeSegment,
 };
 use lynx_theme::loader::load as load_theme;
 use std::collections::HashMap;
@@ -65,46 +57,7 @@ async fn cmd_render(transient: bool) -> Result<()> {
     };
 
     // --- Build segment registry ---
-    let segments: Vec<Box<dyn lynx_prompt::segment::Segment>> = vec![
-        Box::new(UsernameSegment),
-        Box::new(HostnameSegment),
-        Box::new(SshIndicatorSegment),
-        Box::new(DirSegment),
-        Box::new(GitBranchSegment),
-        Box::new(GitStatusSegment),
-        Box::new(GitActionSegment),
-        Box::new(GitAheadBehindSegment),
-        Box::new(GitShaSegment),
-        Box::new(GitStashSegment),
-        Box::new(GitTimeSinceCommitSegment),
-        Box::new(AwsProfileSegment),
-        Box::new(BatterySegment),
-        Box::new(DockerSegment),
-        Box::new(GcpSegment),
-        Box::new(HistNumberSegment),
-        Box::new(KubectlContextSegment),
-        Box::new(NodeVersionSegment),
-        Box::new(RubyVersionSegment),
-        Box::new(GolangVersionSegment),
-        Box::new(RustVersionSegment),
-        Box::new(LangVersionSegment),
-        Box::new(VenvSegment),
-        Box::new(CondaEnvSegment),
-        Box::new(TaskStatusSegment),
-        Box::new(CmdDurationSegment),
-        Box::new(ExitCodeSegment),
-        Box::new(BackgroundJobsSegment),
-        Box::new(ViModeSegment),
-        Box::new(CustomSegment),
-        Box::new(TimeSegment),
-        Box::new(ContextBadgeSegment),
-        Box::new(NewlineSegment),
-        Box::new(OsSegment),
-        Box::new(PromptCharSegment),
-        Box::new(ShellSegment),
-        Box::new(TerraformSegment),
-        Box::new(TextSegment),
-    ];
+    let segments = lynx_prompt::all_segments();
 
     // --- Evaluate and render ---
     let theme_ref = &theme;
