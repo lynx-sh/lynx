@@ -584,6 +584,19 @@ async fn run_command(
             Ok(Ok(status)) => Ok(status.code().unwrap_or(-1)),
             Ok(Err(_)) => Err(()),
             Err(_) => {
+                // On Windows, kill the entire process tree before killing the
+                // immediate child. `sh -c "sleep 60"` forks sleep.exe as a
+                // child; killing only sh leaves sleep.exe alive holding the
+                // pipe write-end, so pending IOCP ReadFile ops never complete
+                // and the tokio runtime stalls until the subprocess exits.
+                // taskkill /F /T kills the tree atomically, closing all
+                // write-ends so the reader tasks can drain and abort cleanly.
+                #[cfg(windows)]
+                if let Some(pid) = child.id() {
+                    let _ = std::process::Command::new("taskkill")
+                        .args(["/F", "/T", "/PID", &pid.to_string()])
+                        .status();
+                }
                 let _ = child.kill().await;
                 if let Some(tx) = stream_tx {
                     let _ = tx.send(StreamEvent::StepOutput {
@@ -592,10 +605,6 @@ async fn run_command(
                         is_stderr: true,
                     });
                 }
-                // Abort reader tasks immediately — the child may have forked
-                // subprocesses (e.g. `sh -c "sleep 60"`) that still hold the
-                // pipe write-end open, which would block await for the full
-                // child lifetime.
                 stdout_handle.abort();
                 stderr_handle.abort();
                 return Err(());
