@@ -141,14 +141,7 @@ pub fn parse(json: &str) -> Result<ConvertedTheme, String> {
     for block in &omp.blocks {
         if block.block_type == "rprompt" {
             // Right prompt — map to top_right (OMP right prompts appear on same line).
-            for seg in &block.segments {
-                theme.top_right.push(convert_segment(
-                    seg,
-                    &mut theme.palette,
-                    &mut palette_counter,
-                    &mut theme.notes,
-                ));
-            }
+            push_segments(&mut theme.top_right, &block.segments, &mut theme.palette, &mut palette_counter, &mut theme.notes);
             continue;
         }
 
@@ -163,64 +156,16 @@ pub fn parse(json: &str) -> Result<ConvertedTheme, String> {
 
         if is_first_block && !is_newline_block {
             // First block, no newline — these go on the top/left line.
-            match block.alignment.as_str() {
-                "right" => {
-                    for seg in &block.segments {
-                        theme.top_right.push(convert_segment(
-                            seg,
-                            &mut theme.palette,
-                            &mut palette_counter,
-                            &mut theme.notes,
-                        ));
-                    }
-                }
-                _ => {
-                    for seg in &block.segments {
-                        theme.top.push(convert_segment(
-                            seg,
-                            &mut theme.palette,
-                            &mut palette_counter,
-                            &mut theme.notes,
-                        ));
-                    }
-                }
-            }
+            let dest = if block.alignment == "right" { &mut theme.top_right } else { &mut theme.top };
+            push_segments(dest, &block.segments, &mut theme.palette, &mut palette_counter, &mut theme.notes);
         } else if is_newline_block {
             // Newline block — this is the input line (second line).
             theme.two_line = true;
-            for seg in &block.segments {
-                theme.left.push(convert_segment(
-                    seg,
-                    &mut theme.palette,
-                    &mut palette_counter,
-                    &mut theme.notes,
-                ));
-            }
+            push_segments(&mut theme.left, &block.segments, &mut theme.palette, &mut palette_counter, &mut theme.notes);
         } else {
             // Subsequent blocks without newline — right-aligned on first line.
-            match block.alignment.as_str() {
-                "right" => {
-                    for seg in &block.segments {
-                        theme.top_right.push(convert_segment(
-                            seg,
-                            &mut theme.palette,
-                            &mut palette_counter,
-                            &mut theme.notes,
-                        ));
-                    }
-                }
-                _ => {
-                    // Additional left block — append to top.
-                    for seg in &block.segments {
-                        theme.top.push(convert_segment(
-                            seg,
-                            &mut theme.palette,
-                            &mut palette_counter,
-                            &mut theme.notes,
-                        ));
-                    }
-                }
-            }
+            let dest = if block.alignment == "right" { &mut theme.top_right } else { &mut theme.top };
+            push_segments(dest, &block.segments, &mut theme.palette, &mut palette_counter, &mut theme.notes);
         }
 
         is_first_block = false;
@@ -256,6 +201,18 @@ pub fn parse(json: &str) -> Result<ConvertedTheme, String> {
     }
 
     Ok(theme)
+}
+
+fn push_segments(
+    dest: &mut Vec<ConvertedSegment>,
+    block_segs: &[OmpSegment],
+    palette: &mut HashMap<String, String>,
+    counter: &mut u32,
+    notes: &mut Vec<String>,
+) {
+    for seg in block_segs {
+        dest.push(convert_segment(seg, palette, counter, notes));
+    }
 }
 
 fn convert_segment(
