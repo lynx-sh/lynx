@@ -38,13 +38,25 @@ use std::path::PathBuf;
 /// Panics if `$HOME` is unset or empty. HOME is a fundamental requirement
 /// for Lynx to function — there is no sensible fallback.
 pub fn home() -> PathBuf {
-    let val = std::env::var_os(env_vars::HOME).unwrap_or_default();
-    if val.is_empty() {
-        panic!(
+    // Unix: $HOME is canonical.
+    // Windows: fall back to $USERPROFILE, then $HOMEDRIVE+$HOMEPATH.
+    let val = std::env::var_os(env_vars::HOME)
+        .filter(|v| !v.is_empty())
+        .or_else(|| std::env::var_os("USERPROFILE").filter(|v| !v.is_empty()))
+        .or_else(|| {
+            let drive = std::env::var_os("HOMEDRIVE")?;
+            let path = std::env::var_os("HOMEPATH")?;
+            let mut p = drive;
+            p.push(path);
+            Some(p)
+        });
+
+    match val {
+        Some(v) => PathBuf::from(v),
+        None => panic!(
             "lynx: HOME environment variable is not set and home directory could not be determined"
-        );
+        ),
     }
-    PathBuf::from(val)
 }
 
 /// Resolve the Lynx config/install directory.
