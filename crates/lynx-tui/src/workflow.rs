@@ -31,8 +31,8 @@ enum TuiStepPhase {
 impl TuiStepPhase {
     fn icon(&self) -> &'static str {
         match self {
-            TuiStepPhase::Pending => "\u{25cb}",  // ○
-            TuiStepPhase::Running => "\u{25cf}",  // ●
+            TuiStepPhase::Pending => "\u{25cb}", // ○
+            TuiStepPhase::Running => "\u{25cf}", // ●
             TuiStepPhase::Done(s) => s.icon(),
         }
     }
@@ -158,7 +158,11 @@ impl TuiState {
                 duration_ms,
             } => {
                 // Add a completion marker in the output.
-                let icon = if status.icon().is_empty() { "\u{25cb}" } else { status.icon() };
+                let icon = if status.icon().is_empty() {
+                    "\u{25cb}"
+                } else {
+                    status.icon()
+                };
                 self.output_lines.push(OutputLine {
                     step_name: name.clone(),
                     text: format!("{icon} finished ({duration_ms}ms)"),

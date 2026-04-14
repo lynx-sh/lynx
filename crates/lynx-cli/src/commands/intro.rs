@@ -71,11 +71,7 @@ pub fn run(args: IntroArgs) -> Result<()> {
             if args.len() == 1 {
                 cmd_set(&args[0])
             } else {
-                Err(LynxError::unknown_command(
-                    super::unknown_subcmd_name(&args),
-                    "intro",
-                )
-                .into())
+                Err(LynxError::unknown_command(super::unknown_subcmd_name(&args), "intro").into())
             }
         }
         IntroCommand::Logo {

@@ -1,8 +1,8 @@
 pub mod alias;
 pub mod audit;
-pub mod completions;
 pub mod benchmark;
 pub mod browse;
+pub mod completions;
 pub mod config;
 pub mod context;
 pub mod cron;
@@ -82,17 +82,15 @@ pub(crate) fn open_in_editor(path: &std::path::Path) -> Result<()> {
     cmd.arg(path);
 
     let status = cmd.status().map_err(|_| {
-        anyhow::Error::from(LynxError::Shell(
-            format!(
-                "No editor found — set VISUAL or EDITOR env var, or install VS Code (tried: {editor})"
-            )
-        ))
+        anyhow::Error::from(LynxError::Shell(format!(
+            "No editor found — set VISUAL or EDITOR env var, or install VS Code (tried: {editor})"
+        )))
     })?;
 
     if !status.success() {
-        return Err(LynxError::Shell(
-            format!("Editor `{editor}` exited with an error — file may not have been saved"),
-        )
+        return Err(LynxError::Shell(format!(
+            "Editor `{editor}` exited with an error — file may not have been saved"
+        ))
         .into());
     }
     Ok(())

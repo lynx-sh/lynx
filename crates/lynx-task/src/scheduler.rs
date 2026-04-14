@@ -269,7 +269,6 @@ async fn send_notification(task_name: &str, log: &TaskRunLog) {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

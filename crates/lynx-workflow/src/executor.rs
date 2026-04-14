@@ -171,7 +171,15 @@ async fn execute_workflow_impl(
                     name: step.name.clone(),
                 },
             );
-            let result = execute_step(step, params, &mode, stream_tx.clone(), workflow_path.as_deref(), agent_mode).await;
+            let result = execute_step(
+                step,
+                params,
+                &mode,
+                stream_tx.clone(),
+                workflow_path.as_deref(),
+                agent_mode,
+            )
+            .await;
             emit(
                 &stream_tx,
                 StreamEvent::StepFinished {
@@ -209,7 +217,15 @@ async fn execute_workflow_impl(
                 tokio::spawn(async move {
                     // Semaphore is Arc-owned by the enclosing scope — never closed.
                     let _permit = sem.acquire().await.expect("semaphore is never closed");
-                    let result = execute_step(&step, &params, &mode, tx.clone(), wf_path.as_deref(), agent_mode).await;
+                    let result = execute_step(
+                        &step,
+                        &params,
+                        &mode,
+                        tx.clone(),
+                        wf_path.as_deref(),
+                        agent_mode,
+                    )
+                    .await;
                     if let Some(sender) = tx {
                         let _ = sender.send(StreamEvent::StepFinished {
                             name: result.name.clone(),
@@ -434,10 +450,20 @@ async fn execute_step(
         // Resolve effective cwd: step-level cwd (param-substituted) wins,
         // then workflow-level path (param-substituted), then none.
         let step_cwd = step.cwd.as_deref().map(|c| substitute_params(c, params));
-        let resolved_cwd: Option<String> = step_cwd
-            .or_else(|| workflow_path.map(|p| substitute_params(p, params)));
+        let resolved_cwd: Option<String> =
+            step_cwd.or_else(|| workflow_path.map(|p| substitute_params(p, params)));
 
-        match run_command(&cmd, step, mode, &step.name, stream_tx.as_ref(), resolved_cwd.as_deref(), agent_mode).await {
+        match run_command(
+            &cmd,
+            step,
+            mode,
+            &step.name,
+            stream_tx.as_ref(),
+            resolved_cwd.as_deref(),
+            agent_mode,
+        )
+        .await
+        {
             Ok((code, out, err)) => {
                 if code == 0 {
                     return StepResult {

@@ -33,11 +33,7 @@ pub async fn run(args: ContextArgs) -> Result<()> {
             if args.len() == 1 {
                 cmd_set(&args[0]).await
             } else {
-                Err(LynxError::unknown_command(
-                    super::unknown_subcmd_name(&args),
-                    "context",
-                )
-                .into())
+                Err(LynxError::unknown_command(super::unknown_subcmd_name(&args), "context").into())
             }
         }
     }

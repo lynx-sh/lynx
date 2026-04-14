@@ -116,8 +116,7 @@ pub async fn run_in_pty(
 
     let exit_result: Result<i32, ()> = if let Some(timeout_sec) = step.timeout_sec {
         let timeout = std::time::Duration::from_secs(timeout_sec);
-        match tokio::time::timeout(timeout, tokio::task::spawn_blocking(move || child.wait()))
-            .await
+        match tokio::time::timeout(timeout, tokio::task::spawn_blocking(move || child.wait())).await
         {
             Ok(Ok(Ok(status))) => Ok(status.exit_code() as i32),
             _ => {

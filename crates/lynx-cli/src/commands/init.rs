@@ -103,7 +103,9 @@ pub fn run(args: InitArgs) -> Result<()> {
     // Write _lx completion function to $LYNX_DIR/shell/completions/_lx.
     // Adding that dir to $fpath lets compinit pick it up regardless of whether
     // compinit has already run. We also conditionally call compdef if it's available.
-    let completions_dir = lynx_core::paths::lynx_dir().join("shell").join("completions");
+    let completions_dir = lynx_core::paths::lynx_dir()
+        .join("shell")
+        .join("completions");
     let _ = std::fs::create_dir_all(&completions_dir);
     let completions_file = completions_dir.join("_lx");
     let completions_zsh = {

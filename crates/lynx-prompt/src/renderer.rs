@@ -98,18 +98,17 @@ pub fn render_prompt(
     let cont_cfg = &theme.segments.continuation;
     if let Some(ref tmpl) = cont_cfg.template {
         let cap = capability();
-        let text = if cap != TermCapability::None
-            && (cont_cfg.fg.is_some() || cont_cfg.bg.is_some())
-        {
-            let color = SegmentColor {
-                fg: cont_cfg.fg.clone(),
-                bg: cont_cfg.bg.clone(),
-                bold: false,
+        let text =
+            if cap != TermCapability::None && (cont_cfg.fg.is_some() || cont_cfg.bg.is_some()) {
+                let color = SegmentColor {
+                    fg: cont_cfg.fg.clone(),
+                    bg: cont_cfg.bg.clone(),
+                    bold: false,
+                };
+                apply_color_zsh(tmpl, &color, cap)
+            } else {
+                tmpl.clone()
             };
-            apply_color_zsh(tmpl, &color, cap)
-        } else {
-            tmpl.clone()
-        };
         out.push_str(&format!("PROMPT2=\"{text}\"\n"));
     } else if !continuation.is_empty() {
         let prompt2 = assemble(continuation, theme, sep, true, ctx);

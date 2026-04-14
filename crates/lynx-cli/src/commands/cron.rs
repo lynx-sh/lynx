@@ -104,11 +104,9 @@ pub async fn run(args: CronArgs) -> Result<()> {
                 command: Some("cron".into()),
             })
         }
-        CronCommand::Other(args) => Err(LynxError::unknown_command(
-            super::unknown_subcmd_name(&args),
-            "cron",
-        )
-        .into()),
+        CronCommand::Other(args) => {
+            Err(LynxError::unknown_command(super::unknown_subcmd_name(&args), "cron").into())
+        }
     }
 }
 

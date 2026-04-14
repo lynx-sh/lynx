@@ -101,7 +101,10 @@ struct WizardState {
 
 impl WizardState {
     fn new(first_default: bool) -> Self {
-        Self { step: 0, confirm_selected: first_default }
+        Self {
+            step: 0,
+            confirm_selected: first_default,
+        }
     }
 }
 
@@ -111,7 +114,10 @@ fn wizard_event_loop(
     colors: &TuiColors,
 ) -> io::Result<Vec<OnboardResult>> {
     let first_default = match steps.first() {
-        Some(OnboardStep { kind: OnboardStepKind::Confirm { default, .. }, .. }) => *default,
+        Some(OnboardStep {
+            kind: OnboardStepKind::Confirm { default, .. },
+            ..
+        }) => *default,
         _ => true,
     };
     let mut state = WizardState::new(first_default);
@@ -197,12 +203,7 @@ fn pad_quit(mut results: Vec<OnboardResult>, total: usize) -> Vec<OnboardResult>
 
 // ── Rendering ────────────────────────────────────────────────────────────────
 
-fn render_step(
-    f: &mut Frame,
-    steps: &[OnboardStep],
-    state: &WizardState,
-    colors: &TuiColors,
-) {
+fn render_step(f: &mut Frame, steps: &[OnboardStep], state: &WizardState, colors: &TuiColors) {
     let current = &steps[state.step];
     let total = steps.len();
     let accent = colors.accent;
@@ -247,12 +248,16 @@ fn render_step(
     // ── Confirm row (only for Confirm steps) ────────────────────────────────
     if let OnboardStepKind::Confirm { prompt, .. } = &current.kind {
         let yes_style = if state.confirm_selected {
-            Style::default().fg(success).add_modifier(Modifier::BOLD | Modifier::REVERSED)
+            Style::default()
+                .fg(success)
+                .add_modifier(Modifier::BOLD | Modifier::REVERSED)
         } else {
             Style::default().fg(muted)
         };
         let no_style = if !state.confirm_selected {
-            Style::default().fg(colors.error).add_modifier(Modifier::BOLD | Modifier::REVERSED)
+            Style::default()
+                .fg(colors.error)
+                .add_modifier(Modifier::BOLD | Modifier::REVERSED)
         } else {
             Style::default().fg(muted)
         };
@@ -339,10 +344,7 @@ mod tests {
 
     #[test]
     fn pad_quit_already_full() {
-        let results = vec![
-            OnboardResult::Confirmed(true),
-            OnboardResult::Quit,
-        ];
+        let results = vec![OnboardResult::Confirmed(true), OnboardResult::Quit];
         let padded = pad_quit(results, 2);
         assert_eq!(padded.len(), 2);
     }
@@ -362,7 +364,10 @@ mod tests {
         let step = OnboardStep {
             title: "t".into(),
             body: "b".into(),
-            kind: OnboardStepKind::Confirm { prompt: "ok?".into(), default: false },
+            kind: OnboardStepKind::Confirm {
+                prompt: "ok?".into(),
+                default: false,
+            },
         };
         assert!(!default_for_step(&step));
     }

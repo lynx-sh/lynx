@@ -112,11 +112,9 @@ pub fn run(args: DaemonArgs) -> Result<()> {
             println!("✓ lynx-daemon removed");
         }
         DaemonCommand::Other(args) => {
-            return Err(LynxError::unknown_command(
-                super::unknown_subcmd_name(&args),
-                "daemon",
-            )
-            .into());
+            return Err(
+                LynxError::unknown_command(super::unknown_subcmd_name(&args), "daemon").into(),
+            );
         }
     }
 

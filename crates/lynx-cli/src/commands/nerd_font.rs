@@ -288,8 +288,7 @@ pub fn configure_iterm2_font(font_family: &str, size: u32) -> Result<()> {
     let font_value = format!("{font_family}-Regular {size}");
 
     // Use PlistBuddy to update the Default profile's font.
-    let plist = lynx_core::paths::home()
-        .join("Library/Preferences/com.googlecode.iterm2.plist");
+    let plist = lynx_core::paths::home().join("Library/Preferences/com.googlecode.iterm2.plist");
 
     // Update Normal Font in the first (default) profile.
     let status = Command::new("/usr/libexec/PlistBuddy")

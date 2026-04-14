@@ -402,11 +402,10 @@ fn check_user_path_invalid() -> Check {
         Check {
             name: "UserPathInvalid",
             status: Status::Warn,
-            detail: format!(
-                "path(s) not found on disk: {}",
-                invalid.join(", ")
+            detail: format!("path(s) not found on disk: {}", invalid.join(", ")),
+            fix: Some(
+                "lx path list to review, lx path remove <path> to remove stale entries".to_string(),
             ),
-            fix: Some("lx path list to review, lx path remove <path> to remove stale entries".to_string()),
         }
     }
 }

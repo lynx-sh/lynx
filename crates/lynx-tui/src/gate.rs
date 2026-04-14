@@ -14,8 +14,8 @@
 //! 7. `config_enabled` is not `Some(false)` — user config opt-out
 
 use crossterm::tty::IsTty;
-use std::io;
 use lynx_core::env_vars;
+use std::io;
 
 /// Returns `true` if interactive TUI mode should be used.
 ///
@@ -54,10 +54,7 @@ pub(crate) fn tui_enabled(config_enabled: Option<bool>) -> bool {
     }
 
     // CI pipelines (GitHub Actions, CircleCI, etc.).
-    if matches!(
-        std::env::var(env_vars::CI).as_deref(),
-        Ok("true") | Ok("1")
-    ) {
+    if matches!(std::env::var(env_vars::CI).as_deref(), Ok("true") | Ok("1")) {
         return false;
     }
 

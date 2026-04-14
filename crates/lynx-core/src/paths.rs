@@ -40,7 +40,9 @@ use std::path::PathBuf;
 pub fn home() -> PathBuf {
     let val = std::env::var_os(env_vars::HOME).unwrap_or_default();
     if val.is_empty() {
-        panic!("lynx: HOME environment variable is not set and home directory could not be determined");
+        panic!(
+            "lynx: HOME environment variable is not set and home directory could not be determined"
+        );
     }
     PathBuf::from(val)
 }

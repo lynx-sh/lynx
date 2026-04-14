@@ -220,8 +220,7 @@ fn pick_plugins(current: &[String], colors: &lynx_tui::TuiColors) -> Result<Vec<
         .collect();
 
     println!("\n── Plugin selection ─────────────────────────────────────────────");
-    let selected_indices =
-        lynx_tui::show_multi(&entries, "Enable plugins", colors, &preselected)?;
+    let selected_indices = lynx_tui::show_multi(&entries, "Enable plugins", colors, &preselected)?;
 
     if selected_indices.is_empty() && preselected.is_empty() {
         // Cancelled with nothing to restore — keep current.

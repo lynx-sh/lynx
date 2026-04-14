@@ -222,7 +222,12 @@ impl lynx_tui::ListItem for WorkflowListEntry {
 
 fn print_summary(result: &lynx_workflow::executor::JobResult) {
     for step in &result.steps {
-        println!("  {} {}  ({}ms)", step.status.icon(), step.name, step.duration_ms);
+        println!(
+            "  {} {}  ({}ms)",
+            step.status.icon(),
+            step.name,
+            step.duration_ms
+        );
     }
     println!();
     if result.success {
