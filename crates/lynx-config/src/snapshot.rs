@@ -118,13 +118,27 @@ pub fn restore(snap_dir: &Path, config_dir: &Path) -> Result<()> {
             "snapshot not found: {snap_dir:?}"
         )));
     }
+    restore_recursive(snap_dir, config_dir)
+}
+
+fn restore_recursive(snap_dir: &Path, config_dir: &Path) -> Result<()> {
     for entry in std::fs::read_dir(snap_dir)
         .map_err(LynxError::IoRaw)?
         .flatten()
     {
         let src = entry.path();
-        let dest = config_dir.join(entry.file_name());
-        std::fs::copy(&src, &dest).map_err(LynxError::IoRaw)?;
+        let name = entry.file_name();
+        let dest = config_dir.join(&name);
+        if src.is_file() {
+            std::fs::copy(&src, &dest).map_err(LynxError::IoRaw)?;
+        } else if src.is_dir() {
+            // Skip the snapshots dir (not snapshotted, must not be restored over).
+            if name == "snapshots" {
+                continue;
+            }
+            std::fs::create_dir_all(&dest).map_err(LynxError::IoRaw)?;
+            restore_recursive(&src, &dest)?;
+        }
     }
     Ok(())
 }
@@ -132,10 +146,17 @@ pub fn restore(snap_dir: &Path, config_dir: &Path) -> Result<()> {
 fn copy_config_files(src: &Path, dest: &Path) -> Result<()> {
     for entry in std::fs::read_dir(src).map_err(LynxError::IoRaw)?.flatten() {
         let path = entry.path();
-        // Only copy files (not subdirs — snapshots/ itself lives here).
+        let name = entry.file_name();
         if path.is_file() {
-            let dest_file = dest.join(entry.file_name());
-            std::fs::copy(&path, &dest_file).map_err(LynxError::IoRaw)?;
+            std::fs::copy(&path, dest.join(&name)).map_err(LynxError::IoRaw)?;
+        } else if path.is_dir() {
+            // Skip the snapshots dir to avoid infinite recursion.
+            if name == "snapshots" {
+                continue;
+            }
+            let dest_sub = dest.join(&name);
+            std::fs::create_dir_all(&dest_sub).map_err(LynxError::IoRaw)?;
+            copy_config_files(&path, &dest_sub)?;
         }
     }
     Ok(())
@@ -227,6 +248,47 @@ mod tests {
         let (config, snaps) = setup();
         let snap = create_in(snaps.path(), config.path(), "test-label").unwrap();
         assert!(snap.join("config.toml").exists());
+    }
+
+    #[test]
+    fn create_snapshot_copies_subdirs() {
+        let (config, snaps) = setup();
+        // Create a themes/ subdir with a file inside.
+        let themes_dir = config.path().join("themes");
+        fs::create_dir_all(&themes_dir).unwrap();
+        fs::write(themes_dir.join("custom.toml"), "[meta]\nname = \"custom\"").unwrap();
+
+        let snap = create_in(snaps.path(), config.path(), "subdir-test").unwrap();
+
+        assert!(snap.join("config.toml").exists(), "top-level file preserved");
+        assert!(snap.join("themes").is_dir(), "themes/ subdir copied");
+        assert!(
+            snap.join("themes/custom.toml").exists(),
+            "themes/custom.toml copied"
+        );
+        // Snapshots dir itself must NOT appear inside the snapshot.
+        assert!(
+            !snap.join("snapshots").exists(),
+            "snapshots/ must not be recursed"
+        );
+    }
+
+    #[test]
+    fn restore_restores_subdirs() {
+        let (config, snaps) = setup();
+        let themes_dir = config.path().join("themes");
+        fs::create_dir_all(&themes_dir).unwrap();
+        fs::write(themes_dir.join("custom.toml"), "original").unwrap();
+
+        let snap = create_in(snaps.path(), config.path(), "restore-subdir").unwrap();
+
+        // Corrupt the nested file.
+        fs::write(config.path().join("themes/custom.toml"), "broken").unwrap();
+
+        restore(&snap, config.path()).unwrap();
+
+        let content = fs::read_to_string(config.path().join("themes/custom.toml")).unwrap();
+        assert_eq!(content, "original");
     }
 
     #[test]
