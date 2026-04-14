@@ -136,6 +136,10 @@ async fn run_task(vt: &ValidatedTask) -> TaskRunLog {
     let stdout_handle = child.stdout.take();
     let stderr_handle = child.stderr.take();
 
+    // Capture PID before moving child into the timeout future so we can kill
+    // the process tree on timeout even though child is no longer accessible.
+    let _child_pid = child.id();
+
     // Collect stdout/stderr with a size cap.
     let stdout_fut = read_capped(stdout_handle, MAX_OUTPUT_BYTES);
     let stderr_fut = read_capped(stderr_handle, MAX_OUTPUT_BYTES);
@@ -151,7 +155,19 @@ async fn run_task(vt: &ValidatedTask) -> TaskRunLog {
         match result {
             Ok((status, a, b)) => (status, a, b),
             Err(_elapsed) => {
-                // Timed out — kill the process.
+                // On Windows, kill the entire process tree so that forked
+                // subprocesses (e.g. sleep.exe spawned by sh) release the
+                // pipe write-ends. Without this, pending IOCP ReadFile ops
+                // inside the dropped join! future are never resolved and the
+                // tokio runtime stalls until the subprocess finishes naturally.
+                #[cfg(windows)]
+                if let Some(pid) = _child_pid {
+                    let _ = std::process::Command::new("taskkill")
+                        .args(["/F", "/T", "/PID", &pid.to_string()])
+                        .status();
+                }
+                // child was moved into (and dropped with) the cancelled future;
+                // on Unix, exec'd children become orphans reparented to init.
                 let _ = child.kill().await;
                 let _ = child.wait().await;
                 let duration_ms = start.elapsed().as_millis() as u64;
@@ -268,7 +284,6 @@ async fn send_notification(task_name: &str, log: &TaskRunLog) {
             .await;
     }
 }
-
 
 #[cfg(test)]
 mod tests {

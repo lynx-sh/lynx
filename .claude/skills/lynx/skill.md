@@ -106,7 +106,7 @@ Bugs found during refactor → `pt add`, fix separately.
 7. LynxError for all user-facing errors (D-036) → `error-protocol.md`
 8. No `.unwrap()`/`.expect()` in non-test code unless compile-time safe
 9. No `let _ =` on fallible ops — at minimum `tracing::warn!`
-10. Zero clippy warnings — enforced by `lx run lynx-ai-verify`
+10. Zero clippy warnings, fmt drift, shell violations — all enforced by `lx run lynx-ai-verify`
 
 ## Session Protocol
 ```bash
@@ -114,9 +114,8 @@ pt go                              # START — mandatory
 pt decisions <component>           # before any non-trivial design
 cargo nextest run -p lynx-<crate>  # targeted tests during work
 lx run lynx-ai-verify              # END — final gate (MUST pass before any push)
-bash scripts/verify-guardrails.sh  # REQUIRED before git push — catches shell violations CI will reject
 git commit && pt done S-XXX success "what was done" "what next agent does first"
 ```
 
-> **Push gate (non-negotiable):** Never run `git push` until both `lx run lynx-ai-verify` and
-> `bash scripts/verify-guardrails.sh` exit 0. CI runs the same checks and will reject the branch.
+> **Push gate (non-negotiable):** `lx run lynx-ai-verify` must exit 0 before any `git push`.
+> It runs fmt, clippy, all Rust tests, all bats shell tests, and guardrails — the same checks CI enforces.

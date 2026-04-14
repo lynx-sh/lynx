@@ -111,11 +111,13 @@ mod tests {
         assert!(cfg.enabled_plugins.contains(&"git".to_string()));
     }
 
+    #[cfg(unix)]
     #[test]
     fn assert_valid_zsh_passes_good_code() {
         assert_valid_zsh("echo hello");
     }
 
+    #[cfg(unix)]
     #[test]
     #[should_panic(expected = "zsh syntax check failed")]
     fn assert_valid_zsh_catches_bad_code() {

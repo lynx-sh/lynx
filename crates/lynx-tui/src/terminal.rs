@@ -21,11 +21,15 @@ where
     let mut term = Terminal::new(backend)?;
 
     // SAFETY: we assert the closure is unwind-safe so that cleanup always runs.
-    let result =
-        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(&mut term)));
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(&mut term)));
 
     terminal::disable_raw_mode().ok();
-    execute!(term.backend_mut(), DisableMouseCapture, LeaveAlternateScreen).ok();
+    execute!(
+        term.backend_mut(),
+        DisableMouseCapture,
+        LeaveAlternateScreen
+    )
+    .ok();
     term.show_cursor().ok();
 
     match result {

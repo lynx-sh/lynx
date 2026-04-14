@@ -103,7 +103,9 @@ pub fn run(args: InitArgs) -> Result<()> {
     // Write _lx completion function to $LYNX_DIR/shell/completions/_lx.
     // Adding that dir to $fpath lets compinit pick it up regardless of whether
     // compinit has already run. We also conditionally call compdef if it's available.
-    let completions_dir = lynx_core::paths::lynx_dir().join("shell").join("completions");
+    let completions_dir = lynx_core::paths::lynx_dir()
+        .join("shell")
+        .join("completions");
     let _ = std::fs::create_dir_all(&completions_dir);
     let completions_file = completions_dir.join("_lx");
     let completions_zsh = {
@@ -192,7 +194,9 @@ fn maybe_show_intro(config: &lynx_config::schema::LynxConfig, context: Context) 
 fn load_plugin_manifests(plugin_dir: &str, enabled: &[String]) -> Vec<PluginManifest> {
     let mut manifests = Vec::new();
     for name in enabled {
-        let toml_path = format!("{plugin_dir}/{name}/plugin.toml");
+        let toml_path = std::path::Path::new(plugin_dir)
+            .join(name)
+            .join("plugin.toml");
         if let Ok(content) = std::fs::read_to_string(&toml_path) {
             match lynx_manifest::parse_and_validate(&content) {
                 Ok(m) => manifests.push(m),

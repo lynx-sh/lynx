@@ -38,11 +38,25 @@ use std::path::PathBuf;
 /// Panics if `$HOME` is unset or empty. HOME is a fundamental requirement
 /// for Lynx to function — there is no sensible fallback.
 pub fn home() -> PathBuf {
-    let val = std::env::var_os(env_vars::HOME).unwrap_or_default();
-    if val.is_empty() {
-        panic!("lynx: HOME environment variable is not set and home directory could not be determined");
+    // Unix: $HOME is canonical.
+    // Windows: fall back to $USERPROFILE, then $HOMEDRIVE+$HOMEPATH.
+    let val = std::env::var_os(env_vars::HOME)
+        .filter(|v| !v.is_empty())
+        .or_else(|| std::env::var_os("USERPROFILE").filter(|v| !v.is_empty()))
+        .or_else(|| {
+            let drive = std::env::var_os("HOMEDRIVE")?;
+            let path = std::env::var_os("HOMEPATH")?;
+            let mut p = drive;
+            p.push(path);
+            Some(p)
+        });
+
+    match val {
+        Some(v) => PathBuf::from(v),
+        None => panic!(
+            "lynx: HOME environment variable is not set and home directory could not be determined"
+        ),
     }
-    PathBuf::from(val)
 }
 
 /// Resolve the Lynx config/install directory.
@@ -156,10 +170,17 @@ pub fn find_binary(name: &str) -> Option<PathBuf> {
         std::env::split_paths(&path).find_map(|dir| {
             let candidate = dir.join(name);
             if candidate.is_file() {
-                Some(candidate)
-            } else {
-                None
+                return Some(candidate);
             }
+            // Windows: binaries have a .exe suffix that callers should not need to supply.
+            #[cfg(windows)]
+            {
+                let exe = dir.join(format!("{name}.exe"));
+                if exe.is_file() {
+                    return Some(exe);
+                }
+            }
+            None
         })
     })
 }
@@ -233,6 +254,9 @@ mod tests {
         assert_eq!(cli_bin(), PathBuf::from("/home/testuser/.local/bin/lx"));
     }
 
+    // On Windows, home() falls back to USERPROFILE / HOMEDRIVE+HOMEPATH which are
+    // always set by the OS — simulating a fully-unset home is not meaningful there.
+    #[cfg(unix)]
     #[test]
     #[should_panic(expected = "HOME environment variable is not set")]
     fn home_panics_when_unset() {

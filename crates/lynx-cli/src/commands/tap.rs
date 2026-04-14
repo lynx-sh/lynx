@@ -38,11 +38,9 @@ pub fn run(args: TapArgs) -> Result<()> {
         TapCommand::Add { source } => cmd_add(&source),
         TapCommand::Remove { name } => cmd_remove(&name),
         TapCommand::Update => cmd_update(),
-        TapCommand::Other(args) => Err(LynxError::unknown_command(
-            super::unknown_subcmd_name(&args),
-            "tap",
-        )
-        .into()),
+        TapCommand::Other(args) => {
+            Err(LynxError::unknown_command(super::unknown_subcmd_name(&args), "tap").into())
+        }
     }
 }
 
@@ -100,7 +98,10 @@ fn extract_tap_name(source: &str) -> String {
         .trim_start_matches("http://")
         .trim_end_matches('/');
 
-    let parts: Vec<&str> = without_scheme.split('/').filter(|s| !s.is_empty()).collect();
+    let parts: Vec<&str> = without_scheme
+        .split('/')
+        .filter(|s| !s.is_empty())
+        .collect();
 
     let host = parts.first().copied().unwrap_or("");
     let path_parts = &parts[1..];

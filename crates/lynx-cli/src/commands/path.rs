@@ -89,18 +89,12 @@ fn cmd_add(path: String, label: Option<String>) -> Result<()> {
         label,
     };
     add_path(entry)?;
-    println!(
-        "path '{}' added — takes effect on next shell start",
-        path
-    );
+    println!("path '{}' added — takes effect on next shell start", path);
     Ok(())
 }
 
 fn cmd_remove(path: &str) -> Result<()> {
     remove_path(path)?;
-    println!(
-        "path '{}' removed — takes effect on next shell start",
-        path
-    );
+    println!("path '{}' removed — takes effect on next shell start", path);
     Ok(())
 }

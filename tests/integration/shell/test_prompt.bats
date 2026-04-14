@@ -7,6 +7,14 @@ setup() {
   export PWD="$HOME"
   export LYNX_CONTEXT=interactive
   unset LYNX_CACHE_GIT_STATE LYNX_CACHE_KUBECTL_STATE LYNX_LAST_CMD_MS
+
+  # Provide themes so `lx prompt render` can load them without a full `lx setup`.
+  # LYNX_DIR defaults to ~/.config/lynx; we point it at a temp dir with themes copied in.
+  local repo_root
+  repo_root="$(cd "$BATS_TEST_DIRNAME/../../.." && pwd)"
+  export LYNX_DIR="$HOME/.config/lynx"
+  mkdir -p "$LYNX_DIR/themes"
+  cp "$repo_root"/themes/*.toml "$LYNX_DIR/themes/"
 }
 
 teardown() {

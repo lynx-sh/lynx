@@ -46,11 +46,9 @@ pub fn run(args: JobsArgs) -> Result<()> {
         JobsCommand::Kill { id } => cmd_kill(&id),
         JobsCommand::Log { id } => cmd_log(&id),
         JobsCommand::Clean { hours } => cmd_clean(hours),
-        JobsCommand::Other(args) => Err(LynxError::unknown_command(
-            super::unknown_subcmd_name(&args),
-            "jobs",
-        )
-        .into()),
+        JobsCommand::Other(args) => {
+            Err(LynxError::unknown_command(super::unknown_subcmd_name(&args), "jobs").into())
+        }
     }
 }
 

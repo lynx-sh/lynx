@@ -129,11 +129,9 @@ pub async fn run(args: PluginArgs) -> Result<()> {
                 command: Some("plugin".into()),
             })
         }
-        PluginCommand::Other(args) => Err(LynxError::unknown_command(
-            super::unknown_subcmd_name(&args),
-            "plugin",
-        )
-        .into()),
+        PluginCommand::Other(args) => {
+            Err(LynxError::unknown_command(super::unknown_subcmd_name(&args), "plugin").into())
+        }
     }
 }
 

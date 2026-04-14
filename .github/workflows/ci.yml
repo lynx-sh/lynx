@@ -1,0 +1,117 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "dev", "fix/**", "feat/**"]
+  pull_request:
+    branches: ["main", "dev"]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+# Cancel in-flight runs for the same branch/PR on new push
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── 1. Format check (fast, fail-fast gate) ─────────────────────────────────
+  fmt:
+    name: Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all -- --check
+
+  # ── 2. Clippy (deny warnings) ──────────────────────────────────────────────
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: linux-cargo-clippy-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: linux-cargo-clippy-
+      - run: cargo clippy --all-targets --all-features -- -D warnings
+
+  # ── 3. Tests — Linux (full: Rust + shell integration) ─────────────────────
+  test-linux:
+    name: Test (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: linux-cargo-test-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: linux-cargo-test-
+
+      - uses: taiki-e/install-action@cargo-nextest
+
+      - name: Install zsh, bats, ripgrep
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y zsh bats ripgrep
+
+      - name: Build lx binary
+        run: cargo build -p lynx-cli --bin lx
+
+      - name: Add lx to PATH
+        run: echo "${{ github.workspace }}/target/debug" >> "$GITHUB_PATH"
+
+      - name: Rust tests (all crates)
+        run: cargo nextest run --all --no-fail-fast
+
+      - name: Shell integration tests (bats)
+        run: bats tests/integration/shell/
+
+      - name: Guardrails
+        run: bash scripts/verify-guardrails.sh
+
+  # ── 4. Tests — Windows (Rust compile + unit tests only) ───────────────────
+  #
+  # Shell layer (zsh/bats) cannot run on Windows — skipped by design.
+  # Unix socket / unix-only code is properly #[cfg(unix)]-gated.
+  # This job catches Windows compile regressions early.
+  test-windows:
+    name: Test (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: windows-cargo-test-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: windows-cargo-test-
+
+      - uses: taiki-e/install-action@cargo-nextest
+
+      - name: Build (all crates)
+        run: cargo build --all
+
+      - name: Rust tests (all crates)
+        run: cargo nextest run --all --no-fail-fast

@@ -61,11 +61,9 @@ pub async fn run(args: EventArgs) -> Result<()> {
             })?;
         }
         EventCommand::Other(args) => {
-            return Err(LynxError::unknown_command(
-                super::unknown_subcmd_name(&args),
-                "event",
+            return Err(
+                LynxError::unknown_command(super::unknown_subcmd_name(&args), "event").into(),
             )
-            .into())
         }
     }
     Ok(())

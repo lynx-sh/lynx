@@ -506,7 +506,12 @@ disabled_in = []
 
     #[test]
     fn extract_tar_gz_rejects_absolute_paths() {
-        let err = sanitize_archive_path(Path::new("/etc/passwd")).unwrap_err();
+        // Use a platform-appropriate absolute path.
+        #[cfg(unix)]
+        let abs = Path::new("/etc/passwd");
+        #[cfg(windows)]
+        let abs = Path::new("C:\\Windows\\System32\\foo.txt");
+        let err = sanitize_archive_path(abs).unwrap_err();
         assert!(err.to_string().contains("must not be absolute"));
     }
 

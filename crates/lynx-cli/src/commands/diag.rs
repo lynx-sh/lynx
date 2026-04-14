@@ -40,11 +40,9 @@ pub fn run(args: DiagArgs) -> Result<()> {
             println!("{}", diag::log_path().display());
         }
         Some(DiagCommand::Other(args)) => {
-            return Err(LynxError::unknown_command(
-                super::unknown_subcmd_name(&args),
-                "diag",
+            return Err(
+                LynxError::unknown_command(super::unknown_subcmd_name(&args), "diag").into(),
             )
-            .into())
         }
         None => {
             let lines = diag::tail(args.lines);

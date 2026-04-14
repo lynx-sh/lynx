@@ -44,10 +44,16 @@ pub fn lock_file() -> Result<PathBuf> {
     Ok(runtime_dir()?.join("daemon.lock"))
 }
 
+#[cfg(unix)]
 fn set_permissions_700(dir: &std::path::Path) -> Result<()> {
     use std::os::unix::fs::PermissionsExt;
     let perms = std::fs::Permissions::from_mode(0o700);
     std::fs::set_permissions(dir, perms).map_err(LynxError::IoRaw)
+}
+
+#[cfg(not(unix))]
+fn set_permissions_700(_dir: &std::path::Path) -> Result<()> {
+    Ok(())
 }
 
 fn get_uid() -> u32 {
@@ -76,6 +82,7 @@ fn libc_getuid() -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(unix)]
     use std::os::unix::fs::PermissionsExt;
     use std::sync::{Mutex, OnceLock};
 
@@ -93,6 +100,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn runtime_dir_creates_with_700() {
         let _lock = env_lock().lock().expect("lock");
         let tmp = tempfile::tempdir().unwrap();

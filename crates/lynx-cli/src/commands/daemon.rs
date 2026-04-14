@@ -112,11 +112,9 @@ pub fn run(args: DaemonArgs) -> Result<()> {
             println!("✓ lynx-daemon removed");
         }
         DaemonCommand::Other(args) => {
-            return Err(LynxError::unknown_command(
-                super::unknown_subcmd_name(&args),
-                "daemon",
-            )
-            .into());
+            return Err(
+                LynxError::unknown_command(super::unknown_subcmd_name(&args), "daemon").into(),
+            );
         }
     }
 
@@ -141,6 +139,7 @@ fn is_running() -> Result<bool> {
     Ok(false)
 }
 
+#[cfg(unix)]
 fn process_is_alive(pid: u32) -> bool {
     Command::new("kill")
         .args(["-0", &pid.to_string()])
@@ -149,6 +148,11 @@ fn process_is_alive(pid: u32) -> bool {
         .status()
         .map(|s| s.success())
         .unwrap_or(false)
+}
+
+#[cfg(not(unix))]
+fn process_is_alive(_pid: u32) -> bool {
+    false
 }
 
 fn start_detached() -> Result<()> {
@@ -267,6 +271,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn process_is_alive_returns_true_for_current_process() {
         let pid = std::process::id();
         assert!(process_is_alive(pid));

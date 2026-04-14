@@ -558,7 +558,14 @@ mod tests {
         params.bare_subcommands = true;
         let script = generate_init_script(&params);
         // These must never be exposed bare
-        for forbidden in &["function init ", "function config ", "function run ", "function install ", "function alias ", "function jobs "] {
+        for forbidden in &[
+            "function init ",
+            "function config ",
+            "function run ",
+            "function install ",
+            "function alias ",
+            "function jobs ",
+        ] {
             assert!(
                 !script.contains(forbidden),
                 "forbidden bare command '{forbidden}' must not be emitted"

@@ -141,7 +141,13 @@ pub fn parse(json: &str) -> Result<ConvertedTheme, String> {
     for block in &omp.blocks {
         if block.block_type == "rprompt" {
             // Right prompt — map to top_right (OMP right prompts appear on same line).
-            push_segments(&mut theme.top_right, &block.segments, &mut theme.palette, &mut palette_counter, &mut theme.notes);
+            push_segments(
+                &mut theme.top_right,
+                &block.segments,
+                &mut theme.palette,
+                &mut palette_counter,
+                &mut theme.notes,
+            );
             continue;
         }
 
@@ -156,16 +162,42 @@ pub fn parse(json: &str) -> Result<ConvertedTheme, String> {
 
         if is_first_block && !is_newline_block {
             // First block, no newline — these go on the top/left line.
-            let dest = if block.alignment == "right" { &mut theme.top_right } else { &mut theme.top };
-            push_segments(dest, &block.segments, &mut theme.palette, &mut palette_counter, &mut theme.notes);
+            let dest = if block.alignment == "right" {
+                &mut theme.top_right
+            } else {
+                &mut theme.top
+            };
+            push_segments(
+                dest,
+                &block.segments,
+                &mut theme.palette,
+                &mut palette_counter,
+                &mut theme.notes,
+            );
         } else if is_newline_block {
             // Newline block — this is the input line (second line).
             theme.two_line = true;
-            push_segments(&mut theme.left, &block.segments, &mut theme.palette, &mut palette_counter, &mut theme.notes);
+            push_segments(
+                &mut theme.left,
+                &block.segments,
+                &mut theme.palette,
+                &mut palette_counter,
+                &mut theme.notes,
+            );
         } else {
             // Subsequent blocks without newline — right-aligned on first line.
-            let dest = if block.alignment == "right" { &mut theme.top_right } else { &mut theme.top };
-            push_segments(dest, &block.segments, &mut theme.palette, &mut palette_counter, &mut theme.notes);
+            let dest = if block.alignment == "right" {
+                &mut theme.top_right
+            } else {
+                &mut theme.top
+            };
+            push_segments(
+                dest,
+                &block.segments,
+                &mut theme.palette,
+                &mut palette_counter,
+                &mut theme.notes,
+            );
         }
 
         is_first_block = false;

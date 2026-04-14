@@ -260,7 +260,10 @@ mod tests {
 
         let snap = create_in(snaps.path(), config.path(), "subdir-test").unwrap();
 
-        assert!(snap.join("config.toml").exists(), "top-level file preserved");
+        assert!(
+            snap.join("config.toml").exists(),
+            "top-level file preserved"
+        );
         assert!(snap.join("themes").is_dir(), "themes/ subdir copied");
         assert!(
             snap.join("themes/custom.toml").exists(),

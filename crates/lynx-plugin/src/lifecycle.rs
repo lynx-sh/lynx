@@ -75,7 +75,6 @@ pub fn apply_resolve(
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

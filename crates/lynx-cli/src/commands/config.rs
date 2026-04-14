@@ -125,15 +125,14 @@ fn cmd_get(key: &str) -> Result<()> {
         "schema_version" => cfg.schema_version.to_string(),
         "sync.remote" => cfg.sync.remote.unwrap_or_default(),
         "tui.enabled" => cfg.tui.enabled.to_string(),
-        other => {
-            return Err(LynxError::NotFound {
-                item_type: "Config key".into(),
-                name: other.into(),
-                hint: "known keys: active_theme, active_context, schema_version, sync.remote, tui.enabled"
+        other => return Err(LynxError::NotFound {
+            item_type: "Config key".into(),
+            name: other.into(),
+            hint:
+                "known keys: active_theme, active_context, schema_version, sync.remote, tui.enabled"
                     .into(),
-            }
-            .into())
         }
+        .into()),
     };
     println!("{value}");
     Ok(())

@@ -40,6 +40,11 @@ pub async fn run_in_pty(
         }
     };
 
+    // Extract master up-front so we can unconditionally drop it after the exit
+    // result is obtained but before awaiting read_handle. Without this, the
+    // read loop blocks in read_line() forever because the master fd stays open.
+    let master = pair.master;
+
     let mut builder = CommandBuilder::new(&cmd.binary);
     for arg in &cmd.args {
         builder.arg(arg);
@@ -62,7 +67,7 @@ pub async fn run_in_pty(
     // Drop the slave end so the master gets EOF when the child exits.
     drop(pair.slave);
 
-    let reader = match pair.master.try_clone_reader() {
+    let reader = match master.try_clone_reader() {
         Ok(r) => r,
         Err(e) => {
             tracing::warn!(step = %step_name, "PTY reader clone failed: {e}");
@@ -116,14 +121,13 @@ pub async fn run_in_pty(
 
     let exit_result: Result<i32, ()> = if let Some(timeout_sec) = step.timeout_sec {
         let timeout = std::time::Duration::from_secs(timeout_sec);
-        match tokio::time::timeout(timeout, tokio::task::spawn_blocking(move || child.wait()))
-            .await
+        match tokio::time::timeout(timeout, tokio::task::spawn_blocking(move || child.wait())).await
         {
             Ok(Ok(Ok(status))) => Ok(status.exit_code() as i32),
             _ => {
                 // Kill the orphaned child process by PID before returning.
-                // Dropping pair.master closes the PTY fd, causing read_handle to see
-                // EOF and terminate naturally.
+                // master is dropped unconditionally below, closing the PTY fd so
+                // read_handle sees EOF/EIO and terminates naturally.
                 if let Some(pid) = child_pid {
                     // SIGKILL the child so it doesn't run indefinitely.
                     let _ = std::process::Command::new("kill")
@@ -131,7 +135,6 @@ pub async fn run_in_pty(
                         .status();
                     tracing::warn!(step = %step_name, pid = pid, "PTY child killed after timeout");
                 }
-                drop(pair.master);
                 let _ = tx.send(StreamEvent::StepOutput {
                     name: step_name.to_string(),
                     line: format!("timed out after {timeout_sec}s"),
@@ -146,6 +149,11 @@ pub async fn run_in_pty(
             _ => Err(()),
         }
     };
+
+    // Drop master unconditionally here — this closes the PTY master fd, causing
+    // the read loop to see EOF (macOS) or EIO (Linux) and terminate. Without this,
+    // read_handle.await blocks forever in the no-timeout path.
+    drop(master);
 
     let out = read_handle.await.unwrap_or_default();
 

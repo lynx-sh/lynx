@@ -419,7 +419,11 @@ pub fn print_plain<T: ListItem>(items: &[T], title: &str) {
 pub fn print_plain_multi<T: ListItem>(items: &[T], title: &str, preselected: &[usize]) {
     println!("{title} ({} items)", items.len());
     for (i, item) in items.iter().enumerate() {
-        let marker = if preselected.contains(&i) { "[x]" } else { "[ ]" };
+        let marker = if preselected.contains(&i) {
+            "[x]"
+        } else {
+            "[ ]"
+        };
         let subtitle = item.subtitle();
         if subtitle.is_empty() {
             println!("  {marker} {}", item.title());
@@ -530,9 +534,7 @@ fn multi_event_loop<T: ListItem>(
                 KeyCode::Char('q') | KeyCode::Esc => return Ok(vec![]),
 
                 // Ctrl-c
-                KeyCode::Char('c')
-                    if key.modifiers.contains(KeyModifiers::CONTROL) =>
-                {
+                KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                     return Ok(vec![]);
                 }
 
@@ -617,8 +619,7 @@ fn render_multi<T: ListItem>(
     f.render_stateful_widget(list, chunks[0], &mut list_state);
 
     // Status bar
-    let status = ratatui::widgets::Paragraph::new(hint)
-        .style(Style::default().fg(muted));
+    let status = ratatui::widgets::Paragraph::new(hint).style(Style::default().fg(muted));
     f.render_widget(status, chunks[1]);
 }
 
@@ -642,6 +643,27 @@ pub fn show<T: ListItem>(
     }
 }
 
+/// Show a multi-select list interactively if TTY, or as plain text if piped/agent.
+///
+/// `preselected` — original indices of items that should start checked.
+///
+/// Returns the sorted list of selected original indices, or an empty vec if
+/// the user cancels. In non-interactive mode, all items are printed and all
+/// preselected indices are returned (non-destructive fallback).
+pub fn show_multi<T: ListItem>(
+    items: &[T],
+    title: &str,
+    colors: &TuiColors,
+    preselected: &[usize],
+) -> io::Result<Vec<usize>> {
+    let config_tui = lynx_config::load().ok().map(|c| c.tui.enabled);
+    if !crate::gate::tui_enabled(config_tui) {
+        print_plain_multi(items, title, preselected);
+        return Ok(preselected.to_vec());
+    }
+    run_multi(items, title, colors, preselected)
+}
+
 #[cfg(test)]
 mod multi_tests {
     use super::*;
@@ -649,8 +671,12 @@ mod multi_tests {
 
     struct Item(String, bool);
     impl ListItem for Item {
-        fn title(&self) -> &str { &self.0 }
-        fn is_active(&self) -> bool { self.1 }
+        fn title(&self) -> &str {
+            &self.0
+        }
+        fn is_active(&self) -> bool {
+            self.1
+        }
     }
 
     #[test]
@@ -697,25 +723,3 @@ mod multi_tests {
         assert_eq!(result, Vec::<usize>::new());
     }
 }
-
-/// Show a multi-select list interactively if TTY, or as plain text if piped/agent.
-///
-/// `preselected` — original indices of items that should start checked.
-///
-/// Returns the sorted list of selected original indices, or an empty vec if
-/// the user cancels. In non-interactive mode, all items are printed and all
-/// preselected indices are returned (non-destructive fallback).
-pub fn show_multi<T: ListItem>(
-    items: &[T],
-    title: &str,
-    colors: &TuiColors,
-    preselected: &[usize],
-) -> io::Result<Vec<usize>> {
-    let config_tui = lynx_config::load().ok().map(|c| c.tui.enabled);
-    if !crate::gate::tui_enabled(config_tui) {
-        print_plain_multi(items, title, preselected);
-        return Ok(preselected.to_vec());
-    }
-    run_multi(items, title, colors, preselected)
-}
-

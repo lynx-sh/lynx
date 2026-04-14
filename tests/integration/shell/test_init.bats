@@ -33,8 +33,8 @@ teardown() {
   [[ "$output" != *"lx daemon status"* ]]
 }
 
-@test "agent context detected from CLAUDE_CODE env var" {
-  CLAUDE_CODE=1 run lx init
+@test "agent context detected from CLAUDECODE env var" {
+  CLAUDECODE=1 run lx init
   [ "$status" -eq 0 ]
   [[ "$output" == *"LYNX_CONTEXT=agent"* ]]
 }

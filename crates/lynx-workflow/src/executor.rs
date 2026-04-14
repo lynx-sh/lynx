@@ -171,7 +171,15 @@ async fn execute_workflow_impl(
                     name: step.name.clone(),
                 },
             );
-            let result = execute_step(step, params, &mode, stream_tx.clone(), workflow_path.as_deref(), agent_mode).await;
+            let result = execute_step(
+                step,
+                params,
+                &mode,
+                stream_tx.clone(),
+                workflow_path.as_deref(),
+                agent_mode,
+            )
+            .await;
             emit(
                 &stream_tx,
                 StreamEvent::StepFinished {
@@ -209,7 +217,15 @@ async fn execute_workflow_impl(
                 tokio::spawn(async move {
                     // Semaphore is Arc-owned by the enclosing scope — never closed.
                     let _permit = sem.acquire().await.expect("semaphore is never closed");
-                    let result = execute_step(&step, &params, &mode, tx.clone(), wf_path.as_deref(), agent_mode).await;
+                    let result = execute_step(
+                        &step,
+                        &params,
+                        &mode,
+                        tx.clone(),
+                        wf_path.as_deref(),
+                        agent_mode,
+                    )
+                    .await;
                     if let Some(sender) = tx {
                         let _ = sender.send(StreamEvent::StepFinished {
                             name: result.name.clone(),
@@ -434,10 +450,20 @@ async fn execute_step(
         // Resolve effective cwd: step-level cwd (param-substituted) wins,
         // then workflow-level path (param-substituted), then none.
         let step_cwd = step.cwd.as_deref().map(|c| substitute_params(c, params));
-        let resolved_cwd: Option<String> = step_cwd
-            .or_else(|| workflow_path.map(|p| substitute_params(p, params)));
+        let resolved_cwd: Option<String> =
+            step_cwd.or_else(|| workflow_path.map(|p| substitute_params(p, params)));
 
-        match run_command(&cmd, step, mode, &step.name, stream_tx.as_ref(), resolved_cwd.as_deref(), agent_mode).await {
+        match run_command(
+            &cmd,
+            step,
+            mode,
+            &step.name,
+            stream_tx.as_ref(),
+            resolved_cwd.as_deref(),
+            agent_mode,
+        )
+        .await
+        {
             Ok((code, out, err)) => {
                 if code == 0 {
                     return StepResult {
@@ -558,6 +584,19 @@ async fn run_command(
             Ok(Ok(status)) => Ok(status.code().unwrap_or(-1)),
             Ok(Err(_)) => Err(()),
             Err(_) => {
+                // On Windows, kill the entire process tree before killing the
+                // immediate child. `sh -c "sleep 60"` forks sleep.exe as a
+                // child; killing only sh leaves sleep.exe alive holding the
+                // pipe write-end, so pending IOCP ReadFile ops never complete
+                // and the tokio runtime stalls until the subprocess exits.
+                // taskkill /F /T kills the tree atomically, closing all
+                // write-ends so the reader tasks can drain and abort cleanly.
+                #[cfg(windows)]
+                if let Some(pid) = child.id() {
+                    let _ = std::process::Command::new("taskkill")
+                        .args(["/F", "/T", "/PID", &pid.to_string()])
+                        .status();
+                }
                 let _ = child.kill().await;
                 if let Some(tx) = stream_tx {
                     let _ = tx.send(StreamEvent::StepOutput {
@@ -566,7 +605,9 @@ async fn run_command(
                         is_stderr: true,
                     });
                 }
-                Err(())
+                stdout_handle.abort();
+                stderr_handle.abort();
+                return Err(());
             }
         }
     } else {

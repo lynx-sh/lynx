@@ -1,4 +1,6 @@
-use crate::schema::{IntroConfig, LynxConfig, ShellConfig, SyncConfig, TuiConfig, CURRENT_SCHEMA_VERSION};
+use crate::schema::{
+    IntroConfig, LynxConfig, ShellConfig, SyncConfig, TuiConfig, CURRENT_SCHEMA_VERSION,
+};
 use lynx_core::types::Context;
 
 impl Default for LynxConfig {
