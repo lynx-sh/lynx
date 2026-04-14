@@ -16,11 +16,7 @@
 
 use std::io::{self, Write};
 
-use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind},
-    terminal::{self, EnterAlternateScreen, LeaveAlternateScreen},
-    ExecutableCommand,
-};
+use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::{
     prelude::*,
     widgets::{Block, Borders, Paragraph, Wrap},
@@ -93,26 +89,7 @@ pub fn run_onboard_wizard(
 // ── TUI mode ─────────────────────────────────────────────────────────────────
 
 fn run_tui(steps: &[OnboardStep], colors: &TuiColors) -> io::Result<Vec<OnboardResult>> {
-    terminal::enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    stdout.execute(EnterAlternateScreen)?;
-    stdout.execute(EnableMouseCapture)?;
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
-
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        wizard_event_loop(&mut terminal, steps, colors)
-    }));
-
-    terminal::disable_raw_mode()?;
-    terminal.backend_mut().execute(DisableMouseCapture)?;
-    terminal.backend_mut().execute(LeaveAlternateScreen)?;
-    terminal.show_cursor()?;
-
-    match result {
-        Ok(inner) => inner,
-        Err(panic) => std::panic::resume_unwind(panic),
-    }
+    crate::terminal::with_terminal(|terminal| wizard_event_loop(terminal, steps, colors))
 }
 
 /// Wizard state: which step we're on and the current confirm selection.

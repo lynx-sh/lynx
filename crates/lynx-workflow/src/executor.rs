@@ -284,6 +284,39 @@ fn emit(tx: &Option<std::sync::mpsc::Sender<StreamEvent>>, event: StreamEvent) {
     }
 }
 
+async fn collect_stream<R>(
+    pipe: Option<R>,
+    step_name: String,
+    is_stderr: bool,
+    tx: Option<std::sync::mpsc::Sender<StreamEvent>>,
+) -> Vec<String>
+where
+    R: tokio::io::AsyncRead + Unpin + Send + 'static,
+{
+    use tokio::io::{AsyncBufReadExt, BufReader};
+    let mut collected: Vec<String> = Vec::new();
+    if let Some(pipe) = pipe {
+        let reader = BufReader::new(pipe);
+        let mut lines = reader.lines();
+        while let Ok(Some(line)) = lines.next_line().await {
+            if let Some(ref tx) = tx {
+                let _ = tx.send(StreamEvent::StepOutput {
+                    name: step_name.clone(),
+                    line: line.clone(),
+                    is_stderr,
+                });
+            }
+            if collected.len() < STEP_OUTPUT_LINE_CAP {
+                collected.push(line);
+            } else if collected.len() == STEP_OUTPUT_LINE_CAP {
+                let stream = if is_stderr { "stderr" } else { "stdout" };
+                tracing::warn!(step = %step_name, "{stream} exceeded {STEP_OUTPUT_LINE_CAP} lines; dropping further lines from log buffer");
+            }
+        }
+    }
+    collected
+}
+
 /// In agent mode, emit a single `StepOutput` event with the last
 /// [`AGENT_FAILURE_EXCERPT_LINES`] lines of stderr so the agent can diagnose
 /// the failure without receiving every output line.
@@ -508,61 +541,16 @@ async fn run_command(
         }
     };
 
-    use tokio::io::{AsyncBufReadExt, BufReader};
-
     let stdout = child.stdout.take();
     let stderr = child.stderr.take();
 
-    let name_out = step_name.to_string();
     // In agent mode we suppress StepOutput events — collect only, no send.
     let tx_out = if agent_mode { None } else { stream_tx.cloned() };
-    let stdout_handle: tokio::task::JoinHandle<Vec<String>> = tokio::spawn(async move {
-        let mut collected: Vec<String> = Vec::new();
-        if let Some(stdout) = stdout {
-            let reader = BufReader::new(stdout);
-            let mut lines = reader.lines();
-            while let Ok(Some(line)) = lines.next_line().await {
-                if let Some(ref tx) = tx_out {
-                    let _ = tx.send(StreamEvent::StepOutput {
-                        name: name_out.clone(),
-                        line: line.clone(),
-                        is_stderr: false,
-                    });
-                }
-                if collected.len() < STEP_OUTPUT_LINE_CAP {
-                    collected.push(line);
-                } else if collected.len() == STEP_OUTPUT_LINE_CAP {
-                    tracing::warn!(step = %name_out, "stdout exceeded {STEP_OUTPUT_LINE_CAP} lines; dropping further lines from log buffer");
-                }
-            }
-        }
-        collected
-    });
-
-    let name_err = step_name.to_string();
     let tx_err = if agent_mode { None } else { stream_tx.cloned() };
-    let stderr_handle: tokio::task::JoinHandle<Vec<String>> = tokio::spawn(async move {
-        let mut collected: Vec<String> = Vec::new();
-        if let Some(stderr) = stderr {
-            let reader = BufReader::new(stderr);
-            let mut lines = reader.lines();
-            while let Ok(Some(line)) = lines.next_line().await {
-                if let Some(ref tx) = tx_err {
-                    let _ = tx.send(StreamEvent::StepOutput {
-                        name: name_err.clone(),
-                        line: line.clone(),
-                        is_stderr: true,
-                    });
-                }
-                if collected.len() < STEP_OUTPUT_LINE_CAP {
-                    collected.push(line);
-                } else if collected.len() == STEP_OUTPUT_LINE_CAP {
-                    tracing::warn!(step = %name_err, "stderr exceeded {STEP_OUTPUT_LINE_CAP} lines; dropping further lines from log buffer");
-                }
-            }
-        }
-        collected
-    });
+    let stdout_handle: tokio::task::JoinHandle<Vec<String>> =
+        tokio::spawn(collect_stream(stdout, step_name.to_string(), false, tx_out));
+    let stderr_handle: tokio::task::JoinHandle<Vec<String>> =
+        tokio::spawn(collect_stream(stderr, step_name.to_string(), true, tx_err));
 
     let exit_result = if let Some(timeout_sec) = step.timeout_sec {
         let timeout = std::time::Duration::from_secs(timeout_sec);

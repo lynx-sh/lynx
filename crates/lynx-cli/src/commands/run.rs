@@ -110,17 +110,6 @@ pub async fn run(args: RunArgs) -> Result<()> {
 
     if lynx_tui::workflow::should_use_tui() {
         let (exec_tx, exec_rx) = std::sync::mpsc::channel();
-        let (tui_tx, tui_rx) = std::sync::mpsc::channel();
-
-        // Bridge executor events → TUI events on a background thread.
-        std::thread::spawn(move || {
-            while let Ok(ev) = exec_rx.recv() {
-                let tui_ev = map_stream_to_tui(ev);
-                if tui_tx.send(tui_ev).is_err() {
-                    break;
-                }
-            }
-        });
 
         // Spawn the executor on a background task.
         let wf_clone = wf.clone();
@@ -136,12 +125,12 @@ pub async fn run(args: RunArgs) -> Result<()> {
             .await
         });
 
-        // Run TUI (blocks until user exits).
+        // Run TUI (blocks until user exits). Pass the executor receiver directly.
         let tui_colors = super::tui_colors();
         let action = lynx_tui::workflow::run_workflow_tui(
             &wf.workflow.name,
             &step_names,
-            tui_rx,
+            exec_rx,
             &tui_colors,
         )?;
 
@@ -228,51 +217,6 @@ impl lynx_tui::ListItem for WorkflowListEntry {
     }
     fn category(&self) -> Option<&str> {
         Some("workflow")
-    }
-}
-
-/// Map executor StreamEvent to TUI WorkflowEvent.
-fn map_stream_to_tui(
-    ev: lynx_workflow::executor::StreamEvent,
-) -> lynx_tui::workflow::WorkflowEvent {
-    use lynx_tui::workflow::{WorkflowEvent, WorkflowStepStatus};
-    use lynx_workflow::executor::{StepStatus, StreamEvent};
-
-    match ev {
-        StreamEvent::StepStarted { name } => WorkflowEvent::StepStarted { name },
-        StreamEvent::StepOutput {
-            name,
-            line,
-            is_stderr,
-        } => WorkflowEvent::StepOutput {
-            name,
-            line,
-            is_stderr,
-        },
-        StreamEvent::StepFinished {
-            name,
-            status,
-            duration_ms,
-        } => {
-            let tui_status = match status {
-                StepStatus::Passed => WorkflowStepStatus::Passed,
-                StepStatus::Failed => WorkflowStepStatus::Failed,
-                StepStatus::Skipped => WorkflowStepStatus::Skipped,
-                StepStatus::TimedOut => WorkflowStepStatus::TimedOut,
-            };
-            WorkflowEvent::StepFinished {
-                name,
-                status: tui_status,
-                duration_ms,
-            }
-        }
-        StreamEvent::Done {
-            success,
-            duration_ms,
-        } => WorkflowEvent::Done {
-            success,
-            duration_ms,
-        },
     }
 }
 
@@ -382,74 +326,6 @@ mod tests {
         assert_eq!(entry.subtitle(), "Deploy to prod");
         assert!(entry.detail().contains("lx run deploy"));
         assert_eq!(entry.category(), Some("workflow"));
-    }
-
-    #[test]
-    fn map_stream_to_tui_step_started() {
-        use lynx_workflow::executor::StreamEvent;
-        let ev = StreamEvent::StepStarted {
-            name: "lint".to_string(),
-        };
-        let tui_ev = map_stream_to_tui(ev);
-        assert!(
-            matches!(tui_ev, lynx_tui::workflow::WorkflowEvent::StepStarted { name } if name == "lint")
-        );
-    }
-
-    #[test]
-    fn map_stream_to_tui_step_output() {
-        use lynx_workflow::executor::StreamEvent;
-        let ev = StreamEvent::StepOutput {
-            name: "test".to_string(),
-            line: "ok".to_string(),
-            is_stderr: false,
-        };
-        let tui_ev = map_stream_to_tui(ev);
-        assert!(matches!(
-            tui_ev,
-            lynx_tui::workflow::WorkflowEvent::StepOutput { .. }
-        ));
-    }
-
-    #[test]
-    fn map_stream_to_tui_step_finished_all_statuses() {
-        use lynx_tui::workflow::{WorkflowEvent, WorkflowStepStatus};
-        use lynx_workflow::executor::{StepStatus, StreamEvent};
-
-        for (input, expected) in [
-            (StepStatus::Passed, WorkflowStepStatus::Passed),
-            (StepStatus::Failed, WorkflowStepStatus::Failed),
-            (StepStatus::Skipped, WorkflowStepStatus::Skipped),
-            (StepStatus::TimedOut, WorkflowStepStatus::TimedOut),
-        ] {
-            let ev = StreamEvent::StepFinished {
-                name: "s".to_string(),
-                status: input,
-                duration_ms: 100,
-            };
-            let tui_ev = map_stream_to_tui(ev);
-            match tui_ev {
-                WorkflowEvent::StepFinished { status, .. } => assert_eq!(status, expected),
-                _ => panic!("expected StepFinished"),
-            }
-        }
-    }
-
-    #[test]
-    fn map_stream_to_tui_done() {
-        use lynx_workflow::executor::StreamEvent;
-        let ev = StreamEvent::Done {
-            success: true,
-            duration_ms: 500,
-        };
-        let tui_ev = map_stream_to_tui(ev);
-        assert!(matches!(
-            tui_ev,
-            lynx_tui::workflow::WorkflowEvent::Done {
-                success: true,
-                duration_ms: 500
-            }
-        ));
     }
 
     #[test]
