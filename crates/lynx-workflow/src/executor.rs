@@ -592,7 +592,13 @@ async fn run_command(
                         is_stderr: true,
                     });
                 }
-                Err(())
+                // Abort reader tasks immediately — the child may have forked
+                // subprocesses (e.g. `sh -c "sleep 60"`) that still hold the
+                // pipe write-end open, which would block await for the full
+                // child lifetime.
+                stdout_handle.abort();
+                stderr_handle.abort();
+                return Err(());
             }
         }
     } else {
