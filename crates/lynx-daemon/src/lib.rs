@@ -63,6 +63,7 @@ mod tests {
         assert_ne!(ServiceStatus::Running, ServiceStatus::Stopped);
     }
 
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
     #[test]
     fn platform_backend_returns_backend() {
         // Should not panic on supported platforms

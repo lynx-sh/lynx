@@ -140,6 +140,7 @@ mod tests {
         assert_eq!(parsed["plugin"]["name"].as_str().unwrap(), "test-scaffold");
     }
 
+    #[cfg(unix)]
     #[test]
     fn scaffold_zsh_files_are_valid_syntax() {
         let tmp = tempfile::tempdir().unwrap();

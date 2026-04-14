@@ -229,6 +229,7 @@ mod tests {
         assert!(out.contains("_lynx_kubectl_state="));
     }
 
+    #[cfg(unix)]
     #[test]
     fn community_plugin_state_gather_is_called_and_evaled() {
         use std::fs;
@@ -325,6 +326,7 @@ gather = "sleep 1; echo \"export {cache_var}='ok'\""
         );
     }
 
+    #[cfg(unix)]
     #[test]
     fn community_plugin_state_gather_fast_path_still_returns_output() {
         use std::fs;
