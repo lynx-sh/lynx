@@ -194,7 +194,9 @@ fn maybe_show_intro(config: &lynx_config::schema::LynxConfig, context: Context) 
 fn load_plugin_manifests(plugin_dir: &str, enabled: &[String]) -> Vec<PluginManifest> {
     let mut manifests = Vec::new();
     for name in enabled {
-        let toml_path = format!("{plugin_dir}/{name}/plugin.toml");
+        let toml_path = std::path::Path::new(plugin_dir)
+            .join(name)
+            .join("plugin.toml");
         if let Ok(content) = std::fs::read_to_string(&toml_path) {
             match lynx_manifest::parse_and_validate(&content) {
                 Ok(m) => manifests.push(m),
