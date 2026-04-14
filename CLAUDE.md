@@ -57,3 +57,4 @@ bats tests/integration/shell/  # run shell integration tests
 8. LynxError for all user-facing errors (D-036)
 9. No production panics — no `.unwrap()` in non-test code unless compile-time safe
 10. Proactive issue filing — find broken code → `pt add` immediately
+11. **Push gate** — run `bash scripts/verify-guardrails.sh` AND `lx run lynx-ai-verify` before any `git push`. CI enforces the same checks and will reject branches that skip them.

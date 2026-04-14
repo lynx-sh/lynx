@@ -35,10 +35,10 @@ jobs:
       - name: Install cargo-nextest
         uses: taiki-e/install-action@cargo-nextest
 
-      - name: Install bats-core
+      - name: Install bats-core and zsh
         run: |
           sudo apt-get update -q
-          sudo apt-get install -y bats
+          sudo apt-get install -y bats zsh
 
       - name: Install ripgrep
         run: sudo apt-get install -y ripgrep

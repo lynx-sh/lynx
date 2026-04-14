@@ -51,8 +51,7 @@ async fn cmd_set(name: &str) -> Result<()> {
     })?;
 
     // Emit shell:context-changed in-process so plugin handlers fire.
-    let plugins_dir = lynx_core::paths::installed_plugins_dir();
-    let bus = crate::bus::build_active_bus(&ctx, &plugins_dir);
+    let bus = crate::bus::build_active_bus();
     let data = serde_json::json!({ "context": name }).to_string();
     bus.emit(Event::new(SHELL_CONTEXT_CHANGED, data)).await;
 

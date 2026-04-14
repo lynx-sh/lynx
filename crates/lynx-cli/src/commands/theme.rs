@@ -435,12 +435,8 @@ fn resolve_user_theme_path(theme_name: &str) -> Result<PathBuf> {
 
 async fn emit_theme_changed(name: &str) {
     use lynx_events::types::{Event, THEME_CHANGED};
-    let config = match lynx_config::load() {
-        Ok(c) => c,
-        Err(_) => return,
-    };
-    let plugins_dir = lynx_core::paths::installed_plugins_dir();
-    let bus = crate::bus::build_active_bus(&config.active_context, &plugins_dir);
+    lynx_theme::loader::invalidate_theme_cache();
+    let bus = crate::bus::build_active_bus();
     let data = serde_json::json!({ "theme": name }).to_string();
     bus.emit(Event::new(THEME_CHANGED, data)).await;
 }

@@ -115,7 +115,7 @@ pub async fn run(args: PluginArgs) -> Result<()> {
         PluginCommand::List { json } => cmd_list(json),
         PluginCommand::New { name } => scaffold::cmd_new(&name),
         PluginCommand::Reinstall { name } => registry_ops::cmd_reinstall(&name).await,
-        PluginCommand::Exec { name } => shell_glue::cmd_exec(&name).await,
+        PluginCommand::Exec { name } => shell_glue::cmd_exec(&name),
         PluginCommand::Unload { name } => shell_glue::cmd_unload(&name),
         PluginCommand::Search { query, refresh } => registry_ops::cmd_search(&query, refresh).await,
         PluginCommand::Info { name } => registry_ops::cmd_info(&name).await,

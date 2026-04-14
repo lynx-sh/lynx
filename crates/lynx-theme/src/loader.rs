@@ -1,25 +1,56 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::{OnceLock, RwLock};
 
 use lynx_core::error::{LynxError, Result};
 use tracing::warn;
 
 use crate::schema::{Theme, KNOWN_SEGMENTS};
 
+/// Process-level theme cache. Stores the last loaded (name, Theme) pair.
+/// A name mismatch is treated as a miss — only one theme is cached at a time.
+/// Invalidated by `invalidate_theme_cache()` after any theme mutation.
+static THEME_CACHE: OnceLock<RwLock<Option<(String, Theme)>>> = OnceLock::new();
+
+fn theme_cache() -> &'static RwLock<Option<(String, Theme)>> {
+    THEME_CACHE.get_or_init(|| RwLock::new(None))
+}
+
+/// Invalidate the in-process theme cache. Must be called after any theme set/edit.
+pub fn invalidate_theme_cache() {
+    if let Ok(mut guard) = theme_cache().write() {
+        *guard = None;
+    }
+}
+
 /// Resolve the user theme directory: `~/.config/lynx/themes/`.
 pub fn user_theme_dir() -> PathBuf {
     lynx_core::paths::themes_dir()
 }
 
-/// Load a theme by name from the themes directory.
+/// Load a theme by name, returning a cached clone if the name matches.
+/// Falls back to disk on first call or after `invalidate_theme_cache()`.
 pub fn load(name: &str) -> Result<Theme> {
-    let path = user_theme_dir().join(format!("{name}.toml"));
-    if path.exists() {
-        return load_from_path(&path);
+    // Fast path: return cached value if name matches.
+    if let Ok(guard) = theme_cache().read() {
+        if let Some((cached_name, cached_theme)) = guard.as_ref() {
+            if cached_name == name {
+                return Ok(cached_theme.clone());
+            }
+        }
     }
-    Err(LynxError::Theme(format!(
-        "theme '{name}' not found — run `lx setup` to set up default themes"
-    )))
+    // Slow path: read from disk, populate cache.
+    let path = user_theme_dir().join(format!("{name}.toml"));
+    if !path.exists() {
+        return Err(LynxError::Theme(format!(
+            "theme '{name}' not found — run `lx setup` to set up default themes"
+        )));
+    }
+    let theme = load_from_path(&path)?;
+    if let Ok(mut guard) = theme_cache().write() {
+        *guard = Some((name.to_string(), theme.clone()));
+    }
+    Ok(theme)
 }
 
 /// Load a theme from an explicit file path.
@@ -131,7 +162,10 @@ fn validate_segment_names(theme: &Theme, name: &str) {
         .left
         .order
         .iter()
-        .chain(theme.segments.right.order.iter());
+        .chain(theme.segments.right.order.iter())
+        .chain(theme.segments.top.order.iter())
+        .chain(theme.segments.top_right.order.iter())
+        .chain(theme.segments.continuation.order.iter());
 
     for seg in all_segments {
         if !KNOWN_SEGMENTS.contains(&seg.as_str()) && !seg.starts_with("custom_") {
@@ -226,6 +260,21 @@ order = []
     #[test]
     fn nonexistent_theme_errors() {
         assert!(load("does_not_exist_xyz").is_err());
+    }
+
+    #[test]
+    fn invalidate_theme_cache_clears_cached_entry() {
+        let theme = parse_and_validate(
+            "[meta]\nname=\"t\"\n[segments.left]\norder=[]\n[segments.right]\norder=[]",
+            "t",
+        )
+        .unwrap();
+        if let Ok(mut guard) = theme_cache().write() {
+            *guard = Some(("test-theme".to_string(), theme));
+        }
+        assert!(theme_cache().read().unwrap().is_some());
+        invalidate_theme_cache();
+        assert!(theme_cache().read().unwrap().is_none());
     }
 
     #[test]

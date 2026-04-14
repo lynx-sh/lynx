@@ -87,4 +87,7 @@ pub enum Command {
     Path(crate::commands::path::PathArgs),
     /// Generate shell tab-completion scripts
     Completions(crate::commands::completions::CompletionsArgs),
+    /// [internal] Display a shell eval error via LynxError — called by eval-bridge
+    #[command(name = "shell-error", hide = true)]
+    ShellError(crate::commands::shell_error::ShellErrorArgs),
 }

@@ -39,9 +39,7 @@ pub enum EventCommand {
 pub async fn run(args: EventArgs) -> Result<()> {
     match args.command {
         EventCommand::Emit { name, data } => {
-            let config = lynx_config::load()?;
-            let plugins_dir = lynx_core::paths::installed_plugins_dir();
-            let bus = crate::bus::build_active_bus(&config.active_context, &plugins_dir);
+            let bus = crate::bus::build_active_bus();
             bus.emit(Event::new(name, data)).await;
         }
         EventCommand::Log { tail, filter } => {

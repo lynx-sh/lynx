@@ -7,14 +7,6 @@ use lynx_prompt::{
     evaluator::evaluate_theme,
     renderer::{render_prompt, render_transient_prompt},
     segment::RenderContext,
-    AwsProfileSegment, BackgroundJobsSegment, BatterySegment, CmdDurationSegment, CondaEnvSegment,
-    ContextBadgeSegment, CustomSegment, DirSegment, DockerSegment, ExitCodeSegment, GcpSegment,
-    GitActionSegment, GitAheadBehindSegment, GitBranchSegment, GitShaSegment, GitStashSegment,
-    GitStatusSegment, GitTimeSinceCommitSegment, GolangVersionSegment, HistNumberSegment,
-    HostnameSegment, KubectlContextSegment, LangVersionSegment, NewlineSegment, NodeVersionSegment,
-    OsSegment, PromptCharSegment, RubyVersionSegment, RustVersionSegment, ShellSegment,
-    SshIndicatorSegment, TaskStatusSegment, TerraformSegment, TextSegment, TimeSegment,
-    UsernameSegment, VenvSegment, ViModeSegment,
 };
 use lynx_theme::loader::load as load_theme;
 use std::collections::HashMap;
@@ -45,16 +37,6 @@ pub async fn run(args: PromptArgs) -> Result<()> {
 async fn cmd_render(transient: bool) -> Result<()> {
     let ctx = build_render_context_from_env();
 
-    // Run in-process plugin lifecycle and emit shell:precmd so plugin handlers
-    // fire before the prompt is built. Bus is discarded when this fn returns.
-    let plugins_dir = lynx_core::paths::installed_plugins_dir();
-    let bus = crate::bus::build_active_bus(&ctx.shell_context, &plugins_dir);
-    bus.emit(lynx_events::types::Event::new(
-        lynx_events::types::SHELL_PRECMD,
-        &ctx.cwd,
-    ))
-    .await;
-
     // --- Load theme ---
     // Priority: LYNX_THEME env var (runtime override) → config.active_theme
     // (user's configured choice) → brand::DEFAULT_THEME (last-resort fallback).
@@ -75,46 +57,7 @@ async fn cmd_render(transient: bool) -> Result<()> {
     };
 
     // --- Build segment registry ---
-    let segments: Vec<Box<dyn lynx_prompt::segment::Segment>> = vec![
-        Box::new(UsernameSegment),
-        Box::new(HostnameSegment),
-        Box::new(SshIndicatorSegment),
-        Box::new(DirSegment),
-        Box::new(GitBranchSegment),
-        Box::new(GitStatusSegment),
-        Box::new(GitActionSegment),
-        Box::new(GitAheadBehindSegment),
-        Box::new(GitShaSegment),
-        Box::new(GitStashSegment),
-        Box::new(GitTimeSinceCommitSegment),
-        Box::new(AwsProfileSegment),
-        Box::new(BatterySegment),
-        Box::new(DockerSegment),
-        Box::new(GcpSegment),
-        Box::new(HistNumberSegment),
-        Box::new(KubectlContextSegment),
-        Box::new(NodeVersionSegment),
-        Box::new(RubyVersionSegment),
-        Box::new(GolangVersionSegment),
-        Box::new(RustVersionSegment),
-        Box::new(LangVersionSegment),
-        Box::new(VenvSegment),
-        Box::new(CondaEnvSegment),
-        Box::new(TaskStatusSegment),
-        Box::new(CmdDurationSegment),
-        Box::new(ExitCodeSegment),
-        Box::new(BackgroundJobsSegment),
-        Box::new(ViModeSegment),
-        Box::new(CustomSegment),
-        Box::new(TimeSegment),
-        Box::new(ContextBadgeSegment),
-        Box::new(NewlineSegment),
-        Box::new(OsSegment),
-        Box::new(PromptCharSegment),
-        Box::new(ShellSegment),
-        Box::new(TerraformSegment),
-        Box::new(TextSegment),
-    ];
+    let segments = lynx_prompt::all_segments();
 
     // --- Evaluate and render ---
     let theme_ref = &theme;

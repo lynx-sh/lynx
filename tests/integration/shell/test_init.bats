@@ -26,7 +26,11 @@ teardown() {
 @test "lx init does not auto-start daemon (daemon is opt-in)" {
   run lx init --context interactive
   [ "$status" -eq 0 ]
-  [[ "$output" != *"lx daemon"* ]]
+  # Must not invoke lx daemon directly — bare wrapper definitions are allowed,
+  # but calling lx daemon start/stop/status at init time is forbidden (D-012).
+  [[ "$output" != *"lx daemon start"* ]]
+  [[ "$output" != *"lx daemon stop"* ]]
+  [[ "$output" != *"lx daemon status"* ]]
 }
 
 @test "agent context detected from CLAUDE_CODE env var" {
@@ -49,11 +53,13 @@ teardown() {
 
 @test "thin shell files have no branching keywords" {
   local loader="$BATS_TEST_DIRNAME/../../../shell/core/loader.zsh"
-  local bridge="$BATS_TEST_DIRNAME/../../../shell/lib/eval-bridge.zsh"
   local atuin="$BATS_TEST_DIRNAME/../../../plugins/atuin/shell/init.zsh"
   local pattern='(^|[[:space:]])(if|for|while|case)([[:space:]]|$)'
 
-  run rg -n "$pattern" "$loader" "$bridge" "$atuin"
+  # eval-bridge.zsh is excluded: it has a documented D-001 exception for the
+  # eval stderr trap (see shell-protocol.md). The trap is I/O plumbing only —
+  # all error formatting is delegated to `lx shell-error` (Rust/LynxError::Shell).
+  run rg -n "$pattern" "$loader" "$atuin"
   [ "$status" -eq 1 ]
 }
 

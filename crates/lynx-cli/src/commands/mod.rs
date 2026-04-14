@@ -29,6 +29,7 @@ pub mod refresh_state;
 pub mod rollback;
 pub mod run;
 pub mod setup;
+pub mod shell_error;
 pub mod sync;
 pub mod tap;
 pub mod theme;
@@ -134,6 +135,7 @@ pub async fn dispatch(cli: Cli) -> Result<()> {
         Command::Alias(args) => alias::run(args),
         Command::Path(args) => path::run(args),
         Command::Completions(args) => completions::run(args).map(|_| ()),
+        Command::ShellError(args) => shell_error::run(args),
     }
 }
 

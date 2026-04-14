@@ -52,7 +52,6 @@ done < <(find "$REPO_ROOT/plugins" -name "init.zsh" -print0)
 BRANCH_PATTERN='(^|[[:space:]])(if|for|while|case)([[:space:]]|$)'
 THIN_FILES=(
   "$REPO_ROOT/shell/core/loader.zsh"
-  "$REPO_ROOT/shell/lib/eval-bridge.zsh"
 )
 while IFS= read -r -d '' f; do THIN_FILES+=("$f"); done \
   < <(find "$REPO_ROOT/plugins" -name "init.zsh" -print0)
