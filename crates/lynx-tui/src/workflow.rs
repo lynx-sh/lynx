@@ -8,70 +8,35 @@ use std::io;
 use std::sync::mpsc;
 use std::time::Duration;
 
-use crossterm::{
-    event::{
-        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind, KeyModifiers,
-        MouseEventKind,
-    },
-    terminal::{self, EnterAlternateScreen, LeaveAlternateScreen},
-    ExecutableCommand,
-};
+use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers, MouseEventKind};
 use ratatui::{
     prelude::*,
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
 };
 
 use crate::item::TuiColors;
+use lynx_workflow::executor::{StepStatus, StreamEvent};
 
 // ── Public types ───────────────────────────────────────────────────────────
 
-/// Events sent from the executor to the TUI.
-#[derive(Debug, Clone)]
-pub enum WorkflowEvent {
-    /// A step has started executing.
-    StepStarted { name: String },
-    /// A line of output from a step.
-    StepOutput {
-        name: String,
-        line: String,
-        is_stderr: bool,
-    },
-    /// A step has finished.
-    StepFinished {
-        name: String,
-        status: StepStepStatus,
-        duration_ms: u64,
-    },
-    /// The entire workflow is done.
-    Done { success: bool, duration_ms: u64 },
-}
-
-/// Step status for the TUI (mirrors executor::StepStatus without coupling).
+/// TUI-local step display phase — tracks in-flight state the executor's
+/// `StepStatus` doesn't model (executor only has terminal states).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum WorkflowStepStatus {
+enum TuiStepPhase {
     Pending,
     Running,
-    Passed,
-    Failed,
-    Skipped,
-    TimedOut,
+    Done(StepStatus),
 }
 
-impl WorkflowStepStatus {
-    /// Unicode icon representing this status.
-    pub fn icon(&self) -> &'static str {
+impl TuiStepPhase {
+    fn icon(&self) -> &'static str {
         match self {
-            WorkflowStepStatus::Passed => "\u{2713}",   // ✓
-            WorkflowStepStatus::Failed => "\u{2717}",   // ✗
-            WorkflowStepStatus::Skipped => "\u{2014}",  // —
-            WorkflowStepStatus::TimedOut => "\u{23f0}", // ⏰
-            WorkflowStepStatus::Pending | WorkflowStepStatus::Running => "",
+            TuiStepPhase::Pending => "\u{25cb}",  // ○
+            TuiStepPhase::Running => "\u{25cf}",  // ●
+            TuiStepPhase::Done(s) => s.icon(),
         }
     }
 }
-
-// Keep a short alias for the enum used in events.
-pub type StepStepStatus = WorkflowStepStatus;
 
 /// What the user chose to do.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -88,7 +53,7 @@ pub enum WorkflowAction {
 
 struct StepState {
     name: String,
-    status: WorkflowStepStatus,
+    phase: TuiStepPhase,
     duration_ms: Option<u64>,
 }
 
@@ -125,7 +90,7 @@ impl TuiState {
             .iter()
             .map(|name| StepState {
                 name: name.clone(),
-                status: WorkflowStepStatus::Pending,
+                phase: TuiStepPhase::Pending,
                 duration_ms: None,
             })
             .collect();
@@ -147,15 +112,15 @@ impl TuiState {
         }
     }
 
-    fn handle_event(&mut self, event: WorkflowEvent) {
+    fn handle_event(&mut self, event: StreamEvent) {
         match event {
-            WorkflowEvent::StepStarted { name } => {
+            StreamEvent::StepStarted { name } => {
                 // Auto-advance the step list selection to the running step.
                 if let Some(idx) = self.steps.iter().position(|s| s.name == name) {
                     self.list_state.select(Some(idx));
                 }
                 if let Some(s) = self.steps.iter_mut().find(|s| s.name == name) {
-                    s.status = WorkflowStepStatus::Running;
+                    s.phase = TuiStepPhase::Running;
                 }
                 // Add a visible separator so every step is clearly visible in output.
                 self.output_lines.push(OutputLine {
@@ -172,7 +137,7 @@ impl TuiState {
                     self.scroll_to_bottom();
                 }
             }
-            WorkflowEvent::StepOutput {
+            StreamEvent::StepOutput {
                 name,
                 line,
                 is_stderr,
@@ -187,7 +152,7 @@ impl TuiState {
                     self.scroll_to_bottom();
                 }
             }
-            WorkflowEvent::StepFinished {
+            StreamEvent::StepFinished {
                 name,
                 status,
                 duration_ms,
@@ -200,14 +165,14 @@ impl TuiState {
                     is_stderr: false,
                 });
                 if let Some(s) = self.steps.iter_mut().find(|s| s.name == name) {
-                    s.status = status;
+                    s.phase = TuiStepPhase::Done(status);
                     s.duration_ms = Some(duration_ms);
                 }
                 if self.auto_scroll {
                     self.scroll_to_bottom();
                 }
             }
-            WorkflowEvent::Done {
+            StreamEvent::Done {
                 success,
                 duration_ms,
             } => {
@@ -227,7 +192,7 @@ impl TuiState {
                     is_stderr: false,
                 });
                 for s in &self.steps {
-                    let icon = if s.status.icon().is_empty() { "\u{25cb}" } else { s.status.icon() };
+                    let icon = s.phase.icon();
                     let dur = s
                         .duration_ms
                         .map(|ms| format!(" ({ms}ms)"))
@@ -235,7 +200,7 @@ impl TuiState {
                     self.output_lines.push(OutputLine {
                         step_name: "workflow".to_string(),
                         text: format!("  {icon} {}{dur}", s.name),
-                        is_stderr: s.status == WorkflowStepStatus::Failed,
+                        is_stderr: s.phase == TuiStepPhase::Done(StepStatus::Failed),
                     });
                 }
                 let total_icon = if success { "\u{2713}" } else { "\u{2717}" };
@@ -307,29 +272,12 @@ impl TuiState {
 pub fn run_workflow_tui(
     workflow_name: &str,
     step_names: &[String],
-    rx: mpsc::Receiver<WorkflowEvent>,
+    rx: mpsc::Receiver<StreamEvent>,
     colors: &TuiColors,
 ) -> io::Result<WorkflowAction> {
-    terminal::enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    stdout.execute(EnterAlternateScreen)?;
-    stdout.execute(EnableMouseCapture)?;
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
-
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        event_loop(&mut terminal, workflow_name, step_names, rx, colors)
-    }));
-
-    terminal::disable_raw_mode()?;
-    terminal.backend_mut().execute(DisableMouseCapture)?;
-    terminal.backend_mut().execute(LeaveAlternateScreen)?;
-    terminal.show_cursor()?;
-
-    match result {
-        Ok(inner) => inner,
-        Err(panic) => std::panic::resume_unwind(panic),
-    }
+    crate::terminal::with_terminal(|terminal| {
+        event_loop(terminal, workflow_name, step_names, rx, colors)
+    })
 }
 
 /// Check if we should use the workflow TUI.
@@ -347,7 +295,7 @@ fn event_loop(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
     workflow_name: &str,
     step_names: &[String],
-    rx: mpsc::Receiver<WorkflowEvent>,
+    rx: mpsc::Receiver<StreamEvent>,
     colors: &TuiColors,
 ) -> io::Result<WorkflowAction> {
     let mut state = TuiState::new(step_names);
@@ -490,18 +438,15 @@ fn render_steps(
             let is_selected = state.list_state.selected() == Some(i);
             let is_filtered = state.filter_step.as_ref() == Some(&step.name);
 
-            let icon_color = match step.status {
-                WorkflowStepStatus::Pending | WorkflowStepStatus::Skipped => colors.muted,
-                WorkflowStepStatus::Running => colors.accent,
-                WorkflowStepStatus::Passed => colors.success,
-                WorkflowStepStatus::Failed => colors.error,
-                WorkflowStepStatus::TimedOut => colors.warning,
+            let icon_color = match &step.phase {
+                TuiStepPhase::Pending => colors.muted,
+                TuiStepPhase::Running => colors.accent,
+                TuiStepPhase::Done(StepStatus::Passed) => colors.success,
+                TuiStepPhase::Done(StepStatus::Failed) => colors.error,
+                TuiStepPhase::Done(StepStatus::Skipped) => colors.muted,
+                TuiStepPhase::Done(StepStatus::TimedOut) => colors.warning,
             };
-            let icon = match step.status {
-                WorkflowStepStatus::Pending => "\u{25cb}", // ○
-                WorkflowStepStatus::Running => "\u{25cf}", // ●
-                _ => step.status.icon(),
-            };
+            let icon = step.phase.icon();
 
             let duration = step
                 .duration_ms
@@ -509,13 +454,13 @@ fn render_steps(
                 .unwrap_or_default();
 
             // Name color reflects status; selected gets bold.
-            let status_color = match step.status {
-                WorkflowStepStatus::Pending => None, // default terminal color
-                WorkflowStepStatus::Running => Some(colors.accent),
-                WorkflowStepStatus::Passed => Some(colors.success),
-                WorkflowStepStatus::Failed => Some(colors.error),
-                WorkflowStepStatus::Skipped => Some(colors.muted),
-                WorkflowStepStatus::TimedOut => Some(colors.warning),
+            let status_color = match &step.phase {
+                TuiStepPhase::Pending => None, // default terminal color
+                TuiStepPhase::Running => Some(colors.accent),
+                TuiStepPhase::Done(StepStatus::Passed) => Some(colors.success),
+                TuiStepPhase::Done(StepStatus::Failed) => Some(colors.error),
+                TuiStepPhase::Done(StepStatus::Skipped) => Some(colors.muted),
+                TuiStepPhase::Done(StepStatus::TimedOut) => Some(colors.warning),
             };
 
             let name_style = if is_selected {
@@ -546,15 +491,7 @@ fn render_steps(
     let completed = state
         .steps
         .iter()
-        .filter(|s| {
-            matches!(
-                s.status,
-                WorkflowStepStatus::Passed
-                    | WorkflowStepStatus::Failed
-                    | WorkflowStepStatus::Skipped
-                    | WorkflowStepStatus::TimedOut
-            )
-        })
+        .filter(|s| matches!(s.phase, TuiStepPhase::Done(_)))
         .count();
 
     let title = format!(" {workflow_name} ({completed}/{}) ", state.steps.len());
@@ -675,7 +612,7 @@ fn render_status_bar(frame: &mut Frame, area: Rect, colors: &TuiColors, state: &
         let running = state
             .steps
             .iter()
-            .filter(|s| s.status == WorkflowStepStatus::Running)
+            .filter(|s| s.phase == TuiStepPhase::Running)
             .count();
 
         Line::from(vec![

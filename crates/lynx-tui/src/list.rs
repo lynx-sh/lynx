@@ -5,13 +5,7 @@
 
 use std::io;
 
-use crossterm::{
-    event::{
-        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind, KeyModifiers,
-    },
-    terminal::{self, EnterAlternateScreen, LeaveAlternateScreen},
-    ExecutableCommand,
-};
+use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use ratatui::{
     prelude::*,
     widgets::{Block, Borders, List as RatatuiList, ListItem as RatatuiListItem, ListState},
@@ -135,26 +129,7 @@ pub fn run<T: ListItem>(items: &[T], title: &str, colors: &TuiColors) -> io::Res
         return Ok(ListResult::Cancelled);
     }
 
-    terminal::enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    stdout.execute(EnterAlternateScreen)?;
-    stdout.execute(EnableMouseCapture)?;
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
-
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        event_loop(&mut terminal, items, title, colors)
-    }));
-
-    terminal::disable_raw_mode()?;
-    terminal.backend_mut().execute(DisableMouseCapture)?;
-    terminal.backend_mut().execute(LeaveAlternateScreen)?;
-    terminal.show_cursor()?;
-
-    match result {
-        Ok(inner) => inner,
-        Err(panic) => std::panic::resume_unwind(panic),
-    }
+    crate::terminal::with_terminal(|terminal| event_loop(terminal, items, title, colors))
 }
 
 /// Core event loop: render + handle input.
@@ -499,26 +474,9 @@ pub fn run_multi<T: ListItem>(
         return Ok(vec![]);
     }
 
-    terminal::enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    stdout.execute(EnterAlternateScreen)?;
-    stdout.execute(EnableMouseCapture)?;
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
-
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        multi_event_loop(&mut terminal, items, title, colors, preselected)
-    }));
-
-    terminal::disable_raw_mode()?;
-    terminal.backend_mut().execute(DisableMouseCapture)?;
-    terminal.backend_mut().execute(LeaveAlternateScreen)?;
-    terminal.show_cursor()?;
-
-    match result {
-        Ok(inner) => inner,
-        Err(panic) => std::panic::resume_unwind(panic),
-    }
+    crate::terminal::with_terminal(|terminal| {
+        multi_event_loop(terminal, items, title, colors, preselected)
+    })
 }
 
 fn multi_event_loop<T: ListItem>(
@@ -736,7 +694,7 @@ mod multi_tests {
         let items = vec![Item("a".into(), false)];
         let colors = TuiColors::default();
         let result = show_multi(&items, "Test", &colors, &[]).unwrap();
-        assert_eq!(result, vec![]);
+        assert_eq!(result, Vec::<usize>::new());
     }
 }
 

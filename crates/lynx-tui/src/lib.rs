@@ -18,6 +18,7 @@ mod item;
 mod list;
 pub mod onboard;
 mod preview;
+pub(crate) mod terminal;
 pub mod workflow;
 
 pub use item::{ListAction, ListItem, TuiColors};
