@@ -162,7 +162,10 @@ fn validate_segment_names(theme: &Theme, name: &str) {
         .left
         .order
         .iter()
-        .chain(theme.segments.right.order.iter());
+        .chain(theme.segments.right.order.iter())
+        .chain(theme.segments.top.order.iter())
+        .chain(theme.segments.top_right.order.iter())
+        .chain(theme.segments.continuation.order.iter());
 
     for seg in all_segments {
         if !KNOWN_SEGMENTS.contains(&seg.as_str()) && !seg.starts_with("custom_") {
