@@ -25,6 +25,19 @@ async fn main() -> Result<()> {
     let tasks = load_tasks_safe(&tasks_path);
     let scheduler_handle = Arc::new(Mutex::new(Some(run_scheduler(tasks, log_dir.clone()))));
 
+    shutdown_loop(&pid_path, &tasks_path, &log_dir, scheduler_handle).await?;
+
+    info!("lynx-daemon stopped");
+    Ok(())
+}
+
+#[cfg(unix)]
+async fn shutdown_loop(
+    pid_path: &std::path::Path,
+    tasks_path: &std::path::Path,
+    log_dir: &std::path::Path,
+    scheduler_handle: Arc<Mutex<Option<lynx_task::SchedulerHandle>>>,
+) -> Result<()> {
     let mut sigterm = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
     let mut sighup = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::hangup())?;
 
@@ -35,22 +48,33 @@ async fn main() -> Result<()> {
                 if let Ok(mut guard) = scheduler_handle.lock() {
                     *guard = None;
                 }
-                let _ = std::fs::remove_file(&pid_path);
+                let _ = std::fs::remove_file(pid_path);
                 break;
             }
-
             _ = sighup.recv() => {
                 info!("SIGHUP received — reloading tasks");
-                let new_tasks = load_tasks_safe(&tasks_path);
+                let new_tasks = load_tasks_safe(tasks_path);
                 if let Ok(mut guard) = scheduler_handle.lock() {
-                    *guard = Some(run_scheduler(new_tasks, log_dir.clone()));
+                    *guard = Some(run_scheduler(new_tasks, log_dir.to_path_buf()));
                 }
                 info!("tasks reloaded");
             }
         }
     }
+    Ok(())
+}
 
-    info!("lynx-daemon stopped");
+#[cfg(not(unix))]
+async fn shutdown_loop(
+    pid_path: &std::path::Path,
+    _tasks_path: &std::path::Path,
+    _log_dir: &std::path::Path,
+    _scheduler_handle: Arc<Mutex<Option<lynx_task::SchedulerHandle>>>,
+) -> Result<()> {
+    // On non-Unix platforms (Windows), wait for a Ctrl-C signal only.
+    tokio::signal::ctrl_c().await?;
+    info!("Ctrl-C received — shutting down");
+    let _ = std::fs::remove_file(pid_path);
     Ok(())
 }
 
