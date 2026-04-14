@@ -78,7 +78,7 @@ jobs:
         run: echo "${{ github.workspace }}/target/debug" >> "$GITHUB_PATH"
 
       - name: Rust tests (all crates)
-        run: cargo nextest run --all
+        run: cargo nextest run --all --no-fail-fast
 
       - name: Shell integration tests (bats)
         run: bats tests/integration/shell/
@@ -114,4 +114,4 @@ jobs:
         run: cargo build --all
 
       - name: Rust tests (all crates)
-        run: cargo nextest run --all
+        run: cargo nextest run --all --no-fail-fast
